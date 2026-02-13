@@ -24,6 +24,7 @@ private enum FormField: Hashable {
     case resolutionNotes(UUID)
     case materialName(UUID)
     case materialQuantity(UUID)
+    case materialCost(UUID)
     case newSpotTitle
 }
 
@@ -162,9 +163,11 @@ struct NewFormView: View {
     // MARK: - Issue Photos Section (Audit)
 
     private var issuePhotosSection: some View {
-        ForEach(Array(form.issuePhotos.enumerated()), id: \.element.id) { index, _ in
+        let allPhotos = form.spots.flatMap { $0.issuePhotos }
+        return ForEach(Array(allPhotos.enumerated()), id: \.element.id) { index, photo in
             IssuePhotoCard(
-                issuePhoto: $form.issuePhotos[index],
+                issuePhoto: issuePhotoBinding(photoId: photo.id),
+                currentSpotId: spotIdForIssuePhoto(photo.id),
                 spots: localSpots,
                 number: index + 1,
                 store: store,
@@ -173,9 +176,12 @@ struct NewFormView: View {
                     pendingSpotCallback = callback
                     showNewSpotSheet = true
                 },
+                onChangeSpot: { newSpotId in
+                    moveIssuePhoto(photo.id, toSpot: newSpotId)
+                },
                 onDelete: {
                     withAnimation(FormDesign.spring) {
-                        _ = form.issuePhotos.remove(at: index)
+                        deleteIssuePhoto(photo.id)
                     }
                 }
             )
@@ -188,8 +194,16 @@ struct NewFormView: View {
     private var addIssuePhotoButton: some View {
         Button {
             withAnimation(FormDesign.spring) {
-                let spotId = localSpots.first?.id ?? UUID()
-                form.issuePhotos.append(IssuePhoto(spotId: spotId))
+                let newPhoto = IssuePhoto()
+                if let firstSpot = localSpots.first {
+                    if let si = form.spots.firstIndex(where: { $0.id == firstSpot.id }) {
+                        form.spots[si].issuePhotos.append(newPhoto)
+                    } else {
+                        var formSpot = FormSpot(from: firstSpot)
+                        formSpot.issuePhotos.append(newPhoto)
+                        form.spots.append(formSpot)
+                    }
+                }
             }
         } label: {
             HStack(spacing: 8) {
@@ -215,12 +229,13 @@ struct NewFormView: View {
     // MARK: - Fix Photos Section (Inspection)
 
     private var fixPhotosSection: some View {
-        ForEach(Array(form.fixPhotos.enumerated()), id: \.element.id) { index, _ in
+        let allPhotos = form.spots.flatMap { $0.fixPhotos }
+        return ForEach(Array(allPhotos.enumerated()), id: \.element.id) { index, photo in
             FixPhotoCard(
-                fixPhoto: $form.fixPhotos[index],
+                fixPhoto: fixPhotoBinding(photoId: photo.id),
+                currentSpotId: spotIdForFixPhoto(photo.id),
                 spots: localSpots,
-                auditIssuePhotos: store.auditIssuePhotos,
-                allSpots: localSpots,
+                auditIssuesBySpot: auditIssuesBySpot,
                 number: index + 1,
                 store: store,
                 focusedField: $focusedField,
@@ -228,9 +243,12 @@ struct NewFormView: View {
                     pendingSpotCallback = callback
                     showNewSpotSheet = true
                 },
+                onChangeSpot: { newSpotId in
+                    moveFixPhoto(photo.id, toSpot: newSpotId)
+                },
                 onDelete: {
                     withAnimation(FormDesign.spring) {
-                        _ = form.fixPhotos.remove(at: index)
+                        deleteFixPhoto(photo.id)
                     }
                 }
             )
@@ -243,8 +261,16 @@ struct NewFormView: View {
     private var addFixPhotoButton: some View {
         Button {
             withAnimation(FormDesign.spring) {
-                let spotId = localSpots.first?.id ?? UUID()
-                form.fixPhotos.append(FixPhoto(spotId: spotId))
+                let newPhoto = FixPhoto()
+                if let firstSpot = localSpots.first {
+                    if let si = form.spots.firstIndex(where: { $0.id == firstSpot.id }) {
+                        form.spots[si].fixPhotos.append(newPhoto)
+                    } else {
+                        var formSpot = FormSpot(from: firstSpot)
+                        formSpot.fixPhotos.append(newPhoto)
+                        form.spots.append(formSpot)
+                    }
+                }
             }
         } label: {
             HStack(spacing: 8) {
@@ -434,6 +460,144 @@ struct NewFormView: View {
         .padding(.top, 4)
     }
 
+    // MARK: - FormSpot Photo Helpers
+
+    private func issuePhotoBinding(photoId: UUID) -> Binding<IssuePhoto> {
+        Binding(
+            get: {
+                for spot in form.spots {
+                    if let photo = spot.issuePhotos.first(where: { $0.id == photoId }) {
+                        return photo
+                    }
+                }
+                return IssuePhoto()
+            },
+            set: { newValue in
+                for si in form.spots.indices {
+                    if let pi = form.spots[si].issuePhotos.firstIndex(where: { $0.id == photoId }) {
+                        form.spots[si].issuePhotos[pi] = newValue
+                        return
+                    }
+                }
+            }
+        )
+    }
+
+    private func fixPhotoBinding(photoId: UUID) -> Binding<FixPhoto> {
+        Binding(
+            get: {
+                for spot in form.spots {
+                    if let photo = spot.fixPhotos.first(where: { $0.id == photoId }) {
+                        return photo
+                    }
+                }
+                return FixPhoto()
+            },
+            set: { newValue in
+                for si in form.spots.indices {
+                    if let pi = form.spots[si].fixPhotos.firstIndex(where: { $0.id == photoId }) {
+                        form.spots[si].fixPhotos[pi] = newValue
+                        return
+                    }
+                }
+            }
+        )
+    }
+
+    private func spotIdForIssuePhoto(_ photoId: UUID) -> UUID {
+        for spot in form.spots {
+            if spot.issuePhotos.contains(where: { $0.id == photoId }) {
+                return spot.id
+            }
+        }
+        return UUID()
+    }
+
+    private func spotIdForFixPhoto(_ photoId: UUID) -> UUID {
+        for spot in form.spots {
+            if spot.fixPhotos.contains(where: { $0.id == photoId }) {
+                return spot.id
+            }
+        }
+        return UUID()
+    }
+
+    private func moveIssuePhoto(_ photoId: UUID, toSpot newSpotId: UUID) {
+        var photo: IssuePhoto?
+        for si in form.spots.indices {
+            if let pi = form.spots[si].issuePhotos.firstIndex(where: { $0.id == photoId }) {
+                photo = form.spots[si].issuePhotos.remove(at: pi)
+                if form.spots[si].issuePhotos.isEmpty && form.spots[si].fixPhotos.isEmpty {
+                    form.spots.remove(at: si)
+                }
+                break
+            }
+        }
+        guard let photo else { return }
+        if let si = form.spots.firstIndex(where: { $0.id == newSpotId }) {
+            form.spots[si].issuePhotos.append(photo)
+        } else if let spot = localSpots.first(where: { $0.id == newSpotId }) {
+            var formSpot = FormSpot(from: spot)
+            formSpot.issuePhotos.append(photo)
+            form.spots.append(formSpot)
+        }
+    }
+
+    private func moveFixPhoto(_ photoId: UUID, toSpot newSpotId: UUID) {
+        var photo: FixPhoto?
+        for si in form.spots.indices {
+            if let pi = form.spots[si].fixPhotos.firstIndex(where: { $0.id == photoId }) {
+                photo = form.spots[si].fixPhotos.remove(at: pi)
+                if form.spots[si].issuePhotos.isEmpty && form.spots[si].fixPhotos.isEmpty {
+                    form.spots.remove(at: si)
+                }
+                break
+            }
+        }
+        guard let photo else { return }
+        if let si = form.spots.firstIndex(where: { $0.id == newSpotId }) {
+            form.spots[si].fixPhotos.append(photo)
+        } else if let spot = localSpots.first(where: { $0.id == newSpotId }) {
+            var formSpot = FormSpot(from: spot)
+            formSpot.fixPhotos.append(photo)
+            form.spots.append(formSpot)
+        }
+    }
+
+    private func deleteIssuePhoto(_ photoId: UUID) {
+        for si in form.spots.indices {
+            if let pi = form.spots[si].issuePhotos.firstIndex(where: { $0.id == photoId }) {
+                form.spots[si].issuePhotos.remove(at: pi)
+                if form.spots[si].issuePhotos.isEmpty && form.spots[si].fixPhotos.isEmpty {
+                    form.spots.remove(at: si)
+                }
+                return
+            }
+        }
+    }
+
+    private func deleteFixPhoto(_ photoId: UUID) {
+        for si in form.spots.indices {
+            if let pi = form.spots[si].fixPhotos.firstIndex(where: { $0.id == photoId }) {
+                form.spots[si].fixPhotos.remove(at: pi)
+                if form.spots[si].issuePhotos.isEmpty && form.spots[si].fixPhotos.isEmpty {
+                    form.spots.remove(at: si)
+                }
+                return
+            }
+        }
+    }
+
+    private var auditIssuesBySpot: [UUID: [IssuePhoto]] {
+        var result: [UUID: [IssuePhoto]] = [:]
+        for form in store.forms where form.formType == .audit {
+            for spot in form.spots {
+                result[spot.id, default: []].append(contentsOf: spot.issuePhotos)
+            }
+        }
+        return result
+    }
+
     // MARK: - Save Action
 
     private func saveForm() async {
@@ -450,40 +614,42 @@ struct NewFormView: View {
             var updatedJob = job
             updatedJob.spots = localSpots
 
-            // Upload issue photos
-            let issuePhotosToUpload = updatedForm.issuePhotos.filter { $0.photoURL != nil }
-            let fixPhotosToUpload = updatedForm.fixPhotos.filter { $0.photoURL != nil }
-            let totalUploads = issuePhotosToUpload.count + fixPhotosToUpload.count
-            if totalUploads > 0 {
+            // Upload photos in all spots
+            let hasPhotosToUpload = updatedForm.spots.contains { spot in
+                spot.issuePhotos.contains { $0.photoURL != nil } ||
+                spot.fixPhotos.contains { $0.photoURL != nil }
+            }
+            if hasPhotosToUpload {
                 saveProgress = "Uploading photos..."
             }
 
-            for i in updatedForm.issuePhotos.indices {
-                let photo = updatedForm.issuePhotos[i]
-                if let ref = photo.photoURL, !ref.hasPrefix("http") {
-                    if let data = store.loadTempPhotoData(named: ref) {
-                        let url = try await store.uploadPhoto(
-                            imageData: data,
-                            jobId: job.id,
-                            formId: updatedForm.id,
-                            photoId: photo.id
-                        )
-                        updatedForm.issuePhotos[i].photoURL = url
+            for si in updatedForm.spots.indices {
+                for pi in updatedForm.spots[si].issuePhotos.indices {
+                    let photo = updatedForm.spots[si].issuePhotos[pi]
+                    if let ref = photo.photoURL, !ref.hasPrefix("http") {
+                        if let data = store.loadTempPhotoData(named: ref) {
+                            let url = try await store.uploadPhoto(
+                                imageData: data,
+                                jobId: job.id,
+                                formId: updatedForm.id,
+                                photoId: photo.id
+                            )
+                            updatedForm.spots[si].issuePhotos[pi].photoURL = url
+                        }
                     }
                 }
-            }
-
-            for i in updatedForm.fixPhotos.indices {
-                let photo = updatedForm.fixPhotos[i]
-                if let ref = photo.photoURL, !ref.hasPrefix("http") {
-                    if let data = store.loadTempPhotoData(named: ref) {
-                        let url = try await store.uploadPhoto(
-                            imageData: data,
-                            jobId: job.id,
-                            formId: updatedForm.id,
-                            photoId: photo.id
-                        )
-                        updatedForm.fixPhotos[i].photoURL = url
+                for pi in updatedForm.spots[si].fixPhotos.indices {
+                    let photo = updatedForm.spots[si].fixPhotos[pi]
+                    if let ref = photo.photoURL, !ref.hasPrefix("http") {
+                        if let data = store.loadTempPhotoData(named: ref) {
+                            let url = try await store.uploadPhoto(
+                                imageData: data,
+                                jobId: job.id,
+                                formId: updatedForm.id,
+                                photoId: photo.id
+                            )
+                            updatedForm.spots[si].fixPhotos[pi].photoURL = url
+                        }
                     }
                 }
             }
@@ -561,15 +727,17 @@ private struct SpotPicker: View {
 
 private struct IssuePhotoCard: View {
     @Binding var issuePhoto: IssuePhoto
+    let currentSpotId: UUID
     let spots: [Spot]
     let number: Int
     var store: JobStore
     var focusedField: FocusState<FormField?>.Binding
     var onRequestNewSpot: (@escaping (Spot) -> Void) -> Void
+    var onChangeSpot: (UUID) -> Void
     var onDelete: () -> Void
 
     private var spotJobType: JobType {
-        spots.first { $0.id == issuePhoto.spotId }?.jobType ?? .insulation
+        spots.first { $0.id == currentSpotId }?.jobType ?? .insulation
     }
 
     var body: some View {
@@ -612,8 +780,16 @@ private struct IssuePhotoCard: View {
             // Spot picker
             SpotPicker(
                 spots: spots,
-                selectedSpotId: $issuePhoto.spotId,
-                onRequestNewSpot: onRequestNewSpot
+                selectedSpotId: Binding(
+                    get: { currentSpotId },
+                    set: { onChangeSpot($0) }
+                ),
+                onRequestNewSpot: { callback in
+                    onRequestNewSpot { newSpot in
+                        callback(newSpot)
+                        onChangeSpot(newSpot.id)
+                    }
+                }
             )
 
             Divider()
@@ -698,23 +874,24 @@ private struct IssuePhotoCard: View {
 
 private struct FixPhotoCard: View {
     @Binding var fixPhoto: FixPhoto
+    let currentSpotId: UUID
     let spots: [Spot]
-    let auditIssuePhotos: [IssuePhoto]
-    let allSpots: [Spot]
+    let auditIssuesBySpot: [UUID: [IssuePhoto]]
     let number: Int
     var store: JobStore
     var focusedField: FocusState<FormField?>.Binding
     var onRequestNewSpot: (@escaping (Spot) -> Void) -> Void
+    var onChangeSpot: (UUID) -> Void
     var onDelete: () -> Void
 
     /// Audit issues filtered to the selected spot
     private var issuesAtSpot: [IssuePhoto] {
-        auditIssuePhotos.filter { $0.spotId == fixPhoto.spotId }
+        auditIssuesBySpot[currentSpotId] ?? []
     }
 
     private var linkedIssue: IssuePhoto? {
         guard let linkedId = fixPhoto.linkedAuditIssueId else { return nil }
-        return auditIssuePhotos.first { $0.id == linkedId }
+        return auditIssuesBySpot.values.flatMap { $0 }.first { $0.id == linkedId }
     }
 
     var body: some View {
@@ -757,8 +934,16 @@ private struct FixPhotoCard: View {
             // Spot picker
             SpotPicker(
                 spots: spots,
-                selectedSpotId: $fixPhoto.spotId,
-                onRequestNewSpot: onRequestNewSpot
+                selectedSpotId: Binding(
+                    get: { currentSpotId },
+                    set: { onChangeSpot($0) }
+                ),
+                onRequestNewSpot: { callback in
+                    onRequestNewSpot { newSpot in
+                        callback(newSpot)
+                        onChangeSpot(newSpot.id)
+                    }
+                }
             )
 
             Divider()
@@ -923,11 +1108,21 @@ private struct MaterialEntryCard: View {
                 }
             }
 
-            TextField("Quantity (e.g. 200 sq ft)", text: $material.quantity)
-                .font(.caption)
-                .padding(8)
-                .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
-                .focused(focusedField, equals: .materialQuantity(material.id))
+            HStack(spacing: 8) {
+                TextField("Quantity (e.g. 200 sq ft)", text: $material.quantity)
+                    .font(.caption)
+                    .padding(8)
+                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
+                    .focused(focusedField, equals: .materialQuantity(material.id))
+
+                TextField("Cost ($)", value: $material.cost, format: .number)
+                    .font(.caption)
+                    .keyboardType(.decimalPad)
+                    .padding(8)
+                    .frame(width: 100)
+                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
+                    .focused(focusedField, equals: .materialCost(material.id))
+            }
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))

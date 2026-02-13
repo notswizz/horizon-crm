@@ -3,6 +3,7 @@ import SwiftUI
 struct FixDetailView: View {
     let fixId: UUID
     let formId: UUID
+    let spotId: UUID
     let job: Job
     var store: JobStore
 
@@ -17,12 +18,11 @@ struct FixDetailView: View {
     }
 
     private var fix: FixPhoto? {
-        liveForm?.fixPhotos.first { $0.id == fixId }
+        liveForm?.spots.first { $0.id == spotId }?.fixPhotos.first { $0.id == fixId }
     }
 
     private var spot: Spot? {
-        guard let fix else { return nil }
-        return job.spots.first { $0.id == fix.spotId }
+        job.spots.first { $0.id == spotId }
     }
 
     private var linkedIssue: IssuePhoto? {
@@ -243,9 +243,10 @@ struct FixDetailView: View {
 
     private func saveChanges() {
         guard var form = liveForm,
-              let index = form.fixPhotos.firstIndex(where: { $0.id == fixId }) else { return }
+              let si = form.spots.firstIndex(where: { $0.id == spotId }),
+              let pi = form.spots[si].fixPhotos.firstIndex(where: { $0.id == fixId }) else { return }
 
-        form.fixPhotos[index].resolutionNotes = resolutionNotes
+        form.spots[si].fixPhotos[pi].resolutionNotes = resolutionNotes
 
         store.updateForm(form, in: job)
 

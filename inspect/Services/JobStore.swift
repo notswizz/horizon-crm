@@ -340,30 +340,30 @@ final class JobStore {
 
     // MARK: - Quick Capture Append
 
-    func appendIssuePhoto(_ photo: IssuePhoto, toJob job: Job) async throws {
+    func appendIssuePhoto(_ photo: IssuePhoto, toSpot spotId: UUID, toJob job: Job) async throws {
         let forms = await fetchForms(for: job.id)
         var targetForm = forms.first { $0.formType == .audit }
 
         if targetForm != nil {
-            targetForm!.issuePhotos.append(photo)
+            targetForm!.appendIssuePhoto(photo, toSpot: spotId, availableSpots: job.spots)
             updateForm(targetForm!, in: job)
         } else {
             var newForm = InspectionForm(formType: .audit, date: Date())
-            newForm.issuePhotos.append(photo)
+            newForm.appendIssuePhoto(photo, toSpot: spotId, availableSpots: job.spots)
             addForm(newForm, to: job)
         }
     }
 
-    func appendFixPhoto(_ photo: FixPhoto, toJob job: Job) async throws {
+    func appendFixPhoto(_ photo: FixPhoto, toSpot spotId: UUID, toJob job: Job) async throws {
         let forms = await fetchForms(for: job.id)
         var targetForm = forms.first { $0.formType == .inspection }
 
         if targetForm != nil {
-            targetForm!.fixPhotos.append(photo)
+            targetForm!.appendFixPhoto(photo, toSpot: spotId, availableSpots: job.spots)
             updateForm(targetForm!, in: job)
         } else {
             var newForm = InspectionForm(formType: .inspection, date: Date())
-            newForm.fixPhotos.append(photo)
+            newForm.appendFixPhoto(photo, toSpot: spotId, availableSpots: job.spots)
             addForm(newForm, to: job)
         }
     }

@@ -105,10 +105,17 @@ struct FormDetailView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(material.name.isEmpty ? "Unnamed" : material.name)
                             .font(.subheadline.weight(.medium))
-                        if !material.quantity.isEmpty {
-                            Text(material.quantity)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            if !material.quantity.isEmpty {
+                                Text(material.quantity)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let cost = material.cost {
+                                Text("$\(cost, specifier: "%.2f")")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.green)
+                            }
                         }
                     }
 
@@ -133,53 +140,48 @@ struct FormDetailView: View {
     // MARK: - Audit: Grouped by Spot
 
     private var auditSpotSections: some View {
-        let spotIds = uniqueSpotIds(from: liveForm.issuePhotos.map(\.spotId))
-        return ForEach(spotIds, id: \.self) { spotId in
-            let spot = job.spots.first { $0.id == spotId }
-            let photos = liveForm.issuePhotos.filter { $0.spotId == spotId }
-            spotIssueCard(spot: spot, photos: photos)
+        ForEach(liveForm.spots.filter { !$0.issuePhotos.isEmpty }) { spot in
+            spotIssueCard(spot: spot)
         }
     }
 
-    private func spotIssueCard(spot: Spot?, photos: [IssuePhoto]) -> some View {
+    private func spotIssueCard(spot: FormSpot) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // Spot header
             HStack {
                 Label {
-                    Text(spot?.title ?? "Unknown Spot")
+                    Text(spot.title.isEmpty ? "Unknown Spot" : spot.title)
                         .font(.headline)
                 } icon: {
-                    Image(systemName: spot?.jobType.icon ?? "mappin")
+                    Image(systemName: spot.jobType.icon)
                         .foregroundStyle(.orange)
                 }
 
                 Spacer()
 
-                if let spot {
-                    Text(spot.jobType.rawValue)
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(.orange.opacity(0.1), in: .capsule)
-                        .foregroundStyle(.orange)
-                }
+                Text(spot.jobType.rawValue)
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.orange.opacity(0.1), in: .capsule)
+                    .foregroundStyle(.orange)
             }
 
             Divider()
 
             // Issue photos
-            if photos.count > 1 {
+            if spot.issuePhotos.count > 1 {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(photos) { photo in
-                            issuePhotoCard(photo)
+                        ForEach(spot.issuePhotos) { photo in
+                            issuePhotoCard(photo, spotId: spot.id)
                                 .frame(width: 260)
                         }
                     }
                 }
             } else {
-                ForEach(photos) { photo in
-                    issuePhotoCard(photo)
+                ForEach(spot.issuePhotos) { photo in
+                    issuePhotoCard(photo, spotId: spot.id)
                 }
             }
         }
@@ -188,8 +190,8 @@ struct FormDetailView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
     }
 
-    private func issuePhotoCard(_ photo: IssuePhoto) -> some View {
-        NavigationLink(destination: IssueDetailView(issueId: photo.id, formId: liveForm.id, job: job, store: store)) {
+    private func issuePhotoCard(_ photo: IssuePhoto, spotId: UUID) -> some View {
+        NavigationLink(destination: IssueDetailView(issueId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store)) {
             VStack(alignment: .leading, spacing: 8) {
                 // Category + severity
                 HStack(spacing: 6) {
@@ -264,53 +266,48 @@ struct FormDetailView: View {
     // MARK: - Inspection: Grouped by Spot
 
     private var inspectionSpotSections: some View {
-        let spotIds = uniqueSpotIds(from: liveForm.fixPhotos.map(\.spotId))
-        return ForEach(spotIds, id: \.self) { spotId in
-            let spot = job.spots.first { $0.id == spotId }
-            let photos = liveForm.fixPhotos.filter { $0.spotId == spotId }
-            spotFixCard(spot: spot, photos: photos)
+        ForEach(liveForm.spots.filter { !$0.fixPhotos.isEmpty }) { spot in
+            spotFixCard(spot: spot)
         }
     }
 
-    private func spotFixCard(spot: Spot?, photos: [FixPhoto]) -> some View {
+    private func spotFixCard(spot: FormSpot) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // Spot header
             HStack {
                 Label {
-                    Text(spot?.title ?? "Unknown Spot")
+                    Text(spot.title.isEmpty ? "Unknown Spot" : spot.title)
                         .font(.headline)
                 } icon: {
-                    Image(systemName: spot?.jobType.icon ?? "mappin")
+                    Image(systemName: spot.jobType.icon)
                         .foregroundStyle(.green)
                 }
 
                 Spacer()
 
-                if let spot {
-                    Text(spot.jobType.rawValue)
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(.green.opacity(0.1), in: .capsule)
-                        .foregroundStyle(.green)
-                }
+                Text(spot.jobType.rawValue)
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.green.opacity(0.1), in: .capsule)
+                    .foregroundStyle(.green)
             }
 
             Divider()
 
             // Fix photos
-            if photos.count > 1 {
+            if spot.fixPhotos.count > 1 {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(photos) { photo in
-                            fixPhotoCard(photo)
+                        ForEach(spot.fixPhotos) { photo in
+                            fixPhotoCard(photo, spotId: spot.id)
                                 .frame(width: 260)
                         }
                     }
                 }
             } else {
-                ForEach(photos) { photo in
-                    fixPhotoCard(photo)
+                ForEach(spot.fixPhotos) { photo in
+                    fixPhotoCard(photo, spotId: spot.id)
                 }
             }
         }
@@ -319,8 +316,8 @@ struct FormDetailView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
     }
 
-    private func fixPhotoCard(_ photo: FixPhoto) -> some View {
-        NavigationLink(destination: FixDetailView(fixId: photo.id, formId: liveForm.id, job: job, store: store)) {
+    private func fixPhotoCard(_ photo: FixPhoto, spotId: UUID) -> some View {
+        NavigationLink(destination: FixDetailView(fixId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store)) {
             VStack(alignment: .leading, spacing: 8) {
                 // Linked issue info
                 if let linkedId = photo.linkedAuditIssueId {
@@ -412,17 +409,13 @@ struct FormDetailView: View {
     /// Finds the FixPhoto that resolves a given audit issue
     private func linkedFixPhoto(for issueId: UUID) -> FixPhoto? {
         for form in store.forms where form.formType == .inspection {
-            if let fix = form.fixPhotos.first(where: { $0.linkedAuditIssueId == issueId }) {
-                return fix
+            for spot in form.spots {
+                if let fix = spot.fixPhotos.first(where: { $0.linkedAuditIssueId == issueId }) {
+                    return fix
+                }
             }
         }
         return nil
-    }
-
-    /// Preserves ordering of first-seen spot IDs
-    private func uniqueSpotIds(from ids: [UUID]) -> [UUID] {
-        var seen = Set<UUID>()
-        return ids.filter { seen.insert($0).inserted }
     }
 
     // MARK: - Share
@@ -446,18 +439,16 @@ struct FormDetailView: View {
         if !f.materials.isEmpty {
             text += "\n\nMaterials:"
             for mat in f.materials {
-                text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)"
+                let costStr = mat.cost.map { " — $\(String(format: "%.2f", $0))" } ?? ""
+                text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)\(costStr)"
             }
         }
 
         // Group by spot
         if f.formType == .audit {
-            let spotIds = uniqueSpotIds(from: f.issuePhotos.map(\.spotId))
-            for spotId in spotIds {
-                let spot = job.spots.first { $0.id == spotId }
-                let photos = f.issuePhotos.filter { $0.spotId == spotId }
-                text += "\n\n--- Spot: \(spot?.title ?? "Unknown") (\(spot?.jobType.rawValue ?? "")) ---"
-                for photo in photos {
+            for spot in f.spots where !spot.issuePhotos.isEmpty {
+                text += "\n\n--- Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType.rawValue)) ---"
+                for photo in spot.issuePhotos {
                     text += "\n  Issue: \(photo.category.rawValue) (\(photo.severity.rawValue))"
                     if !photo.notes.isEmpty {
                         text += "\n  Notes: \(photo.notes)"
@@ -465,12 +456,9 @@ struct FormDetailView: View {
                 }
             }
         } else {
-            let spotIds = uniqueSpotIds(from: f.fixPhotos.map(\.spotId))
-            for spotId in spotIds {
-                let spot = job.spots.first { $0.id == spotId }
-                let photos = f.fixPhotos.filter { $0.spotId == spotId }
-                text += "\n\n--- Spot: \(spot?.title ?? "Unknown") (\(spot?.jobType.rawValue ?? "")) ---"
-                for photo in photos {
+            for spot in f.spots where !spot.fixPhotos.isEmpty {
+                text += "\n\n--- Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType.rawValue)) ---"
+                for photo in spot.fixPhotos {
                     if let linkedId = photo.linkedAuditIssueId,
                        let issue = store.auditIssuePhotos.first(where: { $0.id == linkedId }) {
                         text += "\n  Fixes: \(issue.category.rawValue) (\(issue.severity.rawValue))"

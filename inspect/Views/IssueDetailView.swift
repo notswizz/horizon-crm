@@ -3,6 +3,7 @@ import SwiftUI
 struct IssueDetailView: View {
     let issueId: UUID
     let formId: UUID
+    let spotId: UUID
     let job: Job
     var store: JobStore
 
@@ -19,12 +20,11 @@ struct IssueDetailView: View {
     }
 
     private var issue: IssuePhoto? {
-        liveForm?.issuePhotos.first { $0.id == issueId }
+        liveForm?.spots.first { $0.id == spotId }?.issuePhotos.first { $0.id == issueId }
     }
 
     private var spot: Spot? {
-        guard let issue else { return nil }
-        return job.spots.first { $0.id == issue.spotId }
+        job.spots.first { $0.id == spotId }
     }
 
     var body: some View {
@@ -209,7 +209,7 @@ struct IssueDetailView: View {
         Group {
             if let issue, let linkedFix = linkedFixPhoto(for: issue.id) {
                 let inspectionForm = store.forms.first {
-                    $0.formType == .inspection && $0.fixPhotos.contains { $0.id == linkedFix.id }
+                    $0.formType == .inspection && $0.spots.flatMap(\.fixPhotos).contains { $0.id == linkedFix.id }
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 5) {
@@ -243,7 +243,7 @@ struct IssueDetailView: View {
                 .background(.background, in: .rect(cornerRadius: 14))
                 .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
             } else if let issue {
-                NavigationLink(destination: SubmitFixView(job: job, issue: issue, store: store)) {
+                NavigationLink(destination: SubmitFixView(job: job, issue: issue, spotId: spotId, store: store)) {
                     HStack(spacing: 8) {
                         Spacer()
                         Image(systemName: "wrench.and.screwdriver.fill")
@@ -304,11 +304,12 @@ struct IssueDetailView: View {
 
     private func saveChanges() {
         guard var form = liveForm,
-              let index = form.issuePhotos.firstIndex(where: { $0.id == issueId }) else { return }
+              let si = form.spots.firstIndex(where: { $0.id == spotId }),
+              let pi = form.spots[si].issuePhotos.firstIndex(where: { $0.id == issueId }) else { return }
 
-        form.issuePhotos[index].category = category
-        form.issuePhotos[index].severity = severity
-        form.issuePhotos[index].notes = notes
+        form.spots[si].issuePhotos[pi].category = category
+        form.spots[si].issuePhotos[pi].severity = severity
+        form.spots[si].issuePhotos[pi].notes = notes
 
         store.updateForm(form, in: job)
 
@@ -322,8 +323,10 @@ struct IssueDetailView: View {
 
     private func linkedFixPhoto(for issueId: UUID) -> FixPhoto? {
         for form in store.forms where form.formType == .inspection {
-            if let fix = form.fixPhotos.first(where: { $0.linkedAuditIssueId == issueId }) {
-                return fix
+            for spot in form.spots {
+                if let fix = spot.fixPhotos.first(where: { $0.linkedAuditIssueId == issueId }) {
+                    return fix
+                }
             }
         }
         return nil

@@ -4,6 +4,7 @@ import PhotosUI
 struct SubmitFixView: View {
     let job: Job
     let issue: IssuePhoto
+    let spotId: UUID
     var store: JobStore
 
     @Environment(\.dismiss) private var dismiss
@@ -19,7 +20,7 @@ struct SubmitFixView: View {
     @State private var showError = false
 
     private var spot: Spot? {
-        job.spots.first { $0.id == issue.spotId }
+        job.spots.first { $0.id == spotId }
     }
 
     var body: some View {
@@ -301,18 +302,17 @@ struct SubmitFixView: View {
 
             let fixPhoto = FixPhoto(
                 id: photoId,
-                spotId: issue.spotId,
                 linkedAuditIssueId: issue.id,
                 photoURL: downloadURL,
                 resolutionNotes: resolutionNotes
             )
 
             if var form = existingForm {
-                form.fixPhotos.append(fixPhoto)
+                form.appendFixPhoto(fixPhoto, toSpot: spotId, availableSpots: job.spots)
                 store.updateForm(form, in: job)
             } else {
                 var newForm = InspectionForm(id: formId, formType: .inspection, inspectorName: inspectorName, date: Date())
-                newForm.fixPhotos.append(fixPhoto)
+                newForm.appendFixPhoto(fixPhoto, toSpot: spotId, availableSpots: job.spots)
                 store.addForm(newForm, to: job)
             }
 

@@ -144,11 +144,37 @@ struct Spot: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - Form Spot (snapshot of a spot within a form, with photos)
+
+struct FormSpot: Identifiable, Codable, Equatable, Sendable {
+    let id: UUID
+    var title: String
+    var jobType: JobType
+    var issuePhotos: [IssuePhoto]
+    var fixPhotos: [FixPhoto]
+
+    init(id: UUID = UUID(), title: String = "", jobType: JobType = .insulation,
+         issuePhotos: [IssuePhoto] = [], fixPhotos: [FixPhoto] = []) {
+        self.id = id
+        self.title = title
+        self.jobType = jobType
+        self.issuePhotos = issuePhotos
+        self.fixPhotos = fixPhotos
+    }
+
+    init(from spot: Spot) {
+        self.id = spot.id
+        self.title = spot.title
+        self.jobType = spot.jobType
+        self.issuePhotos = []
+        self.fixPhotos = []
+    }
+}
+
 // MARK: - Issue Photo (audit forms — one photo = one issue)
 
 struct IssuePhoto: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
-    var spotId: UUID
     var photoURL: String?
     var category: IssueCategory
     var severity: IssueSeverity
@@ -157,7 +183,6 @@ struct IssuePhoto: Identifiable, Codable, Equatable, Sendable {
 
     init(
         id: UUID = UUID(),
-        spotId: UUID = UUID(),
         photoURL: String? = nil,
         category: IssueCategory = .other,
         severity: IssueSeverity = .major,
@@ -165,7 +190,6 @@ struct IssuePhoto: Identifiable, Codable, Equatable, Sendable {
         dateTaken: Date = Date()
     ) {
         self.id = id
-        self.spotId = spotId
         self.photoURL = photoURL
         self.category = category
         self.severity = severity
@@ -178,7 +202,6 @@ struct IssuePhoto: Identifiable, Codable, Equatable, Sendable {
 
 struct FixPhoto: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
-    var spotId: UUID
     var linkedAuditIssueId: UUID?
     var photoURL: String?
     var resolutionNotes: String
@@ -186,14 +209,12 @@ struct FixPhoto: Identifiable, Codable, Equatable, Sendable {
 
     init(
         id: UUID = UUID(),
-        spotId: UUID = UUID(),
         linkedAuditIssueId: UUID? = nil,
         photoURL: String? = nil,
         resolutionNotes: String = "",
         dateTaken: Date = Date()
     ) {
         self.id = id
-        self.spotId = spotId
         self.linkedAuditIssueId = linkedAuditIssueId
         self.photoURL = photoURL
         self.resolutionNotes = resolutionNotes
@@ -240,17 +261,20 @@ struct Material: Identifiable, Codable, Equatable, Sendable {
     var name: String
     var type: MaterialType
     var quantity: String
+    var cost: Double?
 
     init(
         id: UUID = UUID(),
         name: String = "",
         type: MaterialType = .insulation,
-        quantity: String = ""
+        quantity: String = "",
+        cost: Double? = nil
     ) {
         self.id = id
         self.name = name
         self.type = type
         self.quantity = quantity
+        self.cost = cost
     }
 }
 
@@ -294,9 +318,13 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
     var inspectorName: String
     var date: Date
     var notes: String
-    var issuePhotos: [IssuePhoto]
-    var fixPhotos: [FixPhoto]
+    var spots: [FormSpot]
     var materials: [Material]
+
+    /// Flattened issue photos across all spots (read-only, for backward compat)
+    var issuePhotos: [IssuePhoto] { spots.flatMap { $0.issuePhotos } }
+    /// Flattened fix photos across all spots (read-only, for backward compat)
+    var fixPhotos: [FixPhoto] { spots.flatMap { $0.fixPhotos } }
 
     var photoCount: Int { issuePhotos.count + fixPhotos.count }
 
@@ -306,8 +334,7 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
         inspectorName: String = "",
         date: Date = Date(),
         notes: String = "",
-        issuePhotos: [IssuePhoto] = [],
-        fixPhotos: [FixPhoto] = [],
+        spots: [FormSpot] = [],
         materials: [Material] = []
     ) {
         self.id = id
@@ -315,9 +342,30 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
         self.inspectorName = inspectorName
         self.date = date
         self.notes = notes
-        self.issuePhotos = issuePhotos
-        self.fixPhotos = fixPhotos
+        self.spots = spots
         self.materials = materials
+    }
+
+    /// Append an issue photo to the FormSpot matching spotId, creating one if needed
+    mutating func appendIssuePhoto(_ photo: IssuePhoto, toSpot spotId: UUID, availableSpots: [Spot]) {
+        if let si = spots.firstIndex(where: { $0.id == spotId }) {
+            spots[si].issuePhotos.append(photo)
+        } else if let spot = availableSpots.first(where: { $0.id == spotId }) {
+            var formSpot = FormSpot(from: spot)
+            formSpot.issuePhotos.append(photo)
+            spots.append(formSpot)
+        }
+    }
+
+    /// Append a fix photo to the FormSpot matching spotId, creating one if needed
+    mutating func appendFixPhoto(_ photo: FixPhoto, toSpot spotId: UUID, availableSpots: [Spot]) {
+        if let si = spots.firstIndex(where: { $0.id == spotId }) {
+            spots[si].fixPhotos.append(photo)
+        } else if let spot = availableSpots.first(where: { $0.id == spotId }) {
+            var formSpot = FormSpot(from: spot)
+            formSpot.fixPhotos.append(photo)
+            spots.append(formSpot)
+        }
     }
 }
 
@@ -416,7 +464,6 @@ extension InspectionForm {
         let kitchenSpotId = UUID()
         let hvacSpotId = UUID()
         let issue1Id = UUID()
-        let issue2Id = UUID()
 
         return [
             InspectionForm(
@@ -424,18 +471,30 @@ extension InspectionForm {
                 inspectorName: "Mike Davis",
                 date: Date().addingTimeInterval(-86400 * 2),
                 notes: "Comprehensive energy audit completed.",
-                issuePhotos: [
-                    IssuePhoto(
-                        spotId: atticSpotId,
-                        category: .insufficientRValue,
-                        severity: .major,
-                        notes: "R-value measured at R-13, well below the recommended R-38 for this climate zone."
+                spots: [
+                    FormSpot(
+                        id: atticSpotId,
+                        title: "Attic Hatch",
+                        jobType: .attic,
+                        issuePhotos: [
+                            IssuePhoto(
+                                category: .insufficientRValue,
+                                severity: .major,
+                                notes: "R-value measured at R-13, well below the recommended R-38 for this climate zone."
+                            ),
+                        ]
                     ),
-                    IssuePhoto(
-                        spotId: kitchenSpotId,
-                        category: .missingWeatherstrip,
-                        severity: .minor,
-                        notes: "Visible gaps around window frame. Weatherstripping worn and missing in places."
+                    FormSpot(
+                        id: kitchenSpotId,
+                        title: "Kitchen Window",
+                        jobType: .airSealing,
+                        issuePhotos: [
+                            IssuePhoto(
+                                category: .missingWeatherstrip,
+                                severity: .minor,
+                                notes: "Visible gaps around window frame. Weatherstripping worn and missing in places."
+                            ),
+                        ]
                     ),
                 ],
                 materials: [
@@ -447,11 +506,17 @@ extension InspectionForm {
                 inspectorName: "Sarah Chen",
                 date: Date().addingTimeInterval(-86400),
                 notes: "Initial inspection of HVAC installation.",
-                fixPhotos: [
-                    FixPhoto(
-                        spotId: hvacSpotId,
-                        linkedAuditIssueId: issue1Id,
-                        resolutionNotes: "Unit leveled and P-trap installed."
+                spots: [
+                    FormSpot(
+                        id: hvacSpotId,
+                        title: "Heat Pump Pad",
+                        jobType: .hvac,
+                        fixPhotos: [
+                            FixPhoto(
+                                linkedAuditIssueId: issue1Id,
+                                resolutionNotes: "Unit leveled and P-trap installed."
+                            ),
+                        ]
                     ),
                 ],
                 materials: [

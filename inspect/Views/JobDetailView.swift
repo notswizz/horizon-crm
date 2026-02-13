@@ -361,23 +361,15 @@ struct JobDetailView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                NavigationLink(destination: NewFormView(job: job, formType: .audit, store: store)) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.caption)
-                        Text("Start Audit")
-                            .font(.subheadline.weight(.medium))
-                    }
-                    .foregroundStyle(.blue)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(.blue.opacity(0.06), in: .rect(cornerRadius: DetailDesign.innerRadius))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DetailDesign.innerRadius)
-                            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                            .foregroundStyle(.blue.opacity(0.2))
-                    )
+                HStack(spacing: 6) {
+                    Image(systemName: "camera.fill")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Text("Use Quick Capture to start an audit")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
+                .padding(.vertical, 8)
             }
         }
         .padding(DetailDesign.cardPadding)
@@ -439,22 +431,16 @@ struct JobDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            NavigationLink(destination: NewFormView(job: job, formType: .inspection, store: store)) {
-                HStack(spacing: 5) {
-                    Image(systemName: "plus.circle.fill")
+            if inspections.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "camera.fill")
                         .font(.caption)
-                    Text("Add Inspection")
-                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.tertiary)
+                    Text("Use Quick Capture to add inspections")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
-                .foregroundStyle(.orange)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(.orange.opacity(0.06), in: .rect(cornerRadius: DetailDesign.innerRadius))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DetailDesign.innerRadius)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                        .foregroundStyle(.orange.opacity(0.2))
-                )
+                .padding(.vertical, 8)
             }
         }
         .padding(DetailDesign.cardPadding)
@@ -493,10 +479,17 @@ struct JobDetailView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(material.name.isEmpty ? "Unnamed" : material.name)
                             .font(.subheadline.weight(.medium))
-                        if !material.quantity.isEmpty {
-                            Text(material.quantity)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            if !material.quantity.isEmpty {
+                                Text(material.quantity)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let cost = material.cost {
+                                Text("$\(cost, specifier: "%.2f")")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.green)
+                            }
                         }
                     }
 
@@ -644,7 +637,8 @@ struct JobDetailView: View {
         if !store.allMaterials.isEmpty {
             text += "\n\n--- ALL MATERIALS ---"
             for mat in store.allMaterials {
-                text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)"
+                let costStr = mat.cost.map { " — $\(String(format: "%.2f", $0))" } ?? ""
+                text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)\(costStr)"
             }
         }
 
@@ -672,17 +666,15 @@ struct JobDetailView: View {
         if !form.materials.isEmpty {
             text += "\nMaterials:"
             for mat in form.materials {
-                text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)"
+                let costStr = mat.cost.map { " — $\(String(format: "%.2f", $0))" } ?? ""
+                text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)\(costStr)"
             }
         }
 
         if form.formType == .audit {
-            let spotIds = uniqueSpotIds(from: form.issuePhotos.map(\.spotId))
-            for spotId in spotIds {
-                let spot = job.spots.first { $0.id == spotId }
-                let photos = form.issuePhotos.filter { $0.spotId == spotId }
-                text += "\n\n  Spot: \(spot?.title ?? "Unknown") (\(spot?.jobType.rawValue ?? ""))"
-                for photo in photos {
+            for spot in form.spots where !spot.issuePhotos.isEmpty {
+                text += "\n\n  Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType.rawValue))"
+                for photo in spot.issuePhotos {
                     text += "\n    Issue: \(photo.category.rawValue) (\(photo.severity.rawValue))"
                     if !photo.notes.isEmpty {
                         text += "\n    Notes: \(photo.notes)"
@@ -690,12 +682,9 @@ struct JobDetailView: View {
                 }
             }
         } else {
-            let spotIds = uniqueSpotIds(from: form.fixPhotos.map(\.spotId))
-            for spotId in spotIds {
-                let spot = job.spots.first { $0.id == spotId }
-                let photos = form.fixPhotos.filter { $0.spotId == spotId }
-                text += "\n\n  Spot: \(spot?.title ?? "Unknown") (\(spot?.jobType.rawValue ?? ""))"
-                for photo in photos {
+            for spot in form.spots where !spot.fixPhotos.isEmpty {
+                text += "\n\n  Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType.rawValue))"
+                for photo in spot.fixPhotos {
                     if let linkedId = photo.linkedAuditIssueId,
                        let issue = store.auditIssuePhotos.first(where: { $0.id == linkedId }) {
                         text += "\n    Fixes: \(issue.category.rawValue) (\(issue.severity.rawValue))"
@@ -708,11 +697,6 @@ struct JobDetailView: View {
         }
 
         return text
-    }
-
-    private func uniqueSpotIds(from ids: [UUID]) -> [UUID] {
-        var seen = Set<UUID>()
-        return ids.filter { seen.insert($0).inserted }
     }
 }
 
