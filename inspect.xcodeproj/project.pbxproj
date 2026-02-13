@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		EDB6CDD82F3E8617007AD187 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = EDB6CDD72F3E8617007AD187 /* FirebaseFirestore */; };
+		EDB6CDDA2F3E8617007AD187 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = EDB6CDD92F3E8617007AD187 /* FirebaseStorage */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		EDB6CD2A2F3AF1A2007AD187 /* inspect.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = inspect.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EDB6CDD82F3E8617007AD187 /* FirebaseFirestore in Frameworks */,
+				EDB6CDDA2F3E8617007AD187 /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +72,8 @@
 			);
 			name = inspect;
 			packageProductDependencies = (
+				EDB6CDD72F3E8617007AD187 /* FirebaseFirestore */,
+				EDB6CDD92F3E8617007AD187 /* FirebaseStorage */,
 			);
 			productName = inspect;
 			productReference = EDB6CD2A2F3AF1A2007AD187 /* inspect.app */;
@@ -94,6 +103,9 @@
 			);
 			mainGroup = EDB6CD212F3AF1A2007AD187;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EDB6CDD62F3E8617007AD187 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EDB6CD2B2F3AF1A2007AD187 /* Products */;
 			projectDirPath = "";
@@ -256,6 +268,8 @@
 				DEVELOPMENT_TEAM = 2XX5D58B87;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos of completed work for quality inspection.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Select before and after photos for quality inspection.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -288,6 +302,8 @@
 				DEVELOPMENT_TEAM = 2XX5D58B87;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos of completed work for quality inspection.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Select before and after photos for quality inspection.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -332,6 +348,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		EDB6CDD62F3E8617007AD187 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		EDB6CDD72F3E8617007AD187 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EDB6CDD62F3E8617007AD187 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		EDB6CDD92F3E8617007AD187 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EDB6CDD62F3E8617007AD187 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EDB6CD222F3AF1A2007AD187 /* Project object */;
 }

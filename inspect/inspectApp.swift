@@ -1,17 +1,25 @@
-//
-//  inspectApp.swift
-//  inspect
-//
-//  Created by Jack Smith on 2/9/26.
-//
-
 import SwiftUI
+import FirebaseCore
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        FirebaseApp.configure()
+        return true
+    }
+}
 
 @main
 struct inspectApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @State private var store = JobStore()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(store: store)
+                .onAppear { store.startListening() }
         }
     }
 }

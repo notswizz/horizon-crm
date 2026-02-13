@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Jobs collection
+    match /jobs/{jobId} {
+      allow read, write: if true;
+
+      // Forms subcollection (audits & inspections)
+      match /forms/{formId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

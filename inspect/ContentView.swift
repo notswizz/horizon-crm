@@ -1,24 +1,22 @@
-//
-//  ContentView.swift
-//  inspect
-//
-//  Created by Jack Smith on 2/9/26.
-//
-
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
-}
+    var store: JobStore
 
-#Preview {
-    ContentView()
+    var body: some View {
+        TabView {
+            Tab("Jobs", systemImage: "list.clipboard") {
+                JobsListView(store: store)
+            }
+
+            Tab("Capture", systemImage: "camera.fill") {
+                QuickCaptureView(store: store)
+            }
+
+            Tab("Settings", systemImage: "gearshape.fill") {
+                SettingsView(store: store)
+            }
+        }
+        .tint(.orange)
+    }
 }

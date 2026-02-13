@@ -1,0 +1,869 @@
+import SwiftUI
+import PhotosUI
+
+// MARK: - Design Tokens
+
+private enum CaptureDesign {
+    static let cardRadius: CGFloat = 16
+    static let cardPadding: CGFloat = 20
+    static let shadowColor = Color.black.opacity(0.06)
+    static let shadowRadius: CGFloat = 12
+    static let shadowY: CGFloat = 4
+    static let sectionSpacing: CGFloat = 20
+    static let innerSpacing: CGFloat = 16
+    static let spring = Animation.spring(response: 0.35, dampingFraction: 0.8)
+    static let chipHeight: CGFloat = 36
+    static let severityPillHeight: CGFloat = 32
+}
+
+// MARK: - Quick Capture View
+
+struct QuickCaptureView: View {
+    var store: JobStore
+    @AppStorage("inspectorName") private var inspectorName = ""
+
+    // Photo state
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var selectedPhoto: String?
+    @State private var displayImage: UIImage?
+
+    // Tagging state
+    @State private var selectedJobId: UUID?
+    @State private var captureType: FormType = .audit
+    @State private var spotId: UUID?
+    @State private var category: IssueCategory = .other
+    @State private var severity: IssueSeverity = .major
+    @State private var notes = ""
+    @State private var linkedAuditIssueId: UUID?
+    @State private var resolutionNotes = ""
+
+    // New spot sheet
+    @State private var showNewSpotSheet = false
+    @State private var newSpotTitle = ""
+    @State private var newSpotJobType: JobType = .insulation
+    @State private var localSpots: [Spot] = []
+
+    // Audit issues for fix linkage
+    @State private var auditIssues: [IssuePhoto] = []
+
+    // Save state
+    @State private var isSaving = false
+    @State private var showSuccess = false
+    @State private var savedType: FormType = .audit
+    @State private var savedJobAddress = ""
+    @State private var errorMessage: String?
+    @State private var showError = false
+
+    private var selectedJob: Job? {
+        store.jobs.first { $0.id == selectedJobId }
+    }
+
+    private var selectedSpot: Spot? {
+        localSpots.first { $0.id == spotId }
+    }
+
+    private var spotJobType: JobType {
+        selectedSpot?.jobType ?? .insulation
+    }
+
+    private var issuesAtSpot: [IssuePhoto] {
+        auditIssues.filter { $0.spotId == spotId }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                if store.jobs.isEmpty {
+                    emptyState
+                } else if selectedPhoto == nil {
+                    capturePhase
+                } else {
+                    taggingPhase
+                }
+
+                if showSuccess {
+                    successOverlay
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Quick Capture")
+            .navigationBarTitleDisplayMode(.large)
+            .alert("Save Error", isPresented: $showError) {
+                Button("OK") { }
+            } message: {
+                Text(errorMessage ?? "An unknown error occurred.")
+            }
+            .sheet(isPresented: $showNewSpotSheet) {
+                newSpotSheet
+            }
+        }
+    }
+
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "camera.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+            Text("Create a job first")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text("You need at least one job before you can capture photos.")
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(40)
+    }
+
+    // MARK: - Phase 1: Capture
+
+    private var capturePhase: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "camera.viewfinder")
+                .font(.system(size: 64))
+                .foregroundStyle(.orange)
+
+            Text("Snap a photo, then tag it")
+                .font(.title3.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            PhotosPicker(selection: $selectedItem, matching: .images) {
+                HStack(spacing: 10) {
+                    Image(systemName: "camera.fill")
+                        .font(.title2)
+                    Text("Take / Choose Photo")
+                        .font(.headline)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 60)
+                .background(
+                    LinearGradient(
+                        colors: [.orange, .orange.opacity(0.85)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: .capsule
+                )
+                .shadow(color: .orange.opacity(0.3), radius: 12, y: 4)
+            }
+            .padding(.horizontal, 40)
+            .onChange(of: selectedItem) { _, newItem in
+                importPhoto(from: newItem)
+            }
+
+            Spacer()
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Phase 2: Tagging
+
+    private var taggingPhase: some View {
+        ScrollView {
+            VStack(spacing: CaptureDesign.sectionSpacing) {
+                photoPreviewCard
+                jobPickerCard
+                typeToggleCard
+
+                if captureType == .audit {
+                    issueDetailsCard
+                } else {
+                    fixDetailsCard
+                }
+
+                saveButton
+            }
+            .padding()
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    // MARK: - Photo Preview Card
+
+    private var photoPreviewCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label {
+                    Text("Photo")
+                        .font(.headline)
+                } icon: {
+                    Image(systemName: "photo.fill")
+                        .foregroundStyle(.orange)
+                }
+                Spacer()
+                Button {
+                    resetPhoto()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.counterclockwise")
+                        Text("Retake")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.orange)
+                }
+            }
+
+            if let displayImage {
+                Image(uiImage: displayImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 200)
+                    .clipped()
+                    .clipShape(.rect(cornerRadius: 12))
+            }
+        }
+        .cardStyle()
+    }
+
+    // MARK: - Job Picker Card
+
+    private var jobPickerCard: some View {
+        VStack(alignment: .leading, spacing: CaptureDesign.innerSpacing) {
+            Label {
+                Text("Job")
+                    .font(.headline)
+            } icon: {
+                Image(systemName: "list.clipboard.fill")
+                    .foregroundStyle(.orange)
+            }
+
+            Menu {
+                ForEach(store.jobs) { job in
+                    Button {
+                        selectJob(job)
+                    } label: {
+                        Label(job.address.isEmpty ? "Untitled" : job.address, systemImage: "mappin")
+                    }
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "mappin")
+                        .foregroundStyle(.orange)
+                    Text(selectedJob?.address ?? "Select Job")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .foregroundStyle(.primary)
+                .padding(12)
+                .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 10))
+            }
+        }
+        .cardStyle()
+    }
+
+    // MARK: - Type Toggle Card
+
+    private var typeToggleCard: some View {
+        VStack(alignment: .leading, spacing: CaptureDesign.innerSpacing) {
+            Label {
+                Text("Type")
+                    .font(.headline)
+            } icon: {
+                Image(systemName: captureType == .audit ? "clipboard.fill" : "checkmark.shield.fill")
+                    .foregroundStyle(captureType == .audit ? .blue : .green)
+            }
+
+            Picker("Type", selection: $captureType) {
+                Text("Issue (Audit)").tag(FormType.audit)
+                Text("Fix (Inspection)").tag(FormType.inspection)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: captureType) { _, newType in
+                if newType == .inspection, let job = selectedJob {
+                    Task { await loadAuditIssues(for: job) }
+                }
+            }
+        }
+        .cardStyle()
+    }
+
+    // MARK: - Issue Details Card (Audit)
+
+    private var issueDetailsCard: some View {
+        VStack(alignment: .leading, spacing: CaptureDesign.innerSpacing) {
+            Label {
+                Text("Issue Details")
+                    .font(.headline)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+            }
+
+            // Spot picker
+            spotPickerSection
+
+            Divider()
+
+            // Category
+            VStack(alignment: .leading, spacing: 8) {
+                Text("CATEGORY")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                Menu {
+                    ForEach(IssueCategory.categories(for: spotJobType)) { cat in
+                        Button(cat.rawValue) {
+                            category = cat
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(category.rawValue)
+                            .font(.subheadline.weight(.medium))
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(10)
+                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+                }
+            }
+
+            // Severity pills
+            VStack(alignment: .leading, spacing: 8) {
+                Text("SEVERITY")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 8) {
+                    ForEach(IssueSeverity.allCases) { sev in
+                        Button {
+                            withAnimation(CaptureDesign.spring) {
+                                severity = sev
+                            }
+                        } label: {
+                            Text(sev.rawValue)
+                                .font(.caption.weight(.semibold))
+                                .frame(height: CaptureDesign.severityPillHeight)
+                                .padding(.horizontal, 14)
+                                .foregroundStyle(severityTextColor(sev))
+                                .background(
+                                    severity == sev
+                                        ? AnyShapeStyle(sev.color)
+                                        : AnyShapeStyle(sev.color.opacity(0.1)),
+                                    in: .capsule
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(
+                                            severity == sev ? .clear : sev.color.opacity(0.3),
+                                            lineWidth: 1
+                                        )
+                                )
+                        }
+                        .sensoryFeedback(.selection, trigger: severity == sev)
+                    }
+                }
+            }
+
+            Divider()
+
+            // Notes
+            VStack(alignment: .leading, spacing: 8) {
+                Text("NOTES")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                TextField("Observations for this issue...", text: $notes, axis: .vertical)
+                    .lineLimit(2...5)
+                    .font(.subheadline)
+                    .padding(10)
+                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+            }
+        }
+        .cardStyle()
+    }
+
+    // MARK: - Fix Details Card (Inspection)
+
+    private var fixDetailsCard: some View {
+        VStack(alignment: .leading, spacing: CaptureDesign.innerSpacing) {
+            Label {
+                Text("Fix Details")
+                    .font(.headline)
+            } icon: {
+                Image(systemName: "wrench.and.screwdriver.fill")
+                    .foregroundStyle(.green)
+            }
+
+            // Spot picker
+            spotPickerSection
+
+            Divider()
+
+            // Linked audit issue
+            VStack(alignment: .leading, spacing: 8) {
+                Text("LINKED AUDIT ISSUE")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                if issuesAtSpot.isEmpty {
+                    Text("No audit issues at this spot")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+                } else {
+                    Menu {
+                        Button("None") {
+                            linkedAuditIssueId = nil
+                        }
+                        Divider()
+                        ForEach(issuesAtSpot) { issue in
+                            Button {
+                                linkedAuditIssueId = issue.id
+                            } label: {
+                                Label(
+                                    "\(issue.category.rawValue) (\(issue.severity.rawValue))",
+                                    systemImage: issue.severity.icon
+                                )
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            if let linkedId = linkedAuditIssueId,
+                               let linked = auditIssues.first(where: { $0.id == linkedId }) {
+                                Image(systemName: linked.severity.icon)
+                                    .foregroundStyle(linked.severity.color)
+                                Text(linked.category.rawValue)
+                                    .font(.subheadline.weight(.medium))
+                                Text(linked.severity.rawValue)
+                                    .font(.caption2.weight(.medium))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(linked.severity.color.opacity(0.15), in: .capsule)
+                                    .foregroundStyle(linked.severity.color)
+                            } else {
+                                Text("Select audit issue...")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(10)
+                        .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+                    }
+                }
+            }
+
+            Divider()
+
+            // Resolution notes
+            VStack(alignment: .leading, spacing: 8) {
+                Text("RESOLUTION NOTES")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                TextField("How was this fixed?", text: $resolutionNotes, axis: .vertical)
+                    .lineLimit(2...5)
+                    .font(.subheadline)
+                    .padding(10)
+                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+            }
+        }
+        .cardStyle()
+    }
+
+    // MARK: - Spot Picker Section
+
+    private var spotPickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SPOT")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            if localSpots.isEmpty {
+                Button {
+                    showNewSpotSheet = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add a Spot")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .foregroundStyle(.orange)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+                }
+            } else {
+                Menu {
+                    ForEach(localSpots) { spot in
+                        Button {
+                            spotId = spot.id
+                        } label: {
+                            Label(spot.title.isEmpty ? "Untitled" : spot.title, systemImage: spot.jobType.icon)
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        showNewSpotSheet = true
+                    } label: {
+                        Label("New Spot...", systemImage: "plus.circle")
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: selectedSpot?.jobType.icon ?? "mappin")
+                            .foregroundStyle(.orange)
+                        Text(selectedSpot?.title ?? "Select Spot")
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(10)
+                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+                }
+            }
+        }
+    }
+
+    // MARK: - Save Button
+
+    private var saveButton: some View {
+        VStack(spacing: 12) {
+            Button {
+                Task { await save() }
+            } label: {
+                HStack(spacing: 8) {
+                    Spacer()
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "square.and.arrow.up.fill")
+                        Text("Save")
+                    }
+                    Spacer()
+                }
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(height: 54)
+                .background(
+                    LinearGradient(
+                        colors: canSave
+                            ? [.orange, .orange.opacity(0.85)]
+                            : [.gray, .gray.opacity(0.85)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: .capsule
+                )
+                .shadow(
+                    color: canSave ? .orange.opacity(0.3) : .clear,
+                    radius: 12,
+                    y: 4
+                )
+            }
+            .disabled(!canSave || isSaving)
+            .sensoryFeedback(.impact(weight: .medium), trigger: isSaving)
+        }
+        .padding(.top, 4)
+    }
+
+    // MARK: - Success Overlay
+
+    private var successOverlay: some View {
+        let isAudit = savedType == .audit
+        let accentColor: Color = isAudit ? .orange : .green
+        let icon = isAudit ? "exclamationmark.triangle.fill" : "wrench.and.screwdriver.fill"
+        let title = isAudit ? "Issue Added" : "Fix Added"
+
+        return VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(accentColor.opacity(0.15))
+                    .frame(width: 80, height: 80)
+
+                Image(systemName: icon)
+                    .font(.system(size: 32))
+                    .foregroundStyle(accentColor)
+            }
+
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.title3.weight(.bold))
+
+                Text(savedJobAddress)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                Text("Saved to \(isAudit ? "Audit" : "Inspection") form")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color(.tertiarySystemFill), in: .capsule)
+        }
+        .padding(32)
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.12), radius: 24, y: 8)
+    }
+
+    // MARK: - New Spot Sheet
+
+    private var newSpotSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 20) {
+                TextField("Spot title (e.g. Kitchen Window)", text: $newSpotTitle)
+                    .font(.headline)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("JOB TYPE")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(JobType.allCases) { type in
+                                Button {
+                                    newSpotJobType = type
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: type.icon)
+                                            .font(.caption2)
+                                        Text(type.rawValue)
+                                            .font(.caption.weight(.medium))
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .frame(height: CaptureDesign.chipHeight)
+                                    .foregroundStyle(newSpotJobType == type ? .white : .primary)
+                                    .background(
+                                        newSpotJobType == type
+                                            ? AnyShapeStyle(.orange)
+                                            : AnyShapeStyle(.clear),
+                                        in: .capsule
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(
+                                                newSpotJobType == type ? .clear : Color(.systemGray3),
+                                                lineWidth: 1
+                                            )
+                                    )
+                                }
+                                .sensoryFeedback(.selection, trigger: newSpotJobType == type)
+                            }
+                        }
+                    }
+                }
+
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("New Spot")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        showNewSpotSheet = false
+                        newSpotTitle = ""
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        let spot = Spot(title: newSpotTitle, jobType: newSpotJobType)
+                        localSpots.append(spot)
+                        spotId = spot.id
+                        showNewSpotSheet = false
+                        newSpotTitle = ""
+                    }
+                    .disabled(newSpotTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.height(280)])
+    }
+
+    // MARK: - Helpers
+
+    private var canSave: Bool {
+        selectedPhoto != nil && selectedJobId != nil && spotId != nil
+    }
+
+    private func severityTextColor(_ sev: IssueSeverity) -> Color {
+        if severity == sev {
+            return sev == .minor ? .black : .white
+        }
+        return sev.color
+    }
+
+    private func selectJob(_ job: Job) {
+        selectedJobId = job.id
+        localSpots = job.spots
+        spotId = job.spots.first?.id
+        linkedAuditIssueId = nil
+        if captureType == .inspection {
+            Task { await loadAuditIssues(for: job) }
+        }
+    }
+
+    private func loadAuditIssues(for job: Job) async {
+        let forms = await store.fetchForms(for: job.id)
+        auditIssues = forms.filter { $0.formType == .audit }.flatMap { $0.issuePhotos }
+    }
+
+    private func importPhoto(from item: PhotosPickerItem?) {
+        guard let item else { return }
+        Task {
+            if let data = try? await item.loadTransferable(type: Data.self) {
+                let filename = store.saveTempPhoto(data)
+                selectedPhoto = filename
+                displayImage = store.loadTempImage(named: filename)
+                // Auto-select first job if none selected
+                if selectedJobId == nil, let first = store.jobs.first {
+                    selectJob(first)
+                }
+            }
+            selectedItem = nil
+        }
+    }
+
+    private func resetPhoto() {
+        selectedPhoto = nil
+        displayImage = nil
+        selectedItem = nil
+    }
+
+    private func resetAll() {
+        resetPhoto()
+        captureType = .audit
+        spotId = nil
+        category = .other
+        severity = .major
+        notes = ""
+        linkedAuditIssueId = nil
+        resolutionNotes = ""
+        auditIssues = []
+    }
+
+    // MARK: - Save
+
+    private func save() async {
+        guard let photo = selectedPhoto,
+              let job = selectedJob,
+              let spotId else { return }
+
+        isSaving = true
+        defer { isSaving = false }
+
+        do {
+            // Upload photo
+            guard let imageData = store.loadTempPhotoData(named: photo) else {
+                throw NSError(domain: "QuickCapture", code: 1,
+                              userInfo: [NSLocalizedDescriptionKey: "Could not load photo data."])
+            }
+
+            // We need a form ID for the upload path — fetch or create inline
+            let forms = await store.fetchForms(for: job.id)
+            let existingForm: InspectionForm?
+            let formId: UUID
+
+            if captureType == .audit {
+                existingForm = forms.first { $0.formType == .audit }
+            } else {
+                existingForm = forms.first { $0.formType == .inspection }
+            }
+            formId = existingForm?.id ?? UUID()
+
+            let photoId = UUID()
+            let downloadURL = try await store.uploadPhoto(
+                imageData: imageData,
+                jobId: job.id,
+                formId: formId,
+                photoId: photoId
+            )
+
+            // Persist new spots to job if we added any
+            var updatedJob = job
+            updatedJob.spots = localSpots
+            if updatedJob.spots != job.spots {
+                store.updateJob(updatedJob)
+            }
+
+            if captureType == .audit {
+                let issuePhoto = IssuePhoto(
+                    id: photoId,
+                    spotId: spotId,
+                    photoURL: downloadURL,
+                    category: category,
+                    severity: severity,
+                    notes: notes
+                )
+                if var form = existingForm {
+                    form.issuePhotos.append(issuePhoto)
+                    store.updateForm(form, in: updatedJob)
+                } else {
+                    var newForm = InspectionForm(id: formId, formType: .audit, inspectorName: inspectorName, date: Date())
+                    newForm.issuePhotos.append(issuePhoto)
+                    store.addForm(newForm, to: updatedJob)
+                }
+            } else {
+                let fixPhoto = FixPhoto(
+                    id: photoId,
+                    spotId: spotId,
+                    linkedAuditIssueId: linkedAuditIssueId,
+                    photoURL: downloadURL,
+                    resolutionNotes: resolutionNotes
+                )
+                if var form = existingForm {
+                    form.fixPhotos.append(fixPhoto)
+                    store.updateForm(form, in: updatedJob)
+                } else {
+                    var newForm = InspectionForm(id: formId, formType: .inspection, inspectorName: inspectorName, date: Date())
+                    newForm.fixPhotos.append(fixPhoto)
+                    store.addForm(newForm, to: updatedJob)
+                }
+            }
+
+            store.cleanupTempPhotos()
+
+            // Capture info for overlay before resetting
+            savedType = captureType
+            savedJobAddress = job.address
+
+            // Show success
+            withAnimation(CaptureDesign.spring) {
+                showSuccess = true
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                withAnimation(CaptureDesign.spring) {
+                    showSuccess = false
+                }
+                resetAll()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+}
