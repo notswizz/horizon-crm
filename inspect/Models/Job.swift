@@ -278,6 +278,16 @@ struct Material: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - Rebate Outcome
+
+enum RebateOutcome: String, Codable, CaseIterable, Identifiable, Sendable {
+    case pending = "Pending"
+    case approved = "Approved"
+    case declined = "Declined"
+
+    var id: String { rawValue }
+}
+
 // MARK: - Job Stage
 
 enum JobStage: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -380,6 +390,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
     var notes: String
     var currentStage: JobStage
     var rebateAmount: Double
+    var rebateOutcome: RebateOutcome
     var spots: [Spot]
     var formCount: Int
     var photoCount: Int
@@ -396,6 +407,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
         notes: String = "",
         currentStage: JobStage = .auditPending,
         rebateAmount: Double = 0,
+        rebateOutcome: RebateOutcome = .pending,
         spots: [Spot] = [],
         formCount: Int = 0,
         photoCount: Int = 0,
@@ -411,6 +423,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
         self.notes = notes
         self.currentStage = currentStage
         self.rebateAmount = rebateAmount
+        self.rebateOutcome = rebateOutcome
         self.spots = spots
         self.formCount = formCount
         self.photoCount = photoCount

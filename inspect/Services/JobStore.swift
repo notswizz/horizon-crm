@@ -426,4 +426,189 @@ final class JobStore {
             try? FileManager.default.createDirectory(at: tempDirectoryURL, withIntermediateDirectories: true)
         }
     }
+
+    // MARK: - Export Training Data
+
+    func exportAllAsJSONL() async -> String {
+        let iso = ISO8601DateFormatter()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+
+        var lines: [String] = []
+
+        for job in jobs {
+            let jobForms = await fetchForms(for: job.id)
+
+            // Collect all audit issues keyed by spotId for linking
+            var issuesBySpot: [UUID: [IssuePhoto]] = [:]
+            var allFixesByLinkedId: [UUID: FixPhoto] = [:]
+            // Collect materials keyed by the spot they belong to (via form → spot association)
+            var materialsBySpot: [UUID: [Material]] = [:]
+
+            for form in jobForms where form.formType == .audit {
+                for spot in form.spots {
+                    issuesBySpot[spot.id, default: []].append(contentsOf: spot.issuePhotos)
+                }
+                // Distribute materials to spots by matching material type → spot job type
+                for mat in form.materials {
+                    for spot in form.spots where materialTypeMatchesJobType(mat.type, spot.jobType) {
+                        materialsBySpot[spot.id, default: []].append(mat)
+                    }
+                }
+            }
+            for form in jobForms where form.formType == .inspection {
+                for spot in form.spots {
+                    for fix in spot.fixPhotos {
+                        if let linkedId = fix.linkedAuditIssueId {
+                            allFixesByLinkedId[linkedId] = fix
+                        }
+                    }
+                }
+                for mat in form.materials {
+                    for spot in form.spots where materialTypeMatchesJobType(mat.type, spot.jobType) {
+                        materialsBySpot[spot.id, default: []].append(mat)
+                    }
+                }
+            }
+
+            // Build combined spots — merge audit + inspection data per spot
+            var spotExports: [SpotExport] = []
+            let allSpotIds = Set(
+                jobForms.flatMap { $0.spots.map { $0.id } } + job.spots.map { $0.id }
+            )
+
+            for spotId in allSpotIds {
+                let formSpot = jobForms.flatMap { $0.spots }.first { $0.id == spotId }
+                let jobSpot = job.spots.first { $0.id == spotId }
+                let title = formSpot?.title ?? jobSpot?.title ?? "Unknown"
+                let jobType = formSpot?.jobType.rawValue ?? jobSpot?.jobType.rawValue ?? "Unknown"
+
+                // Build findings: each audit issue + its linked fix (if any)
+                let issues = issuesBySpot[spotId] ?? []
+                var findings: [FindingExport] = issues.map { issue in
+                    let fix = allFixesByLinkedId[issue.id]
+                    return FindingExport(
+                        category: issue.category.rawValue,
+                        severity: issue.severity.rawValue,
+                        issueNotes: issue.notes,
+                        beforePhotoURL: issue.photoURL,
+                        issueDate: iso.string(from: issue.dateTaken),
+                        resolved: fix != nil,
+                        afterPhotoURL: fix?.photoURL,
+                        resolutionNotes: fix?.resolutionNotes,
+                        fixDate: fix.map { iso.string(from: $0.dateTaken) }
+                    )
+                }
+
+                // Unlinked fixes (no audit issue) — standalone fix records
+                for form in jobForms where form.formType == .inspection {
+                    for spot in form.spots where spot.id == spotId {
+                        for fix in spot.fixPhotos where fix.linkedAuditIssueId == nil {
+                            findings.append(FindingExport(
+                                category: nil,
+                                severity: nil,
+                                issueNotes: nil,
+                                beforePhotoURL: nil,
+                                issueDate: nil,
+                                resolved: true,
+                                afterPhotoURL: fix.photoURL,
+                                resolutionNotes: fix.resolutionNotes,
+                                fixDate: iso.string(from: fix.dateTaken)
+                            ))
+                        }
+                    }
+                }
+
+                // Materials for this spot
+                let spotMats = (materialsBySpot[spotId] ?? []).map { mat in
+                    MaterialExport(name: mat.name, type: mat.type.rawValue, quantity: mat.quantity, cost: mat.cost)
+                }
+
+                if !findings.isEmpty || !spotMats.isEmpty {
+                    spotExports.append(SpotExport(
+                        title: title,
+                        jobType: jobType,
+                        findings: findings.isEmpty ? nil : findings,
+                        materials: spotMats.isEmpty ? nil : spotMats
+                    ))
+                }
+            }
+
+            // Collect unique inspector names
+            let inspectors = Array(Set(jobForms.map { $0.inspectorName }.filter { !$0.isEmpty }))
+
+            // Form notes combined
+            let formNotes = jobForms.filter { !$0.notes.isEmpty }.map { "\($0.formType.rawValue): \($0.notes)" }
+
+            let export = JobExport(
+                address: job.address,
+                contactName: job.contactName,
+                contactPhone: job.contactPhone,
+                contactEmail: job.contactEmail,
+                notes: job.notes,
+                stage: job.currentStage.rawValue,
+                rebateAmount: job.rebateAmount,
+                rebateOutcome: job.rebateOutcome.rawValue,
+                inspectors: inspectors,
+                formNotes: formNotes.isEmpty ? nil : formNotes,
+                spots: spotExports,
+                createdAt: iso.string(from: job.createdAt)
+            )
+
+            if let data = try? encoder.encode(export), let line = String(data: data, encoding: .utf8) {
+                lines.append(line)
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
 }
+
+// MARK: - Export Structs
+
+private struct JobExport: Encodable {
+    let address, contactName, contactPhone, contactEmail, notes, stage: String
+    let rebateAmount: Double
+    let rebateOutcome: String
+    let inspectors: [String]
+    let formNotes: [String]?
+    let spots: [SpotExport]
+    let createdAt: String
+}
+
+private struct SpotExport: Encodable {
+    let title, jobType: String
+    let findings: [FindingExport]?
+    let materials: [MaterialExport]?
+}
+
+/// Maps material type to compatible spot job types
+private func materialTypeMatchesJobType(_ materialType: MaterialType, _ jobType: JobType) -> Bool {
+    switch materialType {
+    case .insulation: return [.insulation, .attic, .crawlspace].contains(jobType)
+    case .sealant:    return [.airSealing, .weatherization].contains(jobType)
+    case .hvacUnit:   return jobType == .hvac
+    case .ductwork:   return jobType == .ductSealing
+    case .other:      return true
+    }
+}
+
+private struct FindingExport: Encodable {
+    // Issue (before)
+    let category: String?
+    let severity: String?
+    let issueNotes: String?
+    let beforePhotoURL: String?
+    let issueDate: String?
+    // Resolution (after)
+    let resolved: Bool
+    let afterPhotoURL: String?
+    let resolutionNotes: String?
+    let fixDate: String?
+}
+
+private struct MaterialExport: Encodable {
+    let name, type, quantity: String
+    let cost: Double?
+}
+

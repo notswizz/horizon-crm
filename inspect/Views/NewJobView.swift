@@ -78,7 +78,6 @@ private enum Field: Hashable {
     case contactPhone
     case contactEmail
     case notes
-    case rebateAmount
 }
 
 // MARK: - New Job View
@@ -87,7 +86,6 @@ struct NewJobView: View {
     var store: JobStore
     @Environment(\.dismiss) private var dismiss
     @State private var job = Job()
-    @State private var rebateText = ""
     @State private var showSuccess = false
     @State private var showError = false
     @FocusState private var focusedField: Field?
@@ -98,7 +96,6 @@ struct NewJobView: View {
                 VStack(spacing: Design.sectionSpacing) {
                     jobDetailsCard
                     contactCard
-                    rebateCard
                     notesCard
                     actionButtons
                 }
@@ -208,33 +205,6 @@ struct NewJobView: View {
                 keyboardType: .emailAddress
             )
             .focused($focusedField, equals: .contactEmail)
-        }
-        .cardStyle()
-    }
-
-    // MARK: - Rebate Card
-
-    private var rebateCard: some View {
-        VStack(alignment: .leading, spacing: Design.innerSpacing) {
-            Label {
-                Text("Rebate Amount")
-                    .font(.headline)
-            } icon: {
-                Image(systemName: "dollarsign.circle.fill")
-                    .foregroundStyle(.green)
-            }
-
-            StyledTextField(
-                icon: "dollarsign",
-                label: "AMOUNT",
-                placeholder: "0",
-                text: $rebateText,
-                keyboardType: .decimalPad
-            )
-            .focused($focusedField, equals: .rebateAmount)
-            .onChange(of: rebateText) { _, newValue in
-                job.rebateAmount = Double(newValue) ?? 0
-            }
         }
         .cardStyle()
     }

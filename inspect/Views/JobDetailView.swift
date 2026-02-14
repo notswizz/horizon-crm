@@ -156,13 +156,60 @@ struct JobDetailView: View {
                         Label("\(job.issueCount) issue\(job.issueCount == 1 ? "" : "s")", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.red)
                     }
-                    if job.rebateAmount > 0 {
-                        Label("$\(job.rebateAmount, specifier: "%.0f")", systemImage: "dollarsign.circle.fill")
-                            .foregroundStyle(.green)
+                    Menu {
+                        ForEach(RebateOutcome.allCases) { outcome in
+                            Button {
+                                var updated = job
+                                updated.rebateOutcome = outcome
+                                if outcome != .approved {
+                                    updated.rebateAmount = 0
+                                }
+                                store.updateJob(updated)
+                            } label: {
+                                if outcome == job.rebateOutcome {
+                                    Label(outcome.rawValue, systemImage: "checkmark")
+                                } else {
+                                    Text(outcome.rawValue)
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "dollarsign.circle.fill")
+                            Text(job.rebateOutcome.rawValue)
+                        }
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(rebateOutcomeColor.opacity(0.15), in: .capsule)
+                        .foregroundStyle(rebateOutcomeColor)
                     }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+                if job.rebateOutcome == .approved {
+                    HStack(spacing: 8) {
+                        Image(systemName: "dollarsign")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                        TextField("Rebate amount", text: $rebateText)
+                            .keyboardType(.decimalPad)
+                            .font(.subheadline)
+                        if !rebateText.isEmpty {
+                            Text("$\(rebateText)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    .padding(10)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
+                    .onChange(of: rebateText) { _, newValue in
+                        var updated = job
+                        updated.rebateAmount = Double(newValue) ?? 0
+                        store.updateJob(updated)
+                    }
+                }
             }
             .padding(DetailDesign.cardPadding)
         }
@@ -242,21 +289,26 @@ struct JobDetailView: View {
         .shadow(color: DetailDesign.shadowColor, radius: DetailDesign.shadowRadius, y: DetailDesign.shadowY)
     }
 
-    // MARK: - Spots Section (always shown, with add button)
+    // MARK: - Spots Section
 
     private var spotsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Spots")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Label {
+                    Text("Spots")
+                        .font(.subheadline.weight(.semibold))
+                } icon: {
+                    Image(systemName: "mappin.and.ellipse")
+                        .foregroundStyle(.orange)
+                        .font(.subheadline)
+                }
                 Spacer()
                 Button {
                     showNewSpotSheet = true
                 } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 10, weight: .bold))
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 14))
                         Text("Add")
                             .font(.caption.weight(.semibold))
                     }
@@ -265,38 +317,44 @@ struct JobDetailView: View {
             }
 
             if job.spots.isEmpty {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "mappin.slash")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.tertiary)
                     Text("No spots yet — add one to get started")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
             } else {
-                ForEach(job.spots) { spot in
-                    HStack(spacing: 10) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(.orange.opacity(0.1))
-                                .frame(width: 28, height: 28)
-                            Image(systemName: spot.jobType.icon)
-                                .font(.system(size: 11))
+                VStack(spacing: 6) {
+                    ForEach(job.spots) { spot in
+                        HStack(spacing: 10) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(.orange.opacity(0.1))
+                                    .frame(width: 32, height: 32)
+                                Image(systemName: spot.jobType.icon)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.orange)
+                            }
+
+                            Text(spot.title.isEmpty ? "Untitled" : spot.title)
+                                .font(.subheadline.weight(.medium))
+
+                            Spacer()
+
+                            Text(spot.jobType.rawValue)
+                                .font(.caption2.weight(.medium))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.orange.opacity(0.08), in: .capsule)
                                 .foregroundStyle(.orange)
                         }
-
-                        Text(spot.title.isEmpty ? "Untitled" : spot.title)
-                            .font(.subheadline.weight(.medium))
-
-                        Spacer()
-
-                        Text(spot.jobType.rawValue)
-                            .font(.caption2.weight(.medium))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(.orange.opacity(0.08), in: .capsule)
-                            .foregroundStyle(.orange)
+                        .padding(10)
+                        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
                     }
                 }
             }
@@ -306,70 +364,79 @@ struct JobDetailView: View {
         .shadow(color: DetailDesign.shadowColor, radius: DetailDesign.shadowRadius, y: DetailDesign.shadowY)
     }
 
-    // MARK: - Audit Section (single, editable)
+    // MARK: - Audit Section
 
     private var auditSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: "clipboard.fill")
-                    .font(.caption)
-                    .foregroundStyle(.blue)
-                Text("Audit")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label {
+                    Text("Audit")
+                        .font(.subheadline.weight(.semibold))
+                } icon: {
+                    Image(systemName: "clipboard.fill")
+                        .foregroundStyle(.blue)
+                        .font(.subheadline)
+                }
+                Spacer()
+                if let audit, audit.issuePhotos.count > 0 {
+                    Text("\(audit.issuePhotos.count) issue\(audit.issuePhotos.count == 1 ? "" : "s")")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(.red.opacity(0.1), in: .capsule)
+                }
             }
 
             if let audit {
                 NavigationLink(destination: FormDetailView(form: audit, job: job, store: store)) {
-                    HStack {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(.blue.opacity(0.1))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.blue)
+                        }
+
                         VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 6) {
-                                Text(audit.inspectorName.isEmpty ? "Unknown Inspector" : audit.inspectorName)
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(.primary)
+                            Text(audit.inspectorName.isEmpty ? "Unknown Inspector" : audit.inspectorName)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.primary)
 
-                                if audit.issuePhotos.count > 0 {
-                                    Text("\(audit.issuePhotos.count) issue\(audit.issuePhotos.count == 1 ? "" : "s")")
-                                        .font(.caption2.weight(.medium))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(.red.opacity(0.1), in: .capsule)
-                                        .foregroundStyle(.red)
-                                }
-                            }
-
-                            HStack(spacing: 10) {
-                                Text(audit.date.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
+                            HStack(spacing: 8) {
+                                Label(audit.date.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
                                 if audit.photoCount > 0 {
-                                    Label("\(audit.photoCount)", systemImage: "photo")
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
+                                    Label("\(audit.photoCount) photo\(audit.photoCount == 1 ? "" : "s")", systemImage: "photo")
                                 }
                             }
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                         }
 
                         Spacer()
 
                         Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.tertiary)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.quaternary)
                     }
                     .padding(12)
                     .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
                 }
                 .buttonStyle(.plain)
             } else {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "camera.fill")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.tertiary)
                     Text("Use Quick Capture to start an audit")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
             }
         }
         .padding(DetailDesign.cardPadding)
@@ -380,67 +447,80 @@ struct JobDetailView: View {
     // MARK: - Inspections Section
 
     private var inspectionsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: "checkmark.shield.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                Text("Inspections")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label {
+                    Text("Inspections")
+                        .font(.subheadline.weight(.semibold))
+                } icon: {
+                    Image(systemName: "checkmark.shield.fill")
+                        .foregroundStyle(.green)
+                        .font(.subheadline)
+                }
                 Spacer()
                 if !inspections.isEmpty {
                     Text("\(inspections.count)")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
                         .background(Color(.tertiarySystemFill), in: .capsule)
                 }
             }
 
-            ForEach(inspections) { inspection in
-                NavigationLink(destination: FormDetailView(form: inspection, job: job, store: store)) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(inspection.inspectorName.isEmpty ? "Unknown Inspector" : inspection.inspectorName)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.primary)
-
-                            HStack(spacing: 10) {
-                                Text(inspection.date.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                                if inspection.fixPhotos.count > 0 {
-                                    Label("\(inspection.fixPhotos.count) fix\(inspection.fixPhotos.count == 1 ? "" : "es")", systemImage: "wrench.and.screwdriver")
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(12)
-                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
-                }
-                .buttonStyle(.plain)
-            }
-
             if inspections.isEmpty {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "camera.fill")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.tertiary)
                     Text("Use Quick Capture to add inspections")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
+            } else {
+                VStack(spacing: 6) {
+                    ForEach(inspections) { inspection in
+                        NavigationLink(destination: FormDetailView(form: inspection, job: job, store: store)) {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(.green.opacity(0.1))
+                                        .frame(width: 36, height: 36)
+                                    Image(systemName: "person.fill")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(.green)
+                                }
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(inspection.inspectorName.isEmpty ? "Unknown Inspector" : inspection.inspectorName)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.primary)
+
+                                    HStack(spacing: 8) {
+                                        Label(inspection.date.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
+                                        if inspection.fixPhotos.count > 0 {
+                                            Label("\(inspection.fixPhotos.count) fix\(inspection.fixPhotos.count == 1 ? "" : "es")", systemImage: "wrench.and.screwdriver")
+                                        }
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.quaternary)
+                            }
+                            .padding(12)
+                            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
         }
         .padding(DetailDesign.cardPadding)
@@ -584,6 +664,14 @@ struct JobDetailView: View {
 
     // MARK: - Helpers
 
+    private var rebateOutcomeColor: Color {
+        switch job.rebateOutcome {
+        case .pending: .orange
+        case .approved: .green
+        case .declined: .red
+        }
+    }
+
     private var pipelineStages: [JobStage] {
         [.auditPending, .workInProgress, .inspectionPending, .completed]
     }
@@ -619,7 +707,7 @@ struct JobDetailView: View {
         Phone: \(job.contactPhone)
         Email: \(job.contactEmail)
         Stage: \(job.currentStage.rawValue)
-        Rebate: $\(String(format: "%.0f", job.rebateAmount))
+        Rebate: $\(String(format: "%.0f", job.rebateAmount)) (\(job.rebateOutcome.rawValue))
         Created: \(job.createdAt.formatted(date: .long, time: .shortened))
         """
 
