@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var isExporting = false
     @State private var exportFileURL: URL?
     @State private var showShareSheet = false
+    @State private var estimatedValue: String = "—"
+    @State private var isEstimating = false
 
     var body: some View {
         NavigationStack {
@@ -85,8 +87,9 @@ struct SettingsView: View {
                 Task {
                     isExporting = true
                     let jsonl = await store.exportAllAsJSONL()
+                    let datestamp = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date()) }()
                     let tempURL = FileManager.default.temporaryDirectory
-                        .appendingPathComponent("inspect_training_data.jsonl")
+                        .appendingPathComponent("horizon_training_data_\(datestamp).jsonl")
                     try? jsonl.data(using: .utf8)?.write(to: tempURL)
                     exportFileURL = tempURL
                     isExporting = false
@@ -124,49 +127,67 @@ struct SettingsView: View {
                     Text("est. value")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                    Text(estimatedDataValue)
-                        .font(.subheadline.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.green)
+                    if isEstimating {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text(estimatedValue)
+                            .font(.subheadline.weight(.bold).monospacedDigit())
+                            .foregroundStyle(.green)
+                    }
                 }
             }
         }
         .cardStyle()
+        .task(id: store.jobs.count) {
+            await computeEstimate()
+        }
     }
 
-    /// Estimated dollar value of the training dataset
+    /// Computes estimated dollar value by fetching actual form data per job.
     ///
     /// Base per job = $5/job + $2/photo + $3/issue
-    /// Multipliers per job:
-    ///   ×1.5 if rebate outcome (rebateAmount > 0)
-    ///   ×1.3 if >80% of issues have before+after pairs
-    ///   ×1.2 if material costs tracked (completed/inspectionPending with forms)
-    private var estimatedDataValue: String {
+    /// Multipliers:
+    ///   ×1.5 if rebate outcome known (approved or declined)
+    ///   ×1.3 if >80% of issues have linked fix photos (actual before+after pairs)
+    ///   ×1.2 if any materials have cost data
+    private func computeEstimate() async {
+        guard !store.jobs.isEmpty else {
+            estimatedValue = "$0"
+            return
+        }
+        isEstimating = true
+        defer { isEstimating = false }
+
         var total: Double = 0
 
         for job in store.jobs {
-            // Base
             let base = 5.0 + Double(job.photoCount) * 2 + Double(job.issueCount) * 3
 
-            // Multiplier: rebate outcome (approved or declined = known outcome)
+            // Rebate multiplier
             let hasRebateOutcome = job.rebateOutcome == .approved || job.rebateOutcome == .declined
             let rebateMult: Double = hasRebateOutcome ? 1.5 : 1.0
 
-            // Multiplier: before/after pairs
-            // fixCount ≈ photoCount - issueCount (photos = issues + fixes)
-            let fixCount = max(0, job.photoCount - job.issueCount)
-            let pairRatio = job.issueCount > 0 ? Double(fixCount) / Double(job.issueCount) : 0
+            // Fetch real form data for pair ratio + material cost check
+            let forms = await store.fetchForms(for: job.id)
+
+            // Count actual linked fixes
+            let allFixPhotos = forms
+                .filter { $0.formType == .inspection }
+                .flatMap { $0.fixPhotos }
+            let linkedFixCount = allFixPhotos.filter { $0.linkedAuditIssueId != nil }.count
+            let pairRatio = job.issueCount > 0 ? Double(linkedFixCount) / Double(job.issueCount) : 0
             let pairMult: Double = pairRatio > 0.8 ? 1.3 : 1.0
 
-            // Multiplier: material costs tracked
-            // Proxy: job progressed past audit with forms submitted
-            let hasCostData = job.formCount > 0 && (job.currentStage == .completed || job.currentStage == .inspectionPending)
+            // Check if any materials have actual cost data
+            let allMaterials = forms.flatMap { $0.allMaterials }
+            let hasCostData = allMaterials.contains { $0.cost != nil && $0.cost! > 0 }
             let materialMult: Double = hasCostData ? 1.2 : 1.0
 
             total += base * rebateMult * pairMult * materialMult
         }
 
-        if total < 1 { return "$0" }
-        return "$\(Int(total))"
+        estimatedValue = total < 1 ? "$0" : "$\(Int(total))"
     }
 
     private var totalPhotos: Int {

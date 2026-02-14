@@ -152,14 +152,16 @@ struct FormSpot: Identifiable, Codable, Equatable, Sendable {
     var jobType: JobType
     var issuePhotos: [IssuePhoto]
     var fixPhotos: [FixPhoto]
+    var materials: [Material]
 
     init(id: UUID = UUID(), title: String = "", jobType: JobType = .insulation,
-         issuePhotos: [IssuePhoto] = [], fixPhotos: [FixPhoto] = []) {
+         issuePhotos: [IssuePhoto] = [], fixPhotos: [FixPhoto] = [], materials: [Material] = []) {
         self.id = id
         self.title = title
         self.jobType = jobType
         self.issuePhotos = issuePhotos
         self.fixPhotos = fixPhotos
+        self.materials = materials
     }
 
     init(from spot: Spot) {
@@ -168,6 +170,17 @@ struct FormSpot: Identifiable, Codable, Equatable, Sendable {
         self.jobType = spot.jobType
         self.issuePhotos = []
         self.fixPhotos = []
+        self.materials = []
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        jobType = try c.decode(JobType.self, forKey: .jobType)
+        issuePhotos = try c.decodeIfPresent([IssuePhoto].self, forKey: .issuePhotos) ?? []
+        fixPhotos = try c.decodeIfPresent([FixPhoto].self, forKey: .fixPhotos) ?? []
+        materials = try c.decodeIfPresent([Material].self, forKey: .materials) ?? []
     }
 }
 
@@ -329,12 +342,13 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
     var date: Date
     var notes: String
     var spots: [FormSpot]
-    var materials: [Material]
 
-    /// Flattened issue photos across all spots (read-only, for backward compat)
+    /// Flattened issue photos across all spots
     var issuePhotos: [IssuePhoto] { spots.flatMap { $0.issuePhotos } }
-    /// Flattened fix photos across all spots (read-only, for backward compat)
+    /// Flattened fix photos across all spots
     var fixPhotos: [FixPhoto] { spots.flatMap { $0.fixPhotos } }
+    /// All materials across all spots
+    var allMaterials: [Material] { spots.flatMap { $0.materials } }
 
     var photoCount: Int { issuePhotos.count + fixPhotos.count }
 
@@ -344,8 +358,7 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
         inspectorName: String = "",
         date: Date = Date(),
         notes: String = "",
-        spots: [FormSpot] = [],
-        materials: [Material] = []
+        spots: [FormSpot] = []
     ) {
         self.id = id
         self.formType = formType
@@ -353,7 +366,6 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
         self.date = date
         self.notes = notes
         self.spots = spots
-        self.materials = materials
     }
 
     /// Append an issue photo to the FormSpot matching spotId, creating one if needed
@@ -377,6 +389,18 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
             spots.append(formSpot)
         }
     }
+
+    /// Append materials to the FormSpot matching spotId
+    mutating func appendMaterials(_ materials: [Material], toSpot spotId: UUID, availableSpots: [Spot]) {
+        guard !materials.isEmpty else { return }
+        if let si = spots.firstIndex(where: { $0.id == spotId }) {
+            spots[si].materials.append(contentsOf: materials)
+        } else if let spot = availableSpots.first(where: { $0.id == spotId }) {
+            var formSpot = FormSpot(from: spot)
+            formSpot.materials = materials
+            spots.append(formSpot)
+        }
+    }
 }
 
 // MARK: - Job
@@ -395,6 +419,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
     var formCount: Int
     var photoCount: Int
     var issueCount: Int
+    var fixCount: Int
     var createdAt: Date
     var updatedAt: Date
 
@@ -412,6 +437,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
         formCount: Int = 0,
         photoCount: Int = 0,
         issueCount: Int = 0,
+        fixCount: Int = 0,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -428,8 +454,29 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
         self.formCount = formCount
         self.photoCount = photoCount
         self.issueCount = issueCount
+        self.fixCount = fixCount
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        address = try c.decode(String.self, forKey: .address)
+        contactName = try c.decode(String.self, forKey: .contactName)
+        contactPhone = try c.decode(String.self, forKey: .contactPhone)
+        contactEmail = try c.decode(String.self, forKey: .contactEmail)
+        notes = try c.decode(String.self, forKey: .notes)
+        currentStage = try c.decode(JobStage.self, forKey: .currentStage)
+        rebateAmount = try c.decode(Double.self, forKey: .rebateAmount)
+        rebateOutcome = try c.decodeIfPresent(RebateOutcome.self, forKey: .rebateOutcome) ?? .pending
+        spots = try c.decodeIfPresent([Spot].self, forKey: .spots) ?? []
+        formCount = try c.decodeIfPresent(Int.self, forKey: .formCount) ?? 0
+        photoCount = try c.decodeIfPresent(Int.self, forKey: .photoCount) ?? 0
+        issueCount = try c.decodeIfPresent(Int.self, forKey: .issueCount) ?? 0
+        fixCount = try c.decodeIfPresent(Int.self, forKey: .fixCount) ?? 0
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
     }
 }
 
@@ -495,6 +542,9 @@ extension InspectionForm {
                                 severity: .major,
                                 notes: "R-value measured at R-13, well below the recommended R-38 for this climate zone."
                             ),
+                        ],
+                        materials: [
+                            Material(name: "R-38 Fiberglass Batts", type: .insulation, quantity: "200 sq ft"),
                         ]
                     ),
                     FormSpot(
@@ -509,9 +559,6 @@ extension InspectionForm {
                             ),
                         ]
                     ),
-                ],
-                materials: [
-                    Material(name: "R-38 Fiberglass Batts", type: .insulation, quantity: "200 sq ft"),
                 ]
             ),
             InspectionForm(
@@ -529,12 +576,12 @@ extension InspectionForm {
                                 linkedAuditIssueId: issue1Id,
                                 resolutionNotes: "Unit leveled and P-trap installed."
                             ),
+                        ],
+                        materials: [
+                            Material(name: "Carrier 25VNA0 Heat Pump", type: .hvacUnit, quantity: "1 unit"),
+                            Material(name: "Foam Line Insulation", type: .insulation, quantity: "30 ft"),
                         ]
                     ),
-                ],
-                materials: [
-                    Material(name: "Carrier 25VNA0 Heat Pump", type: .hvacUnit, quantity: "1 unit"),
-                    Material(name: "Foam Line Insulation", type: .insulation, quantity: "30 ft"),
                 ]
             ),
         ]

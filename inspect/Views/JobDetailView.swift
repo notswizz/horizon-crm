@@ -20,9 +20,15 @@ struct JobDetailView: View {
 
     @State private var editedStage: JobStage
     @State private var rebateText: String
+    @State private var showRebateAlert = false
     @State private var showNewSpotSheet = false
     @State private var newSpotTitle = ""
     @State private var newSpotJobType: JobType = .insulation
+
+    /// Live version from the store's listener, falls back to the passed-in snapshot
+    private var liveJob: Job {
+        store.jobs.first { $0.id == job.id } ?? job
+    }
 
     init(job: Job, store: JobStore) {
         self.job = job
@@ -57,7 +63,7 @@ struct JobDetailView: View {
             }
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle(job.address.isEmpty ? "Job" : job.address)
+        .navigationTitle(liveJob.address.isEmpty ? "Job" : liveJob.address)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -66,9 +72,22 @@ struct JobDetailView: View {
                 }
             }
         }
-        .onAppear { store.startListeningToForms(for: job.id) }
-        .refreshable { await store.refreshForms(for: job.id) }
+        .onAppear { store.startListeningToForms(for: liveJob.id) }
+        .refreshable { await store.refreshForms(for: liveJob.id) }
         .sheet(isPresented: $showNewSpotSheet) { newSpotSheet }
+        .alert("Rebate Amount", isPresented: $showRebateAlert) {
+            TextField("Amount", text: $rebateText)
+                .keyboardType(.decimalPad)
+            Button("Save") {
+                var updated = liveJob
+                updated.rebateOutcome = .approved
+                updated.rebateAmount = Double(rebateText) ?? 0
+                store.updateJob(updated)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Enter the approved rebate amount.")
+        }
     }
 
     // MARK: - Hero Header
@@ -79,94 +98,106 @@ struct JobDetailView: View {
             Rectangle()
                 .fill(
                     LinearGradient(
-                        colors: [job.currentStage.color, job.currentStage.color.opacity(0.6)],
+                        colors: [liveJob.currentStage.color, liveJob.currentStage.color.opacity(0.6)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
                 .frame(height: 3)
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 14) {
                 // Address + badge
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(job.address.isEmpty ? "Untitled" : job.address)
-                            .font(.title3.weight(.bold))
-                            .lineLimit(2)
-
-                        Text(job.createdAt.formatted(date: .long, time: .omitted))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(liveJob.address.isEmpty ? "Untitled" : liveJob.address)
+                        .font(.title3.weight(.bold))
+                        .lineLimit(2)
 
                     Spacer(minLength: 12)
 
-                    StageBadge(stage: job.currentStage)
-                        .padding(.top, 2)
+                    StageBadge(stage: liveJob.currentStage)
                 }
 
-                // Contact row — name + tappable icons
-                if !job.contactName.isEmpty || !job.contactPhone.isEmpty || !job.contactEmail.isEmpty {
-                    HStack(spacing: 8) {
-                        if !job.contactName.isEmpty {
-                            Text(job.contactName)
+                // Contact row
+                if !liveJob.contactName.isEmpty || !liveJob.contactPhone.isEmpty || !liveJob.contactEmail.isEmpty {
+                    HStack(spacing: 10) {
+                        if !liveJob.contactName.isEmpty {
+                            Label(liveJob.contactName, systemImage: "person.fill")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
 
                         Spacer()
 
-                        if !job.contactPhone.isEmpty,
-                           let url = URL(string: "tel:\(job.contactPhone.filter { $0.isNumber })") {
+                        if !liveJob.contactPhone.isEmpty,
+                           let url = URL(string: "tel:\(liveJob.contactPhone.filter { $0.isNumber })") {
                             Link(destination: url) {
                                 Image(systemName: "phone.fill")
                                     .font(.caption)
-                                    .foregroundStyle(.blue)
-                                    .frame(width: 28, height: 28)
-                                    .background(.blue.opacity(0.1), in: .circle)
+                                    .foregroundStyle(.green)
+                                    .frame(width: 30, height: 30)
+                                    .background(.green.opacity(0.1), in: .circle)
                             }
                         }
 
-                        if !job.contactEmail.isEmpty,
-                           let url = URL(string: "mailto:\(job.contactEmail)") {
+                        if !liveJob.contactEmail.isEmpty,
+                           let url = URL(string: "mailto:\(liveJob.contactEmail)") {
                             Link(destination: url) {
                                 Image(systemName: "envelope.fill")
                                     .font(.caption)
                                     .foregroundStyle(.blue)
-                                    .frame(width: 28, height: 28)
+                                    .frame(width: 30, height: 30)
                                     .background(.blue.opacity(0.1), in: .circle)
                             }
                         }
                     }
                 }
 
-                if !job.notes.isEmpty {
-                    Text(job.notes)
+                if !liveJob.notes.isEmpty {
+                    Text(liveJob.notes)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
 
-                // Inline stats row — subtle
-                HStack(spacing: 14) {
-                    if job.photoCount > 0 {
-                        Label("\(job.photoCount) photo\(job.photoCount == 1 ? "" : "s")", systemImage: "photo")
+                // Bottom bar: stats left, rebate right
+                Divider()
+
+                HStack(spacing: 0) {
+                    // Stats
+                    HStack(spacing: 12) {
+                        if liveJob.photoCount > 0 {
+                            Label("\(liveJob.photoCount)", systemImage: "photo")
+                        }
+                        if liveJob.issueCount > 0 {
+                            Label("\(liveJob.issueCount)", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                        }
+                        if liveJob.fixCount > 0 {
+                            Label("\(liveJob.fixCount)", systemImage: "wrench.and.screwdriver.fill")
+                                .foregroundStyle(.green)
+                        }
                     }
-                    if job.issueCount > 0 {
-                        Label("\(job.issueCount) issue\(job.issueCount == 1 ? "" : "s")", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    // Rebate outcome pill — tappable menu
                     Menu {
                         ForEach(RebateOutcome.allCases) { outcome in
                             Button {
-                                var updated = job
-                                updated.rebateOutcome = outcome
-                                if outcome != .approved {
+                                if outcome == .approved {
+                                    // Show alert to enter amount — save happens in the alert
+                                    showRebateAlert = true
+                                } else {
+                                    var updated = liveJob
+                                    updated.rebateOutcome = outcome
                                     updated.rebateAmount = 0
+                                    rebateText = ""
+                                    store.updateJob(updated)
                                 }
-                                store.updateJob(updated)
                             } label: {
-                                if outcome == job.rebateOutcome {
+                                if outcome == liveJob.rebateOutcome {
                                     Label(outcome.rawValue, systemImage: "checkmark")
                                 } else {
                                     Text(outcome.rawValue)
@@ -174,42 +205,24 @@ struct JobDetailView: View {
                             }
                         }
                     } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "dollarsign.circle.fill")
-                            Text(job.rebateOutcome.rawValue)
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(rebateOutcomeColor)
+                                .frame(width: 6, height: 6)
+                            if liveJob.rebateOutcome == .approved && liveJob.rebateAmount > 0 {
+                                Text("$\(liveJob.rebateAmount, specifier: "%.0f")")
+                                    .font(.caption.weight(.bold))
+                            }
+                            Text(liveJob.rebateOutcome.rawValue)
+                                .font(.caption.weight(.medium))
                         }
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(rebateOutcomeColor.opacity(0.15), in: .capsule)
                         .foregroundStyle(rebateOutcomeColor)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
 
-                if job.rebateOutcome == .approved {
-                    HStack(spacing: 8) {
-                        Image(systemName: "dollarsign")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                        TextField("Rebate amount", text: $rebateText)
-                            .keyboardType(.decimalPad)
-                            .font(.subheadline)
-                        if !rebateText.isEmpty {
-                            Text("$\(rebateText)")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.green)
-                        }
-                    }
-                    .padding(10)
-                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
-                    .onChange(of: rebateText) { _, newValue in
-                        var updated = job
-                        updated.rebateAmount = Double(newValue) ?? 0
-                        store.updateJob(updated)
-                    }
-                }
+                Text(liveJob.createdAt.formatted(date: .long, time: .omitted))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
             .padding(DetailDesign.cardPadding)
         }
@@ -233,7 +246,7 @@ struct JobDetailView: View {
                     ForEach(JobStage.allCases) { stage in
                         Button {
                             editedStage = stage
-                            var updated = job
+                            var updated = liveJob
                             updated.currentStage = stage
                             store.updateJob(updated)
                         } label: {
@@ -254,8 +267,8 @@ struct JobDetailView: View {
             // Pipeline dots
             HStack(spacing: 0) {
                 ForEach(Array(pipelineStages.enumerated()), id: \.element.id) { index, stage in
-                    let isActive = stageIndex(stage) <= stageIndex(job.currentStage)
-                    let isCurrent = stage == job.currentStage
+                    let isActive = stageIndex(stage) <= stageIndex(liveJob.currentStage)
+                    let isCurrent = stage == liveJob.currentStage
 
                     VStack(spacing: 5) {
                         ZStack {
@@ -275,7 +288,7 @@ struct JobDetailView: View {
                     .frame(maxWidth: .infinity)
 
                     if index < pipelineStages.count - 1 {
-                        let filled = stageIndex(pipelineStages[index + 1]) <= stageIndex(job.currentStage)
+                        let filled = stageIndex(pipelineStages[index + 1]) <= stageIndex(liveJob.currentStage)
                         Rectangle()
                             .fill(filled ? stage.color.opacity(0.4) : Color(.systemGray5))
                             .frame(height: 2)
@@ -316,7 +329,7 @@ struct JobDetailView: View {
                 }
             }
 
-            if job.spots.isEmpty {
+            if liveJob.spots.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "mappin.slash")
                         .font(.subheadline)
@@ -330,7 +343,7 @@ struct JobDetailView: View {
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
             } else {
                 VStack(spacing: 6) {
-                    ForEach(job.spots) { spot in
+                    ForEach(liveJob.spots) { spot in
                         HStack(spacing: 10) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
@@ -389,7 +402,7 @@ struct JobDetailView: View {
             }
 
             if let audit {
-                NavigationLink(destination: FormDetailView(form: audit, job: job, store: store)) {
+                NavigationLink(destination: FormDetailView(form: audit, job: liveJob, store: store)) {
                     HStack(spacing: 12) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 8)
@@ -483,7 +496,7 @@ struct JobDetailView: View {
             } else {
                 VStack(spacing: 6) {
                     ForEach(inspections) { inspection in
-                        NavigationLink(destination: FormDetailView(form: inspection, job: job, store: store)) {
+                        NavigationLink(destination: FormDetailView(form: inspection, job: liveJob, store: store)) {
                             HStack(spacing: 12) {
                                 ZStack {
                                     RoundedRectangle(cornerRadius: 8)
@@ -651,7 +664,7 @@ struct JobDetailView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
                         let spot = Spot(title: newSpotTitle, jobType: newSpotJobType)
-                        store.addSpot(spot, to: job)
+                        store.addSpot(spot, to: liveJob)
                         showNewSpotSheet = false
                         newSpotTitle = ""
                     }
@@ -665,7 +678,7 @@ struct JobDetailView: View {
     // MARK: - Helpers
 
     private var rebateOutcomeColor: Color {
-        switch job.rebateOutcome {
+        switch liveJob.rebateOutcome {
         case .pending: .orange
         case .approved: .green
         case .declined: .red
@@ -702,22 +715,22 @@ struct JobDetailView: View {
         var text = """
         Job Report
         ========================
-        Address: \(job.address)
-        Contact: \(job.contactName)
-        Phone: \(job.contactPhone)
-        Email: \(job.contactEmail)
-        Stage: \(job.currentStage.rawValue)
-        Rebate: $\(String(format: "%.0f", job.rebateAmount)) (\(job.rebateOutcome.rawValue))
-        Created: \(job.createdAt.formatted(date: .long, time: .shortened))
+        Address: \(liveJob.address)
+        Contact: \(liveJob.contactName)
+        Phone: \(liveJob.contactPhone)
+        Email: \(liveJob.contactEmail)
+        Stage: \(liveJob.currentStage.rawValue)
+        Rebate: $\(String(format: "%.0f", liveJob.rebateAmount)) (\(liveJob.rebateOutcome.rawValue))
+        Created: \(liveJob.createdAt.formatted(date: .long, time: .shortened))
         """
 
-        if !job.notes.isEmpty {
-            text += "\nNotes: \(job.notes)"
+        if !liveJob.notes.isEmpty {
+            text += "\nNotes: \(liveJob.notes)"
         }
 
-        if !job.spots.isEmpty {
+        if !liveJob.spots.isEmpty {
             text += "\n\n--- SPOTS ---"
-            for spot in job.spots {
+            for spot in liveJob.spots {
                 text += "\n  - \(spot.title) (\(spot.jobType.rawValue))"
             }
         }
@@ -751,9 +764,9 @@ struct JobDetailView: View {
             text += "\nNotes: \(form.notes)"
         }
 
-        if !form.materials.isEmpty {
+        if !form.allMaterials.isEmpty {
             text += "\nMaterials:"
-            for mat in form.materials {
+            for mat in form.allMaterials {
                 let costStr = mat.cost.map { " — $\(String(format: "%.2f", $0))" } ?? ""
                 text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)\(costStr)"
             }

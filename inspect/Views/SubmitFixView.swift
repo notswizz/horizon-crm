@@ -14,6 +14,7 @@ struct SubmitFixView: View {
     @State private var photoRef: String?
     @State private var displayImage: UIImage?
     @State private var resolutionNotes = ""
+    @State private var materials: [Material] = []
     @State private var isSaving = false
     @State private var showSuccess = false
     @State private var errorMessage: String?
@@ -30,6 +31,7 @@ struct SubmitFixView: View {
                     issueCard
                     photoSection
                     notesSection
+                    materialsSection
                     saveButton
                 }
                 .padding()
@@ -218,6 +220,123 @@ struct SubmitFixView: View {
         .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
     }
 
+    // MARK: - Materials Section
+
+    private var materialsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 5) {
+                Image(systemName: "shippingbox.fill")
+                    .font(.caption)
+                    .foregroundStyle(.purple)
+                Text("Materials Used")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if !materials.isEmpty {
+                    Text("\(materials.count)")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color(.tertiarySystemFill), in: .capsule)
+                }
+            }
+
+            ForEach(Array(materials.enumerated()), id: \.element.id) { index, _ in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        TextField("Material name", text: $materials[index].name)
+                            .font(.subheadline)
+
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                _ = materials.remove(at: index)
+                            }
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundStyle(.red.opacity(0.7))
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("Quantity", text: $materials[index].quantity)
+                            .font(.caption)
+                            .padding(8)
+                            .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
+
+                        TextField("Cost ($)", value: $materials[index].cost, format: .number)
+                            .font(.caption)
+                            .keyboardType(.decimalPad)
+                            .padding(8)
+                            .frame(width: 100)
+                            .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
+                    }
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(MaterialType.allCases) { type in
+                                Button {
+                                    materials[index].type = type
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: type.icon)
+                                            .font(.caption2)
+                                        Text(type.rawValue)
+                                            .font(.caption.weight(.medium))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 28)
+                                    .foregroundStyle(materials[index].type == type ? .white : .primary)
+                                    .background(
+                                        materials[index].type == type
+                                            ? AnyShapeStyle(type.color)
+                                            : AnyShapeStyle(.clear),
+                                        in: .capsule
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(
+                                                materials[index].type == type ? .clear : Color(.systemGray3),
+                                                lineWidth: 1
+                                            )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(10)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
+            }
+
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    materials.append(Material())
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.caption)
+                    Text("Add Material")
+                        .font(.subheadline.weight(.medium))
+                }
+                .foregroundStyle(.purple)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(.purple.opacity(0.06), in: .rect(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                        .foregroundStyle(.purple.opacity(0.25))
+                )
+            }
+        }
+        .padding(14)
+        .background(.background, in: .rect(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+    }
+
     // MARK: - Save Button
 
     private var saveButton: some View {
@@ -307,12 +426,16 @@ struct SubmitFixView: View {
                 resolutionNotes: resolutionNotes
             )
 
+            let validMaterials = materials.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+
             if var form = existingForm {
                 form.appendFixPhoto(fixPhoto, toSpot: spotId, availableSpots: job.spots)
+                form.appendMaterials(validMaterials, toSpot: spotId, availableSpots: job.spots)
                 store.updateForm(form, in: job)
             } else {
                 var newForm = InspectionForm(id: formId, formType: .inspection, inspectorName: inspectorName, date: Date())
                 newForm.appendFixPhoto(fixPhoto, toSpot: spotId, availableSpots: job.spots)
+                newForm.appendMaterials(validMaterials, toSpot: spotId, availableSpots: job.spots)
                 store.addForm(newForm, to: job)
             }
 

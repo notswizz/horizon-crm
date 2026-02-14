@@ -38,7 +38,7 @@ final class JobStore {
     // MARK: - Aggregated Materials (computed from loaded forms)
 
     var allMaterials: [Material] {
-        forms.flatMap { $0.materials }
+        forms.flatMap { $0.allMaterials }
     }
 
     // MARK: - Audit Issue Photos (for inspection linkage UI)
@@ -85,6 +85,22 @@ final class JobStore {
                 guard let documents = snapshot?.documents else { return }
                 self.forms = documents.compactMap { doc in
                     try? doc.data(as: InspectionForm.self)
+                }
+
+                // Sync denormalized counts on the parent job (backfills fixCount for existing data)
+                if let idx = self.jobs.firstIndex(where: { $0.id == jobId }) {
+                    var job = self.jobs[idx]
+                    let oldFix = job.fixCount
+                    let oldIssue = job.issueCount
+                    let oldPhoto = job.photoCount
+                    let oldForm = job.formCount
+                    let oldStage = job.currentStage
+                    self.recalculateDenormalizedFields(for: &job)
+                    if job.fixCount != oldFix || job.issueCount != oldIssue
+                        || job.photoCount != oldPhoto || job.formCount != oldForm
+                        || job.currentStage != oldStage {
+                        self.updateJob(job)
+                    }
                 }
             }
     }
@@ -197,11 +213,14 @@ final class JobStore {
                 .document(form.id.uuidString)
                 .setData(from: form)
 
+            // Optimistically update in-memory forms so counts use fresh data
+            forms.append(form)
+
             // Auto-advance stage + update denormalized fields
             var updated = job
             updated.updatedAt = Date()
             advanceStage(for: &updated, afterAdding: form)
-            updateDenormalizedFields(for: &updated, adding: form)
+            recalculateDenormalizedFields(for: &updated)
 
             try db.collection(collectionName)
                 .document(updated.id.uuidString)
@@ -218,6 +237,13 @@ final class JobStore {
                 .collection(formsSubcollection)
                 .document(form.id.uuidString)
                 .setData(from: form, merge: true)
+
+            // Optimistically update in-memory forms so recalculation uses fresh data
+            if let idx = forms.firstIndex(where: { $0.id == form.id }) {
+                forms[idx] = form
+            } else {
+                forms.append(form)
+            }
 
             // Recalculate denormalized fields from current forms
             var updated = job
@@ -274,43 +300,18 @@ final class JobStore {
 
         switch form.formType {
         case .audit:
-            // Audit submitted -> move to work in progress
             if job.currentStage == .auditPending {
                 job.currentStage = .workInProgress
             }
         case .inspection:
-            // Inspection submitted -> check if all audit issues have linked fixes
-            let allAuditIssueIds = Set(
-                forms.filter { $0.formType == .audit }.flatMap { $0.issuePhotos }.map { $0.id }
-            )
-            let existingFixLinkedIds = Set(
-                forms.filter { $0.formType == .inspection }.flatMap { $0.fixPhotos }.compactMap { $0.linkedAuditIssueId }
-            )
-            let newFixLinkedIds = Set(form.fixPhotos.compactMap { $0.linkedAuditIssueId })
-            let allLinkedIds = existingFixLinkedIds.union(newFixLinkedIds)
-
-            let allIssuesFixed = !allAuditIssueIds.isEmpty && allAuditIssueIds.isSubset(of: allLinkedIds)
-
-            if job.currentStage == .workInProgress || job.currentStage == .inspectionPending {
-                if allIssuesFixed {
-                    job.currentStage = .completed
-                } else {
-                    job.currentStage = .inspectionPending
-                }
+            if job.currentStage == .workInProgress {
+                job.currentStage = .inspectionPending
             }
+            // Completion is handled by recalculateDenormalizedFields (fixCount >= issueCount)
         }
     }
 
     // MARK: - Denormalized Field Updates
-
-    /// Incrementally update counts when adding a new form
-    private func updateDenormalizedFields(for job: inout Job, adding form: InspectionForm) {
-        job.formCount += 1
-        job.photoCount += form.photoCount
-        job.issueCount = (forms + [form])
-            .filter { $0.formType == .audit }
-            .reduce(0) { $0 + $1.issuePhotos.count }
-    }
 
     /// Recalculate all denormalized fields from the current in-memory forms
     private func recalculateDenormalizedFields(for job: inout Job, excluding excludedId: UUID? = nil) {
@@ -320,6 +321,16 @@ final class JobStore {
         job.issueCount = activeForms
             .filter { $0.formType == .audit }
             .reduce(0) { $0 + $1.issuePhotos.count }
+        job.fixCount = activeForms
+            .filter { $0.formType == .inspection }
+            .flatMap { $0.fixPhotos }
+            .filter { $0.linkedAuditIssueId != nil }
+            .count
+
+        // Auto-complete: all issues have linked fixes
+        if job.issueCount > 0 && job.fixCount >= job.issueCount && job.currentStage != .cancelled {
+            job.currentStage = .completed
+        }
     }
 
     // MARK: - One-Shot Form Fetch (for Quick Capture)
@@ -442,18 +453,12 @@ final class JobStore {
             // Collect all audit issues keyed by spotId for linking
             var issuesBySpot: [UUID: [IssuePhoto]] = [:]
             var allFixesByLinkedId: [UUID: FixPhoto] = [:]
-            // Collect materials keyed by the spot they belong to (via form → spot association)
             var materialsBySpot: [UUID: [Material]] = [:]
 
             for form in jobForms where form.formType == .audit {
                 for spot in form.spots {
                     issuesBySpot[spot.id, default: []].append(contentsOf: spot.issuePhotos)
-                }
-                // Distribute materials to spots by matching material type → spot job type
-                for mat in form.materials {
-                    for spot in form.spots where materialTypeMatchesJobType(mat.type, spot.jobType) {
-                        materialsBySpot[spot.id, default: []].append(mat)
-                    }
+                    materialsBySpot[spot.id, default: []].append(contentsOf: spot.materials)
                 }
             }
             for form in jobForms where form.formType == .inspection {
@@ -463,11 +468,7 @@ final class JobStore {
                             allFixesByLinkedId[linkedId] = fix
                         }
                     }
-                }
-                for mat in form.materials {
-                    for spot in form.spots where materialTypeMatchesJobType(mat.type, spot.jobType) {
-                        materialsBySpot[spot.id, default: []].append(mat)
-                    }
+                    materialsBySpot[spot.id, default: []].append(contentsOf: spot.materials)
                 }
             }
 
@@ -534,22 +535,14 @@ final class JobStore {
                 }
             }
 
-            // Collect unique inspector names
-            let inspectors = Array(Set(jobForms.map { $0.inspectorName }.filter { !$0.isEmpty }))
-
             // Form notes combined
             let formNotes = jobForms.filter { !$0.notes.isEmpty }.map { "\($0.formType.rawValue): \($0.notes)" }
 
             let export = JobExport(
-                address: job.address,
-                contactName: job.contactName,
-                contactPhone: job.contactPhone,
-                contactEmail: job.contactEmail,
                 notes: job.notes,
                 stage: job.currentStage.rawValue,
                 rebateAmount: job.rebateAmount,
                 rebateOutcome: job.rebateOutcome.rawValue,
-                inspectors: inspectors,
                 formNotes: formNotes.isEmpty ? nil : formNotes,
                 spots: spotExports,
                 createdAt: iso.string(from: job.createdAt)
@@ -560,17 +553,23 @@ final class JobStore {
             }
         }
 
-        return lines.joined(separator: "\n")
+        let totalPhotos = jobs.reduce(0) { $0 + $1.photoCount }
+        let totalIssues = jobs.reduce(0) { $0 + $1.issueCount }
+        let totalFixes = jobs.reduce(0) { $0 + $1.fixCount }
+        let header = """
+        {"_metadata":{"exportDate":"\(iso.string(from: Date()))","appVersion":"1.0","totalJobs":\(jobs.count),"totalPhotos":\(totalPhotos),"totalIssues":\(totalIssues),"totalFixes":\(totalFixes)}}
+        """
+
+        return ([header.trimmingCharacters(in: .whitespaces)] + lines).joined(separator: "\n")
     }
 }
 
 // MARK: - Export Structs
 
 private struct JobExport: Encodable {
-    let address, contactName, contactPhone, contactEmail, notes, stage: String
+    let notes, stage: String
     let rebateAmount: Double
     let rebateOutcome: String
-    let inspectors: [String]
     let formNotes: [String]?
     let spots: [SpotExport]
     let createdAt: String
@@ -582,16 +581,6 @@ private struct SpotExport: Encodable {
     let materials: [MaterialExport]?
 }
 
-/// Maps material type to compatible spot job types
-private func materialTypeMatchesJobType(_ materialType: MaterialType, _ jobType: JobType) -> Bool {
-    switch materialType {
-    case .insulation: return [.insulation, .attic, .crawlspace].contains(jobType)
-    case .sealant:    return [.airSealing, .weatherization].contains(jobType)
-    case .hvacUnit:   return jobType == .hvac
-    case .ductwork:   return jobType == .ductSealing
-    case .other:      return true
-    }
-}
 
 private struct FindingExport: Encodable {
     // Issue (before)

@@ -964,11 +964,12 @@ struct QuickCaptureView: View {
                 let validMaterials = materials.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
                 if var form = existingForm {
                     form.appendFixPhoto(fixPhoto, toSpot: spotId, availableSpots: updatedJob.spots)
-                    form.materials.append(contentsOf: validMaterials)
+                    form.appendMaterials(validMaterials, toSpot: spotId, availableSpots: updatedJob.spots)
                     store.updateForm(form, in: updatedJob)
                 } else {
-                    var newForm = InspectionForm(id: formId, formType: .inspection, inspectorName: inspectorName, date: Date(), materials: validMaterials)
+                    var newForm = InspectionForm(id: formId, formType: .inspection, inspectorName: inspectorName, date: Date())
                     newForm.appendFixPhoto(fixPhoto, toSpot: spotId, availableSpots: updatedJob.spots)
+                    newForm.appendMaterials(validMaterials, toSpot: spotId, availableSpots: updatedJob.spots)
                     store.addForm(newForm, to: updatedJob)
                 }
             }

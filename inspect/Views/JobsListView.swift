@@ -39,7 +39,7 @@ struct JobsListView: View {
 
     private var jobsList: some View {
         ScrollView {
-            LazyVStack(spacing: 10) {
+            LazyVStack(spacing: 12) {
                 ForEach(filteredJobs) { job in
                     NavigationLink(destination: JobDetailView(job: job, store: store)) {
                         JobCard(job: job)
@@ -79,69 +79,83 @@ private struct JobCard: View {
     let job: Job
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Stage color edge
-            RoundedRectangle(cornerRadius: 2)
-                .fill(job.currentStage.color)
-                .frame(width: 4)
-                .padding(.vertical, 8)
-
-            VStack(spacing: 10) {
-                // Row 1: address + stage
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(job.address.isEmpty ? "Untitled" : job.address)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                            .foregroundStyle(.primary)
-
-                        if !job.contactName.isEmpty {
-                            Text(job.contactName)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
+        VStack(spacing: 0) {
+            // Top section
+            HStack(alignment: .top, spacing: 12) {
+                // Stage icon circle
+                Circle()
+                    .fill(job.currentStage.color.opacity(0.12))
+                    .frame(width: 40, height: 40)
+                    .overlay {
+                        Image(systemName: job.currentStage.icon)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(job.currentStage.color)
                     }
 
-                    Spacer(minLength: 8)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(job.address.isEmpty ? "Untitled" : job.address)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
 
-                    StageBadge(stage: job.currentStage)
+                    if !job.contactName.isEmpty {
+                        Text(job.contactName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
 
-                // Row 2: meta
-                HStack(spacing: 0) {
-                    HStack(spacing: 8) {
-                        if job.photoCount > 0 {
-                            MetaChip(icon: "photo", value: "\(job.photoCount)")
-                        }
-                        if job.issueCount > 0 {
-                            MetaChip(icon: "exclamationmark.triangle.fill", value: "\(job.issueCount)", color: .red)
-                        }
-                        if job.spots.count > 0 {
-                            MetaChip(icon: "mappin", value: "\(job.spots.count)")
-                        }
+                Spacer(minLength: 4)
+
+                StageBadge(stage: job.currentStage)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
+
+            // Divider
+            Rectangle()
+                .fill(Color(.separator).opacity(0.3))
+                .frame(height: 0.5)
+                .padding(.horizontal, 14)
+
+            // Bottom meta row
+            HStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    if job.photoCount > 0 {
+                        MetaChip(icon: "photo", value: "\(job.photoCount)")
+                    }
+                    if job.issueCount > 0 {
+                        MetaChip(icon: "exclamationmark.triangle.fill", value: "\(job.issueCount)", color: .red)
+                    }
+                    if job.fixCount > 0 {
+                        MetaChip(icon: "wrench.and.screwdriver.fill", value: "\(job.fixCount)", color: .green)
+                    }
+                    if job.spots.count > 0 {
+                        MetaChip(icon: "mappin.and.ellipse", value: "\(job.spots.count)")
+                    }
+                }
+
+                Spacer()
+
+                HStack(spacing: 10) {
+                    if job.rebateAmount > 0 {
+                        Text("$\(job.rebateAmount, specifier: "%.0f")")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.green)
                     }
 
-                    Spacer()
-
-                    HStack(spacing: 8) {
-                        if job.rebateAmount > 0 {
-                            Text("$\(job.rebateAmount, specifier: "%.0f")")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.green)
-                        }
-
-                        Text(job.createdAt.formatted(date: .abbreviated, time: .omitted))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
+                    Text(job.createdAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
-        .background(.background, in: .rect(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+        .background(.background, in: .rect(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
     }
 }
 
@@ -153,11 +167,11 @@ private struct MetaChip: View {
     var color: Color = .secondary
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 9))
+                .font(.system(size: 10))
             Text(value)
-                .font(.caption2.weight(.medium))
+                .font(.caption2.weight(.semibold))
         }
         .foregroundStyle(color)
     }

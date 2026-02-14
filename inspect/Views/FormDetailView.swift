@@ -15,7 +15,7 @@ struct FormDetailView: View {
             VStack(spacing: 20) {
                 formInfoCard
 
-                if !liveForm.materials.isEmpty {
+                if !liveForm.allMaterials.isEmpty {
                     materialsCard
                 }
 
@@ -87,7 +87,7 @@ struct FormDetailView: View {
                         .foregroundStyle(.purple)
                 }
                 Spacer()
-                Text("\(liveForm.materials.count)")
+                Text("\(liveForm.allMaterials.count)")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
@@ -95,7 +95,7 @@ struct FormDetailView: View {
                     .background(Color(.tertiarySystemFill), in: .capsule)
             }
 
-            ForEach(liveForm.materials) { material in
+            ForEach(liveForm.allMaterials) { material in
                 HStack(spacing: 10) {
                     Image(systemName: material.type.icon)
                         .font(.caption)
@@ -436,9 +436,9 @@ struct FormDetailView: View {
             text += "\nNotes: \(f.notes)"
         }
 
-        if !f.materials.isEmpty {
+        if !f.allMaterials.isEmpty {
             text += "\n\nMaterials:"
-            for mat in f.materials {
+            for mat in f.allMaterials {
                 let costStr = mat.cost.map { " — $\(String(format: "%.2f", $0))" } ?? ""
                 text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)\(costStr)"
             }

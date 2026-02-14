@@ -58,6 +58,7 @@ struct NewFormView: View {
     @State private var newSpotJobType: JobType = .insulation
     @State private var pendingSpotCallback: ((Spot) -> Void)?
     @State private var localSpots: [Spot]
+    @State private var localMaterials: [Material] = []
     @FocusState private var focusedField: FormField?
 
     init(job: Job, formType: FormType, store: JobStore) {
@@ -363,8 +364,8 @@ struct NewFormView: View {
                         .foregroundStyle(.orange)
                 }
                 Spacer()
-                if !form.materials.isEmpty {
-                    Text("\(form.materials.count)")
+                if !localMaterials.isEmpty {
+                    Text("\(localMaterials.count)")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 8)
@@ -373,13 +374,13 @@ struct NewFormView: View {
                 }
             }
 
-            ForEach(Array(form.materials.enumerated()), id: \.element.id) { index, _ in
+            ForEach(Array(localMaterials.enumerated()), id: \.element.id) { index, _ in
                 MaterialEntryCard(
-                    material: $form.materials[index],
+                    material: $localMaterials[index],
                     focusedField: $focusedField,
                     onDelete: {
                         withAnimation(FormDesign.spring) {
-                            _ = form.materials.remove(at: index)
+                            _ = localMaterials.remove(at: index)
                         }
                     }
                 )
@@ -394,7 +395,7 @@ struct NewFormView: View {
     private var addMaterialButton: some View {
         Button {
             withAnimation(FormDesign.spring) {
-                form.materials.append(Material())
+                localMaterials.append(Material())
             }
         } label: {
             HStack(spacing: 8) {
@@ -607,8 +608,12 @@ struct NewFormView: View {
         do {
             var updatedForm = form
 
-            // Validate and filter materials
-            updatedForm.materials = updatedForm.materials.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+            // Distribute materials to first spot that has content (or first spot overall)
+            let validMaterials = localMaterials.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+            if !validMaterials.isEmpty, !updatedForm.spots.isEmpty {
+                let targetIdx = updatedForm.spots.firstIndex { !$0.issuePhotos.isEmpty || !$0.fixPhotos.isEmpty } ?? 0
+                updatedForm.spots[targetIdx].materials.append(contentsOf: validMaterials)
+            }
 
             // Persist new spots to job
             var updatedJob = job
