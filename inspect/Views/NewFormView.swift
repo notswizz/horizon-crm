@@ -1,20 +1,5 @@
 import SwiftUI
 
-// MARK: - Design Tokens (local)
-
-private enum FormDesign {
-    static let cardRadius: CGFloat = 16
-    static let cardPadding: CGFloat = 20
-    static let shadowColor = Color.black.opacity(0.06)
-    static let shadowRadius: CGFloat = 12
-    static let shadowY: CGFloat = 4
-    static let sectionSpacing: CGFloat = 20
-    static let innerSpacing: CGFloat = 16
-    static let spring = Animation.spring(response: 0.35, dampingFraction: 0.8)
-    static let chipHeight: CGFloat = 36
-    static let severityPillHeight: CGFloat = 32
-}
-
 // MARK: - Focus Fields
 
 private enum FormField: Hashable {
@@ -71,7 +56,7 @@ struct NewFormView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: FormDesign.sectionSpacing) {
+            VStack(spacing: DS.Spacing.l) {
                 formDetailsCard
 
                 if formType == .audit {
@@ -110,20 +95,20 @@ struct NewFormView: View {
     // MARK: - Form Details Card
 
     private var formDetailsCard: some View {
-        VStack(alignment: .leading, spacing: FormDesign.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             Label {
                 Text("\(formType.rawValue) Details")
                     .font(.headline)
             } icon: {
                 Image(systemName: formType == .audit ? "clipboard.fill" : "checkmark.shield.fill")
-                    .foregroundStyle(formType == .audit ? .blue : .orange)
+                    .foregroundStyle(formType == .audit ? DS.Colors.info : DS.Colors.primary)
             }
 
             // Job address (read-only context)
             HStack(spacing: 12) {
                 Image(systemName: "mappin")
                     .font(.body)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
                     .frame(width: 24, alignment: .center)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("JOB ADDRESS")
@@ -158,7 +143,7 @@ struct NewFormView: View {
             )
             .focused($focusedField, equals: .notes)
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Issue Photos Section (Audit)
@@ -181,7 +166,7 @@ struct NewFormView: View {
                     moveIssuePhoto(photo.id, toSpot: newSpotId)
                 },
                 onDelete: {
-                    withAnimation(FormDesign.spring) {
+                    withAnimation(DS.Animation.defaultSpring) {
                         deleteIssuePhoto(photo.id)
                     }
                 }
@@ -194,7 +179,7 @@ struct NewFormView: View {
 
     private var addIssuePhotoButton: some View {
         Button {
-            withAnimation(FormDesign.spring) {
+            withAnimation(DS.Animation.defaultSpring) {
                 let newPhoto = IssuePhoto()
                 if let firstSpot = localSpots.first {
                     if let si = form.spots.firstIndex(where: { $0.id == firstSpot.id }) {
@@ -213,16 +198,16 @@ struct NewFormView: View {
                 Text("Add Issue Photo")
                     .font(.headline)
             }
-            .foregroundStyle(.orange)
+            .foregroundStyle(DS.Colors.primary)
             .frame(maxWidth: .infinity)
             .frame(height: 80)
-            .background(.orange.opacity(0.04), in: .rect(cornerRadius: FormDesign.cardRadius))
+            .background(DS.Colors.primary.opacity(0.04), in: .rect(cornerRadius: DS.Radius.card))
             .overlay(
-                RoundedRectangle(cornerRadius: FormDesign.cardRadius)
+                RoundedRectangle(cornerRadius: DS.Radius.card)
                     .strokeBorder(
                         style: StrokeStyle(lineWidth: 2, dash: [8, 6])
                     )
-                    .foregroundStyle(.orange.opacity(0.25))
+                    .foregroundStyle(DS.Colors.primary.opacity(0.25))
             )
         }
     }
@@ -248,7 +233,7 @@ struct NewFormView: View {
                     moveFixPhoto(photo.id, toSpot: newSpotId)
                 },
                 onDelete: {
-                    withAnimation(FormDesign.spring) {
+                    withAnimation(DS.Animation.defaultSpring) {
                         deleteFixPhoto(photo.id)
                     }
                 }
@@ -261,7 +246,7 @@ struct NewFormView: View {
 
     private var addFixPhotoButton: some View {
         Button {
-            withAnimation(FormDesign.spring) {
+            withAnimation(DS.Animation.defaultSpring) {
                 let newPhoto = FixPhoto()
                 if let firstSpot = localSpots.first {
                     if let si = form.spots.firstIndex(where: { $0.id == firstSpot.id }) {
@@ -280,16 +265,16 @@ struct NewFormView: View {
                 Text("Add Fix Photo")
                     .font(.headline)
             }
-            .foregroundStyle(.green)
+            .foregroundStyle(DS.Colors.success)
             .frame(maxWidth: .infinity)
             .frame(height: 80)
-            .background(.green.opacity(0.04), in: .rect(cornerRadius: FormDesign.cardRadius))
+            .background(DS.Colors.success.opacity(0.04), in: .rect(cornerRadius: DS.Radius.card))
             .overlay(
-                RoundedRectangle(cornerRadius: FormDesign.cardRadius)
+                RoundedRectangle(cornerRadius: DS.Radius.card)
                     .strokeBorder(
                         style: StrokeStyle(lineWidth: 2, dash: [8, 6])
                     )
-                    .foregroundStyle(.green.opacity(0.25))
+                    .foregroundStyle(DS.Colors.success.opacity(0.25))
             )
         }
     }
@@ -354,14 +339,14 @@ struct NewFormView: View {
     // MARK: - Materials Section
 
     private var materialsSection: some View {
-        VStack(alignment: .leading, spacing: FormDesign.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             HStack {
                 Label {
                     Text("Materials")
                         .font(.headline)
                 } icon: {
                     Image(systemName: "shippingbox.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DS.Colors.primary)
                 }
                 Spacer()
                 if !localMaterials.isEmpty {
@@ -379,7 +364,7 @@ struct NewFormView: View {
                     material: $localMaterials[index],
                     focusedField: $focusedField,
                     onDelete: {
-                        withAnimation(FormDesign.spring) {
+                        withAnimation(DS.Animation.defaultSpring) {
                             _ = localMaterials.remove(at: index)
                         }
                     }
@@ -387,14 +372,14 @@ struct NewFormView: View {
                 .transition(.cardTransition)
             }
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Add Material Button
 
     private var addMaterialButton: some View {
         Button {
-            withAnimation(FormDesign.spring) {
+            withAnimation(DS.Animation.defaultSpring) {
                 localMaterials.append(Material())
             }
         } label: {
@@ -407,9 +392,9 @@ struct NewFormView: View {
             .foregroundStyle(.purple)
             .frame(maxWidth: .infinity)
             .frame(height: 60)
-            .background(.purple.opacity(0.04), in: .rect(cornerRadius: FormDesign.cardRadius))
+            .background(.purple.opacity(0.04), in: .rect(cornerRadius: DS.Radius.card))
             .overlay(
-                RoundedRectangle(cornerRadius: FormDesign.cardRadius)
+                RoundedRectangle(cornerRadius: DS.Radius.card)
                     .strokeBorder(
                         style: StrokeStyle(lineWidth: 2, dash: [8, 6])
                     )
@@ -447,13 +432,13 @@ struct NewFormView: View {
                 .frame(height: 54)
                 .background(
                     LinearGradient(
-                        colors: [.orange, .orange.opacity(0.85)],
+                        colors: [DS.Colors.primary, DS.Colors.primary.opacity(0.85)],
                         startPoint: .leading,
                         endPoint: .trailing
                     ),
                     in: .capsule
                 )
-                .shadow(color: .orange.opacity(0.3), radius: 12, y: 4)
+                .shadow(color: DS.Colors.primary.opacity(0.3), radius: 12, y: 4)
             }
             .disabled(isSaving)
             .sensoryFeedback(.impact(weight: .medium), trigger: isSaving)
@@ -712,7 +697,7 @@ private struct SpotPicker: View {
             } label: {
                 HStack {
                     Image(systemName: selectedSpot?.jobType.icon ?? "mappin")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DS.Colors.primary)
                     Text(selectedSpot?.title ?? "Select Spot")
                         .font(.subheadline.weight(.medium))
                     Spacer()
@@ -750,8 +735,8 @@ private struct IssuePhotoCard: View {
             header
             cardBody
         }
-        .clipShape(.rect(cornerRadius: FormDesign.cardRadius))
-        .shadow(color: FormDesign.shadowColor, radius: FormDesign.shadowRadius, y: FormDesign.shadowY)
+        .clipShape(.rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     private var header: some View {
@@ -769,11 +754,11 @@ private struct IssuePhotoCard: View {
             }
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, FormDesign.cardPadding)
+        .padding(.horizontal, DS.Components.cardPadding)
         .padding(.vertical, 14)
         .background(
             LinearGradient(
-                colors: [.orange, .orange.opacity(0.85)],
+                colors: [DS.Colors.primary, DS.Colors.primary.opacity(0.85)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
@@ -781,7 +766,7 @@ private struct IssuePhotoCard: View {
     }
 
     private var cardBody: some View {
-        VStack(alignment: .leading, spacing: FormDesign.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             // Spot picker
             SpotPicker(
                 spots: spots,
@@ -803,7 +788,7 @@ private struct IssuePhotoCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("PHOTO")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
                     .tracking(0.5)
 
                 SinglePhotoPicker(
@@ -848,7 +833,7 @@ private struct IssuePhotoCard: View {
                         severity: severity,
                         isSelected: issuePhoto.severity == severity
                     ) {
-                        withAnimation(FormDesign.spring) {
+                        withAnimation(DS.Animation.defaultSpring) {
                             issuePhoto.severity = severity
                         }
                     }
@@ -870,7 +855,7 @@ private struct IssuePhotoCard: View {
                     .focused(focusedField, equals: .issueNotes(issuePhoto.id))
             }
         }
-        .padding(FormDesign.cardPadding)
+        .padding(DS.Components.cardPadding)
         .background(.background)
     }
 }
@@ -904,8 +889,8 @@ private struct FixPhotoCard: View {
             header
             cardBody
         }
-        .clipShape(.rect(cornerRadius: FormDesign.cardRadius))
-        .shadow(color: FormDesign.shadowColor, radius: FormDesign.shadowRadius, y: FormDesign.shadowY)
+        .clipShape(.rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     private var header: some View {
@@ -923,11 +908,11 @@ private struct FixPhotoCard: View {
             }
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, FormDesign.cardPadding)
+        .padding(.horizontal, DS.Components.cardPadding)
         .padding(.vertical, 14)
         .background(
             LinearGradient(
-                colors: [.green, .green.opacity(0.85)],
+                colors: [DS.Colors.success, DS.Colors.success.opacity(0.85)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
@@ -935,7 +920,7 @@ private struct FixPhotoCard: View {
     }
 
     private var cardBody: some View {
-        VStack(alignment: .leading, spacing: FormDesign.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             // Spot picker
             SpotPicker(
                 spots: spots,
@@ -1018,7 +1003,7 @@ private struct FixPhotoCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("PHOTO")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(DS.Colors.success)
                     .tracking(0.5)
 
                 SinglePhotoPicker(
@@ -1043,7 +1028,7 @@ private struct FixPhotoCard: View {
                     .focused(focusedField, equals: .resolutionNotes(fixPhoto.id))
             }
         }
-        .padding(FormDesign.cardPadding)
+        .padding(DS.Components.cardPadding)
         .background(.background)
     }
 }
@@ -1069,14 +1054,14 @@ private struct MaterialEntryCard: View {
                 Button(action: onDelete) {
                     Image(systemName: "trash")
                         .font(.caption)
-                        .foregroundStyle(.red.opacity(0.7))
+                        .foregroundStyle(DS.Colors.error.opacity(0.7))
                 }
             }
 
             if nameIsEmpty && !material.quantity.isEmpty {
                 Text("Name is required — this material will be removed on save")
                     .font(.caption2)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(DS.Colors.error)
             }
 
             // Type chips
@@ -1150,11 +1135,11 @@ private struct JobTypeChip: View {
                     .font(.caption.weight(.medium))
             }
             .padding(.horizontal, 12)
-            .frame(height: FormDesign.chipHeight)
+            .frame(height: 36)
             .foregroundStyle(isSelected ? .white : .primary)
             .background(
                 isSelected
-                    ? AnyShapeStyle(.orange)
+                    ? AnyShapeStyle(DS.Colors.primary)
                     : AnyShapeStyle(.clear),
                 in: .capsule
             )
@@ -1188,7 +1173,7 @@ private struct SeverityPill: View {
         Button(action: action) {
             Text(severity.rawValue)
                 .font(.caption.weight(.semibold))
-                .frame(height: FormDesign.severityPillHeight)
+                .frame(height: DS.Components.stagePill)
                 .padding(.horizontal, 14)
                 .foregroundStyle(textColor)
                 .background(

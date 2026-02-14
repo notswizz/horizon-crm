@@ -49,7 +49,7 @@ struct SettingsView: View {
                     .font(.headline)
             } icon: {
                 Image(systemName: "person.crop.circle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
             }
 
             Text("This name is automatically attached to every form you submit.")
@@ -64,7 +64,7 @@ struct SettingsView: View {
                 contentType: .name
             )
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Export Card
@@ -76,7 +76,7 @@ struct SettingsView: View {
                     .font(.headline)
             } icon: {
                 Image(systemName: "square.and.arrow.up")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(DS.Colors.info)
             }
 
             Text("Export all jobs and forms as a JSONL file for AI training.")
@@ -100,7 +100,7 @@ struct SettingsView: View {
                     Spacer()
                     if isExporting {
                         ProgressView()
-                            .tint(.blue)
+                            .tint(DS.Colors.info)
                     } else {
                         Image(systemName: "arrow.down.doc.fill")
                     }
@@ -108,9 +108,9 @@ struct SettingsView: View {
                     Spacer()
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.blue)
+                .foregroundStyle(DS.Colors.info)
                 .frame(height: 44)
-                .background(.blue.opacity(0.1), in: .rect(cornerRadius: 10))
+                .background(DS.Colors.info.opacity(0.1), in: .rect(cornerRadius: 10))
             }
             .disabled(isExporting || store.jobs.isEmpty)
 
@@ -131,14 +131,19 @@ struct SettingsView: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Text(estimatedValue)
-                            .font(.subheadline.weight(.bold).monospacedDigit())
-                            .foregroundStyle(.green)
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.caption)
+                                .foregroundStyle(DS.Colors.success)
+                            Text(estimatedValue)
+                                .font(.title3.weight(.bold).monospacedDigit())
+                                .foregroundStyle(DS.Colors.success)
+                        }
                     }
                 }
             }
         }
-        .cardStyle()
+        .dsCard()
         .task(id: store.jobs.count) {
             await computeEstimate()
         }
@@ -207,7 +212,7 @@ struct SettingsView: View {
                     .font(.headline)
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(DS.Colors.error)
             }
 
             Button(role: .destructive) {
@@ -220,16 +225,16 @@ struct SettingsView: View {
                     Spacer()
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.red)
+                .foregroundStyle(DS.Colors.error)
                 .frame(height: 44)
-                .background(.red.opacity(0.1), in: .rect(cornerRadius: 10))
+                .background(DS.Colors.error.opacity(0.1), in: .rect(cornerRadius: 10))
             }
 
             Text("Permanently removes all jobs, forms, and uploaded photos from the database.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .cardStyle()
+        .dsCard()
     }
 }
 

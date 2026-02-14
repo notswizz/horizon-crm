@@ -85,7 +85,7 @@ struct FixDetailView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "link")
                             .font(.caption)
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(DS.Colors.info)
                         Text("Linked Issue")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
@@ -127,8 +127,8 @@ struct FixDetailView: View {
                     }
                 }
                 .padding(14)
-                .background(.background, in: .rect(cornerRadius: 14))
-                .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+                .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+                .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
             }
         }
     }
@@ -140,7 +140,7 @@ struct FixDetailView: View {
             HStack(spacing: 5) {
                 Image(systemName: "wrench.and.screwdriver.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(DS.Colors.success)
                 Text("Fix Details")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -151,7 +151,7 @@ struct FixDetailView: View {
                 HStack(spacing: 8) {
                     Image(systemName: spot.jobType.icon)
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(DS.Colors.success)
                     Text(spot.title)
                         .font(.subheadline.weight(.medium))
                     Spacer()
@@ -159,8 +159,8 @@ struct FixDetailView: View {
                         .font(.caption2.weight(.medium))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
-                        .background(.green.opacity(0.1), in: .capsule)
-                        .foregroundStyle(.green)
+                        .background(DS.Colors.success.opacity(0.1), in: .capsule)
+                        .foregroundStyle(DS.Colors.success)
                 }
             }
 
@@ -176,8 +176,8 @@ struct FixDetailView: View {
             }
         }
         .padding(14)
-        .background(.background, in: .rect(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Notes Card
@@ -187,7 +187,7 @@ struct FixDetailView: View {
             HStack(spacing: 5) {
                 Image(systemName: "text.alignleft")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(DS.Colors.success)
                 Text("Resolution Notes")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -200,8 +200,8 @@ struct FixDetailView: View {
                 .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
         }
         .padding(14)
-        .background(.background, in: .rect(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Save Button
@@ -225,7 +225,7 @@ struct FixDetailView: View {
             .foregroundStyle(.white)
             .frame(height: 50)
             .background(
-                showSaved ? .green : .green.opacity(0.85),
+                showSaved ? DS.Colors.success : DS.Colors.success.opacity(0.85),
                 in: .capsule
             )
         }
@@ -250,7 +250,7 @@ struct FixDetailView: View {
 
         store.updateForm(form, in: job)
 
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DS.Animation.defaultSpring) {
             showSaved = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {

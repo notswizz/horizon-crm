@@ -1,17 +1,5 @@
 import SwiftUI
 
-// MARK: - Design Tokens
-
-private enum DetailDesign {
-    static let cardRadius: CGFloat = 14
-    static let innerRadius: CGFloat = 10
-    static let cardPadding: CGFloat = 16
-    static let sectionSpacing: CGFloat = 12
-    static let shadowColor = Color.black.opacity(0.04)
-    static let shadowRadius: CGFloat = 6
-    static let shadowY: CGFloat = 2
-}
-
 // MARK: - Job Detail View
 
 struct JobDetailView: View {
@@ -49,9 +37,9 @@ struct JobDetailView: View {
         ScrollView {
             VStack(spacing: 0) {
                 heroHeader
-                    .padding(.bottom, 16)
+                    .padding(.bottom, DS.Spacing.m)
 
-                VStack(spacing: DetailDesign.sectionSpacing) {
+                VStack(spacing: DS.Spacing.s) {
                     stagePipeline
                     spotsSection
                     auditSection
@@ -59,10 +47,10 @@ struct JobDetailView: View {
                     if !store.allMaterials.isEmpty { materialsCard }
                 }
                 .padding(.horizontal)
-                .padding(.bottom, 24)
+                .padding(.bottom, DS.Spacing.xl)
             }
         }
-        .background(Color(.systemGroupedBackground))
+        .background(DS.Colors.background)
         .navigationTitle(liveJob.address.isEmpty ? "Job" : liveJob.address)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -94,27 +82,22 @@ struct JobDetailView: View {
 
     private var heroHeader: some View {
         VStack(spacing: 0) {
-            // Stage color strip
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [liveJob.currentStage.color, liveJob.currentStage.color.opacity(0.6)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(height: 3)
-
             VStack(alignment: .leading, spacing: 14) {
                 // Address + badge
                 HStack(alignment: .top) {
                     Text(liveJob.address.isEmpty ? "Untitled" : liveJob.address)
                         .font(.title3.weight(.bold))
+                        .foregroundStyle(.white)
                         .lineLimit(2)
 
-                    Spacer(minLength: 12)
+                    Spacer(minLength: DS.Spacing.s)
 
-                    StageBadge(stage: liveJob.currentStage)
+                    Text(liveJob.currentStage.rawValue)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, DS.Spacing.xs)
+                        .padding(.vertical, 3)
+                        .background(.white.opacity(0.2), in: .capsule)
+                        .foregroundStyle(.white)
                 }
 
                 // Contact row
@@ -123,7 +106,7 @@ struct JobDetailView: View {
                         if !liveJob.contactName.isEmpty {
                             Label(liveJob.contactName, systemImage: "person.fill")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.85))
                         }
 
                         Spacer()
@@ -133,9 +116,9 @@ struct JobDetailView: View {
                             Link(destination: url) {
                                 Image(systemName: "phone.fill")
                                     .font(.caption)
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(.white)
                                     .frame(width: 30, height: 30)
-                                    .background(.green.opacity(0.1), in: .circle)
+                                    .background(.white.opacity(0.2), in: .circle)
                             }
                         }
 
@@ -144,9 +127,9 @@ struct JobDetailView: View {
                             Link(destination: url) {
                                 Image(systemName: "envelope.fill")
                                     .font(.caption)
-                                    .foregroundStyle(.blue)
+                                    .foregroundStyle(.white)
                                     .frame(width: 30, height: 30)
-                                    .background(.blue.opacity(0.1), in: .circle)
+                                    .background(.white.opacity(0.2), in: .circle)
                             }
                         }
                     }
@@ -155,30 +138,30 @@ struct JobDetailView: View {
                 if !liveJob.notes.isEmpty {
                     Text(liveJob.notes)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.8))
                         .lineLimit(3)
                 }
 
                 // Bottom bar: stats left, rebate right
-                Divider()
+                Rectangle()
+                    .fill(.white.opacity(0.2))
+                    .frame(height: 1)
 
                 HStack(spacing: 0) {
                     // Stats
-                    HStack(spacing: 12) {
+                    HStack(spacing: DS.Spacing.s) {
                         if liveJob.photoCount > 0 {
                             Label("\(liveJob.photoCount)", systemImage: "photo")
                         }
                         if liveJob.issueCount > 0 {
                             Label("\(liveJob.issueCount)", systemImage: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
                         }
                         if liveJob.fixCount > 0 {
                             Label("\(liveJob.fixCount)", systemImage: "wrench.and.screwdriver.fill")
-                                .foregroundStyle(.green)
                         }
                     }
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.8))
 
                     Spacer()
 
@@ -187,7 +170,6 @@ struct JobDetailView: View {
                         ForEach(RebateOutcome.allCases) { outcome in
                             Button {
                                 if outcome == .approved {
-                                    // Show alert to enter amount — save happens in the alert
                                     showRebateAlert = true
                                 } else {
                                     var updated = liveJob
@@ -207,7 +189,7 @@ struct JobDetailView: View {
                     } label: {
                         HStack(spacing: 5) {
                             Circle()
-                                .fill(rebateOutcomeColor)
+                                .fill(.white)
                                 .frame(width: 6, height: 6)
                             if liveJob.rebateOutcome == .approved && liveJob.rebateAmount > 0 {
                                 Text("$\(liveJob.rebateAmount, specifier: "%.0f")")
@@ -216,21 +198,27 @@ struct JobDetailView: View {
                             Text(liveJob.rebateOutcome.rawValue)
                                 .font(.caption.weight(.medium))
                         }
-                        .foregroundStyle(rebateOutcomeColor)
+                        .foregroundStyle(.white.opacity(0.9))
                     }
                 }
 
                 Text(liveJob.createdAt.formatted(date: .long, time: .omitted))
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.white.opacity(0.6))
             }
-            .padding(DetailDesign.cardPadding)
+            .padding(DS.Components.cardPadding)
         }
-        .background(.background)
-        .clipShape(.rect(cornerRadius: DetailDesign.cardRadius))
-        .shadow(color: DetailDesign.shadowColor, radius: DetailDesign.shadowRadius, y: DetailDesign.shadowY)
+        .background(
+            LinearGradient(
+                colors: [DS.Colors.primary, DS.Colors.primaryDark],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(.rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Colors.primary.opacity(0.3), radius: DS.Shadow.radius, y: DS.Shadow.y)
         .padding(.horizontal)
-        .padding(.top, 8)
+        .padding(.top, DS.Spacing.xs)
     }
 
     // MARK: - Stage Pipeline
@@ -238,9 +226,7 @@ struct JobDetailView: View {
     private var stagePipeline: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Progress")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                DSSectionHeader(title: "Progress")
                 Spacer()
                 Menu {
                     ForEach(JobStage.allCases) { stage in
@@ -292,45 +278,42 @@ struct JobDetailView: View {
                         Rectangle()
                             .fill(filled ? stage.color.opacity(0.4) : Color(.systemGray5))
                             .frame(height: 2)
-                            .padding(.bottom, 16)
+                            .padding(.bottom, DS.Spacing.m)
                     }
                 }
             }
         }
-        .padding(DetailDesign.cardPadding)
-        .background(.background, in: .rect(cornerRadius: DetailDesign.cardRadius))
-        .shadow(color: DetailDesign.shadowColor, radius: DetailDesign.shadowRadius, y: DetailDesign.shadowY)
+        .dsCard()
     }
 
     // MARK: - Spots Section
 
     private var spotsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
             HStack {
                 Label {
-                    Text("Spots")
-                        .font(.subheadline.weight(.semibold))
+                    DSSectionHeader(title: "Spots")
                 } icon: {
                     Image(systemName: "mappin.and.ellipse")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DS.Colors.primary)
                         .font(.subheadline)
                 }
                 Spacer()
                 Button {
                     showNewSpotSheet = true
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: DS.Spacing.micro) {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 14))
                         Text("Add")
                             .font(.caption.weight(.semibold))
                     }
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
                 }
             }
 
             if liveJob.spots.isEmpty {
-                HStack(spacing: 8) {
+                HStack(spacing: DS.Spacing.xs) {
                     Image(systemName: "mappin.slash")
                         .font(.subheadline)
                         .foregroundStyle(.tertiary)
@@ -339,78 +322,78 @@ struct JobDetailView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
+                .padding(DS.Spacing.s)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
             } else {
-                VStack(spacing: 6) {
-                    ForEach(liveJob.spots) { spot in
-                        HStack(spacing: 10) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(.orange.opacity(0.1))
-                                    .frame(width: 32, height: 32)
-                                Image(systemName: spot.jobType.icon)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(.orange)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DS.Spacing.xs) {
+                        ForEach(liveJob.spots) { spot in
+                            VStack(spacing: DS.Spacing.xs) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: DS.Spacing.xs)
+                                        .fill(DS.Colors.primary.opacity(0.1))
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: spot.jobType.icon)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundStyle(DS.Colors.primary)
+                                }
+
+                                Text(spot.title.isEmpty ? "Untitled" : spot.title)
+                                    .font(.caption.weight(.medium))
+                                    .lineLimit(1)
+
+                                Text(spot.jobType.rawValue)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
                             }
-
-                            Text(spot.title.isEmpty ? "Untitled" : spot.title)
-                                .font(.subheadline.weight(.medium))
-
-                            Spacer()
-
-                            Text(spot.jobType.rawValue)
-                                .font(.caption2.weight(.medium))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.orange.opacity(0.08), in: .capsule)
-                                .foregroundStyle(.orange)
+                            .frame(width: 100)
+                            .padding(.vertical, DS.Spacing.s)
+                            .padding(.horizontal, DS.Spacing.xs)
+                            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
                         }
-                        .padding(10)
-                        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
                     }
                 }
+                .padding(.horizontal, -DS.Components.cardPadding)
+                .padding(.horizontal, DS.Components.cardPadding)
             }
         }
-        .padding(DetailDesign.cardPadding)
-        .background(.background, in: .rect(cornerRadius: DetailDesign.cardRadius))
-        .shadow(color: DetailDesign.shadowColor, radius: DetailDesign.shadowRadius, y: DetailDesign.shadowY)
+        .dsCard()
     }
 
     // MARK: - Audit Section
 
     private var auditSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
             HStack {
                 Label {
-                    Text("Audit")
-                        .font(.subheadline.weight(.semibold))
+                    DSSectionHeader(title: "Audit")
                 } icon: {
                     Image(systemName: "clipboard.fill")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(DS.Colors.info)
                         .font(.subheadline)
                 }
                 Spacer()
                 if let audit, audit.issuePhotos.count > 0 {
                     Text("\(audit.issuePhotos.count) issue\(audit.issuePhotos.count == 1 ? "" : "s")")
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(DS.Colors.error)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
-                        .background(.red.opacity(0.1), in: .capsule)
+                        .background(DS.Colors.error.opacity(0.1), in: .capsule)
                 }
             }
 
             if let audit {
                 NavigationLink(destination: FormDetailView(form: audit, job: liveJob, store: store)) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: DS.Spacing.s) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(.blue.opacity(0.1))
+                            RoundedRectangle(cornerRadius: DS.Spacing.xs)
+                                .fill(DS.Colors.info.opacity(0.1))
                                 .frame(width: 36, height: 36)
                             Image(systemName: "person.fill")
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(DS.Colors.info)
                         }
 
                         VStack(alignment: .leading, spacing: 3) {
@@ -418,7 +401,7 @@ struct JobDetailView: View {
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(.primary)
 
-                            HStack(spacing: 8) {
+                            HStack(spacing: DS.Spacing.xs) {
                                 Label(audit.date.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
                                 if audit.photoCount > 0 {
                                     Label("\(audit.photoCount) photo\(audit.photoCount == 1 ? "" : "s")", systemImage: "photo")
@@ -434,12 +417,12 @@ struct JobDetailView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.quaternary)
                     }
-                    .padding(12)
-                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
+                    .padding(DS.Spacing.s)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
                 }
                 .buttonStyle(.plain)
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: DS.Spacing.xs) {
                     Image(systemName: "camera.fill")
                         .font(.subheadline)
                         .foregroundStyle(.tertiary)
@@ -448,26 +431,23 @@ struct JobDetailView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
+                .padding(DS.Spacing.s)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
             }
         }
-        .padding(DetailDesign.cardPadding)
-        .background(.background, in: .rect(cornerRadius: DetailDesign.cardRadius))
-        .shadow(color: DetailDesign.shadowColor, radius: DetailDesign.shadowRadius, y: DetailDesign.shadowY)
+        .dsCard()
     }
 
     // MARK: - Inspections Section
 
     private var inspectionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
             HStack {
                 Label {
-                    Text("Inspections")
-                        .font(.subheadline.weight(.semibold))
+                    DSSectionHeader(title: "Inspections")
                 } icon: {
                     Image(systemName: "checkmark.shield.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(DS.Colors.success)
                         .font(.subheadline)
                 }
                 Spacer()
@@ -482,7 +462,7 @@ struct JobDetailView: View {
             }
 
             if inspections.isEmpty {
-                HStack(spacing: 8) {
+                HStack(spacing: DS.Spacing.xs) {
                     Image(systemName: "camera.fill")
                         .font(.subheadline)
                         .foregroundStyle(.tertiary)
@@ -491,20 +471,20 @@ struct JobDetailView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
+                .padding(DS.Spacing.s)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
             } else {
                 VStack(spacing: 6) {
                     ForEach(inspections) { inspection in
                         NavigationLink(destination: FormDetailView(form: inspection, job: liveJob, store: store)) {
-                            HStack(spacing: 12) {
+                            HStack(spacing: DS.Spacing.s) {
                                 ZStack {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(.green.opacity(0.1))
+                                    RoundedRectangle(cornerRadius: DS.Spacing.xs)
+                                        .fill(DS.Colors.success.opacity(0.1))
                                         .frame(width: 36, height: 36)
                                     Image(systemName: "person.fill")
                                         .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(.green)
+                                        .foregroundStyle(DS.Colors.success)
                                 }
 
                                 VStack(alignment: .leading, spacing: 3) {
@@ -512,7 +492,7 @@ struct JobDetailView: View {
                                         .font(.subheadline.weight(.medium))
                                         .foregroundStyle(.primary)
 
-                                    HStack(spacing: 8) {
+                                    HStack(spacing: DS.Spacing.xs) {
                                         Label(inspection.date.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
                                         if inspection.fixPhotos.count > 0 {
                                             Label("\(inspection.fixPhotos.count) fix\(inspection.fixPhotos.count == 1 ? "" : "es")", systemImage: "wrench.and.screwdriver")
@@ -528,27 +508,23 @@ struct JobDetailView: View {
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.quaternary)
                             }
-                            .padding(12)
-                            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DetailDesign.innerRadius))
+                            .padding(DS.Spacing.s)
+                            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
         }
-        .padding(DetailDesign.cardPadding)
-        .background(.background, in: .rect(cornerRadius: DetailDesign.cardRadius))
-        .shadow(color: DetailDesign.shadowColor, radius: DetailDesign.shadowRadius, y: DetailDesign.shadowY)
+        .dsCard()
     }
 
     // MARK: - Materials Card
 
     private var materialsCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
             HStack {
-                Text("Materials")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                DSSectionHeader(title: "Materials")
                 Spacer()
                 Text("\(store.allMaterials.count)")
                     .font(.caption2.weight(.bold))
@@ -572,7 +548,7 @@ struct JobDetailView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(material.name.isEmpty ? "Unnamed" : material.name)
                             .font(.subheadline.weight(.medium))
-                        HStack(spacing: 8) {
+                        HStack(spacing: DS.Spacing.xs) {
                             if !material.quantity.isEmpty {
                                 Text(material.quantity)
                                     .font(.caption)
@@ -581,7 +557,7 @@ struct JobDetailView: View {
                             if let cost = material.cost {
                                 Text("$\(cost, specifier: "%.2f")")
                                     .font(.caption.weight(.medium))
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(DS.Colors.success)
                             }
                         }
                     }
@@ -597,42 +573,40 @@ struct JobDetailView: View {
                 }
             }
         }
-        .padding(DetailDesign.cardPadding)
-        .background(.background, in: .rect(cornerRadius: DetailDesign.cardRadius))
-        .shadow(color: DetailDesign.shadowColor, radius: DetailDesign.shadowRadius, y: DetailDesign.shadowY)
+        .dsCard()
     }
 
     // MARK: - New Spot Sheet
 
     private var newSpotSheet: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: DS.Spacing.l) {
                 TextField("Spot title (e.g. Kitchen Window)", text: $newSpotTitle)
                     .font(.headline)
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                     Text("JOB TYPE")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
 
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: DS.Spacing.xs) {
                             ForEach(JobType.allCases) { type in
                                 Button {
                                     newSpotJobType = type
                                 } label: {
-                                    HStack(spacing: 4) {
+                                    HStack(spacing: DS.Spacing.micro) {
                                         Image(systemName: type.icon)
                                             .font(.caption2)
                                         Text(type.rawValue)
                                             .font(.caption.weight(.medium))
                                     }
-                                    .padding(.horizontal, 12)
+                                    .padding(.horizontal, DS.Spacing.s)
                                     .frame(height: 34)
                                     .foregroundStyle(newSpotJobType == type ? .white : .primary)
                                     .background(
                                         newSpotJobType == type
-                                            ? AnyShapeStyle(.orange)
+                                            ? AnyShapeStyle(DS.Colors.primary)
                                             : AnyShapeStyle(.clear),
                                         in: .capsule
                                     )
@@ -679,9 +653,9 @@ struct JobDetailView: View {
 
     private var rebateOutcomeColor: Color {
         switch liveJob.rebateOutcome {
-        case .pending: .orange
-        case .approved: .green
-        case .declined: .red
+        case .pending: DS.Colors.primary
+        case .approved: DS.Colors.success
+        case .declined: DS.Colors.error
         }
     }
 
@@ -798,28 +772,5 @@ struct JobDetailView: View {
         }
 
         return text
-    }
-}
-
-// MARK: - Form Type Badge
-
-struct FormTypeBadge: View {
-    let formType: FormType
-
-    private var color: Color {
-        formType == .audit ? .blue : .orange
-    }
-
-    private var icon: String {
-        formType == .audit ? "clipboard.fill" : "checkmark.shield.fill"
-    }
-
-    var body: some View {
-        Label(formType.rawValue, systemImage: icon)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.15), in: .capsule)
-            .foregroundStyle(color)
     }
 }

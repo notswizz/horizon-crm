@@ -70,8 +70,8 @@ struct FormDetailView: View {
             }
         }
         .padding()
-        .background(.background, in: .rect(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Materials Card
@@ -114,7 +114,7 @@ struct FormDetailView: View {
                             if let cost = material.cost {
                                 Text("$\(cost, specifier: "%.2f")")
                                     .font(.caption.weight(.medium))
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(DS.Colors.success)
                             }
                         }
                     }
@@ -133,8 +133,8 @@ struct FormDetailView: View {
             }
         }
         .padding()
-        .background(.background, in: .rect(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Audit: Grouped by Spot
@@ -154,7 +154,7 @@ struct FormDetailView: View {
                         .font(.headline)
                 } icon: {
                     Image(systemName: spot.jobType.icon)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DS.Colors.primary)
                 }
 
                 Spacer()
@@ -163,8 +163,8 @@ struct FormDetailView: View {
                     .font(.caption.weight(.medium))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(.orange.opacity(0.1), in: .capsule)
-                    .foregroundStyle(.orange)
+                    .background(DS.Colors.primary.opacity(0.1), in: .capsule)
+                    .foregroundStyle(DS.Colors.primary)
             }
 
             Divider()
@@ -186,8 +186,8 @@ struct FormDetailView: View {
             }
         }
         .padding()
-        .background(.background, in: .rect(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     private func issuePhotoCard(_ photo: IssuePhoto, spotId: UUID) -> some View {
@@ -238,17 +238,17 @@ struct FormDetailView: View {
                     if linkedFixPhoto(for: photo.id) != nil {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.caption)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(DS.Colors.success)
                         Text("Resolved")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(DS.Colors.success)
                     } else {
                         Image(systemName: "exclamationmark.circle")
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(DS.Colors.primary)
                         Text("Open")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(DS.Colors.primary)
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -280,7 +280,7 @@ struct FormDetailView: View {
                         .font(.headline)
                 } icon: {
                     Image(systemName: spot.jobType.icon)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(DS.Colors.success)
                 }
 
                 Spacer()
@@ -289,8 +289,8 @@ struct FormDetailView: View {
                     .font(.caption.weight(.medium))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(.green.opacity(0.1), in: .capsule)
-                    .foregroundStyle(.green)
+                    .background(DS.Colors.success.opacity(0.1), in: .capsule)
+                    .foregroundStyle(DS.Colors.success)
             }
 
             Divider()
@@ -312,8 +312,8 @@ struct FormDetailView: View {
             }
         }
         .padding()
-        .background(.background, in: .rect(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     private func fixPhotoCard(_ photo: FixPhoto, spotId: UUID) -> some View {
@@ -366,7 +366,7 @@ struct FormDetailView: View {
                 HStack(spacing: 6) {
                     if !photo.resolutionNotes.isEmpty {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(DS.Colors.success)
                             .font(.caption)
                         Text(photo.resolutionNotes)
                             .font(.caption)

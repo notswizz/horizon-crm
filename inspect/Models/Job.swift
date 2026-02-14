@@ -111,8 +111,8 @@ enum IssueSeverity: String, CaseIterable, Codable, Identifiable, Sendable {
 
     var color: Color {
         switch self {
-        case .critical: .red
-        case .major: .orange
+        case .critical: DS.Colors.error
+        case .major: DS.Colors.warning
         case .minor: .yellow
         }
     }
@@ -258,11 +258,11 @@ enum MaterialType: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var color: Color {
         switch self {
-        case .insulation: .pink
-        case .sealant: .blue
-        case .hvacUnit: .green
-        case .ductwork: .purple
-        case .other: .gray
+        case .insulation: DS.Colors.primaryLight
+        case .sealant: DS.Colors.info
+        case .hvacUnit: DS.Colors.success
+        case .ductwork: DS.Colors.stageInspectionPending
+        case .other: DS.Colors.stageCancelled
         }
     }
 }
@@ -314,11 +314,11 @@ enum JobStage: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var color: Color {
         switch self {
-        case .auditPending: .blue
-        case .workInProgress: .orange
-        case .inspectionPending: .purple
-        case .completed: .green
-        case .cancelled: .gray
+        case .auditPending: DS.Colors.stageAuditPending
+        case .workInProgress: DS.Colors.stageWorkInProgress
+        case .inspectionPending: DS.Colors.stageInspectionPending
+        case .completed: DS.Colors.stageCompleted
+        case .cancelled: DS.Colors.stageCancelled
         }
     }
 

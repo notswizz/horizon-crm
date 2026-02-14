@@ -50,11 +50,11 @@ struct SubmitFixView: View {
                 VStack(spacing: 16) {
                     ZStack {
                         Circle()
-                            .fill(.green.opacity(0.15))
+                            .fill(DS.Colors.success.opacity(0.15))
                             .frame(width: 80, height: 80)
                         Image(systemName: "wrench.and.screwdriver.fill")
                             .font(.system(size: 32))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(DS.Colors.success)
                     }
                     Text("Fix Submitted")
                         .font(.title3.weight(.bold))
@@ -77,7 +77,7 @@ struct SubmitFixView: View {
             HStack(spacing: 5) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(DS.Colors.error)
                 Text("Fixing Issue")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -123,15 +123,15 @@ struct SubmitFixView: View {
             HStack(spacing: 6) {
                 Image(systemName: "mappin")
                     .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
                 Text(job.address)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .padding(14)
-        .background(.background, in: .rect(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Photo Section
@@ -141,7 +141,7 @@ struct SubmitFixView: View {
             HStack(spacing: 5) {
                 Image(systemName: "camera.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(DS.Colors.success)
                 Text("Fix Photo")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -176,14 +176,14 @@ struct SubmitFixView: View {
                         Text("Take / Choose Photo")
                             .font(.subheadline.weight(.medium))
                     }
-                    .foregroundStyle(.green)
+                    .foregroundStyle(DS.Colors.success)
                     .frame(maxWidth: .infinity)
                     .frame(height: 140)
-                    .background(.green.opacity(0.06), in: .rect(cornerRadius: 10))
+                    .background(DS.Colors.success.opacity(0.06), in: .rect(cornerRadius: 10))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
                             .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                            .foregroundStyle(.green.opacity(0.25))
+                            .foregroundStyle(DS.Colors.success.opacity(0.25))
                     )
                 }
                 .onChange(of: selectedItem) { _, newItem in
@@ -192,8 +192,8 @@ struct SubmitFixView: View {
             }
         }
         .padding(14)
-        .background(.background, in: .rect(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Notes Section
@@ -203,7 +203,7 @@ struct SubmitFixView: View {
             HStack(spacing: 5) {
                 Image(systemName: "text.alignleft")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(DS.Colors.success)
                 Text("Resolution Notes")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -216,8 +216,8 @@ struct SubmitFixView: View {
                 .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
         }
         .padding(14)
-        .background(.background, in: .rect(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Materials Section
@@ -249,13 +249,13 @@ struct SubmitFixView: View {
                             .font(.subheadline)
 
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DS.Animation.defaultSpring) {
                                 _ = materials.remove(at: index)
                             }
                         } label: {
                             Image(systemName: "trash")
                                 .font(.caption)
-                                .foregroundStyle(.red.opacity(0.7))
+                                .foregroundStyle(DS.Colors.error.opacity(0.7))
                         }
                     }
 
@@ -311,7 +311,7 @@ struct SubmitFixView: View {
             }
 
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DS.Animation.defaultSpring) {
                     materials.append(Material())
                 }
             } label: {
@@ -333,8 +333,8 @@ struct SubmitFixView: View {
             }
         }
         .padding(14)
-        .background(.background, in: .rect(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Save Button
@@ -360,7 +360,7 @@ struct SubmitFixView: View {
             .background(
                 LinearGradient(
                     colors: photoRef != nil
-                        ? [.green, .green.opacity(0.85)]
+                        ? [DS.Colors.success, DS.Colors.success.opacity(0.85)]
                         : [.gray, .gray.opacity(0.85)],
                     startPoint: .leading,
                     endPoint: .trailing
@@ -368,7 +368,7 @@ struct SubmitFixView: View {
                 in: .capsule
             )
             .shadow(
-                color: photoRef != nil ? .green.opacity(0.3) : .clear,
+                color: photoRef != nil ? DS.Colors.success.opacity(0.3) : .clear,
                 radius: 12,
                 y: 4
             )
@@ -441,7 +441,7 @@ struct SubmitFixView: View {
 
             store.cleanupTempPhotos()
 
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            withAnimation(DS.Animation.defaultSpring) {
                 showSuccess = true
             }
 

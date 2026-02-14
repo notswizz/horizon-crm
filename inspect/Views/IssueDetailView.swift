@@ -80,7 +80,7 @@ struct IssueDetailView: View {
             HStack(spacing: 5) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(DS.Colors.error)
                 Text("Issue Details")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -91,7 +91,7 @@ struct IssueDetailView: View {
                 HStack(spacing: 8) {
                     Image(systemName: spot.jobType.icon)
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DS.Colors.primary)
                     Text(spot.title)
                         .font(.subheadline.weight(.medium))
                     Spacer()
@@ -99,8 +99,8 @@ struct IssueDetailView: View {
                         .font(.caption2.weight(.medium))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
-                        .background(.orange.opacity(0.1), in: .capsule)
-                        .foregroundStyle(.orange)
+                        .background(DS.Colors.primary.opacity(0.1), in: .capsule)
+                        .foregroundStyle(DS.Colors.primary)
                 }
             }
 
@@ -175,8 +175,8 @@ struct IssueDetailView: View {
             }
         }
         .padding(14)
-        .background(.background, in: .rect(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Notes Card
@@ -186,7 +186,7 @@ struct IssueDetailView: View {
             HStack(spacing: 5) {
                 Image(systemName: "text.alignleft")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
                 Text("Notes")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -199,8 +199,8 @@ struct IssueDetailView: View {
                 .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
         }
         .padding(14)
-        .background(.background, in: .rect(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Fix Status Card
@@ -215,10 +215,10 @@ struct IssueDetailView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.caption)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(DS.Colors.success)
                         Text("Resolved")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(DS.Colors.success)
                     }
 
                     if !linkedFix.resolutionNotes.isEmpty {
@@ -235,13 +235,13 @@ struct IssueDetailView: View {
                                 Image(systemName: "chevron.right")
                                     .font(.caption2)
                             }
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(DS.Colors.info)
                         }
                     }
                 }
                 .padding(14)
-                .background(.background, in: .rect(cornerRadius: 14))
-                .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+                .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+                .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
             } else if let issue {
                 NavigationLink(destination: SubmitFixView(job: job, issue: issue, spotId: spotId, store: store)) {
                     HStack(spacing: 8) {
@@ -251,12 +251,12 @@ struct IssueDetailView: View {
                         Spacer()
                     }
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(DS.Colors.success)
                     .frame(height: 44)
-                    .background(.green.opacity(0.1), in: .rect(cornerRadius: 14))
+                    .background(DS.Colors.success.opacity(0.1), in: .rect(cornerRadius: 14))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .strokeBorder(.green.opacity(0.2), lineWidth: 1)
+                            .strokeBorder(DS.Colors.success.opacity(0.2), lineWidth: 1)
                     )
                 }
             }
@@ -284,7 +284,7 @@ struct IssueDetailView: View {
             .foregroundStyle(.white)
             .frame(height: 50)
             .background(
-                showSaved ? .green : .orange,
+                showSaved ? DS.Colors.success : DS.Colors.primary,
                 in: .capsule
             )
         }
@@ -313,7 +313,7 @@ struct IssueDetailView: View {
 
         store.updateForm(form, in: job)
 
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DS.Animation.defaultSpring) {
             showSaved = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {

@@ -1,75 +1,5 @@
 import SwiftUI
 
-// MARK: - Design Tokens
-
-private enum Design {
-    static let cardRadius: CGFloat = 16
-    static let cardPadding: CGFloat = 20
-    static let shadowColor = Color.black.opacity(0.06)
-    static let shadowRadius: CGFloat = 12
-    static let shadowY: CGFloat = 4
-    static let sectionSpacing: CGFloat = 20
-    static let innerSpacing: CGFloat = 16
-    static let spring = Animation.spring(response: 0.35, dampingFraction: 0.8)
-}
-
-// MARK: - Card Style Modifier
-
-private struct CardStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(Design.cardPadding)
-            .background(.background, in: .rect(cornerRadius: Design.cardRadius))
-            .shadow(color: Design.shadowColor, radius: Design.shadowRadius, y: Design.shadowY)
-    }
-}
-
-extension View {
-    func cardStyle() -> some View {
-        modifier(CardStyle())
-    }
-}
-
-// MARK: - Styled Text Field
-
-struct StyledTextField: View {
-    let icon: String
-    let label: String
-    let placeholder: String
-    @Binding var text: String
-    var axis: Axis = .horizontal
-    var lineLimit: ClosedRange<Int>?
-    var contentType: UITextContentType?
-    var keyboardType: UIKeyboardType = .default
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(.orange)
-                .frame(width: 24, alignment: .center)
-                .padding(.top, 8)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(label)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-
-                if axis == .vertical, let lineLimit {
-                    TextField(placeholder, text: $text, axis: .vertical)
-                        .lineLimit(lineLimit)
-                        .textContentType(contentType)
-                        .keyboardType(keyboardType)
-                } else {
-                    TextField(placeholder, text: $text)
-                        .textContentType(contentType)
-                        .keyboardType(keyboardType)
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Focus Fields
 
 private enum Field: Hashable {
@@ -93,7 +23,7 @@ struct NewJobView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: Design.sectionSpacing) {
+                VStack(spacing: DS.Spacing.l) {
                     jobDetailsCard
                     contactCard
                     notesCard
@@ -102,7 +32,7 @@ struct NewJobView: View {
                 .padding()
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Color(.systemGroupedBackground))
+            .background(DS.Colors.background)
             .navigationTitle("New Job")
             .navigationBarTitleDisplayMode(.inline)
             .alert("Error", isPresented: $showError) {
@@ -122,31 +52,31 @@ struct NewJobView: View {
     // MARK: - Success Overlay
 
     private var successOverlay: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DS.Spacing.s) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(.green)
+                .foregroundStyle(DS.Colors.success)
             Text("Job Created")
                 .font(.title3.weight(.semibold))
             Text("Switch to the Jobs tab to view it.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
-        .padding(32)
-        .background(.ultraThinMaterial, in: .rect(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.1), radius: 20, y: 8)
+        .padding(DS.Spacing.xxl)
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: DS.Spacing.l))
+        .shadow(color: .black.opacity(0.1), radius: DS.Spacing.l, y: DS.Spacing.xs)
     }
 
     // MARK: - Job Details Card
 
     private var jobDetailsCard: some View {
-        VStack(alignment: .leading, spacing: Design.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             Label {
                 Text("Address")
                     .font(.headline)
             } icon: {
                 Image(systemName: "mappin.circle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
             }
 
             StyledTextField(
@@ -158,19 +88,19 @@ struct NewJobView: View {
             )
             .focused($focusedField, equals: .address)
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Contact Card
 
     private var contactCard: some View {
-        VStack(alignment: .leading, spacing: Design.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             Label {
                 Text("Contact Info")
                     .font(.headline)
             } icon: {
                 Image(systemName: "person.crop.circle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
             }
 
             StyledTextField(
@@ -206,19 +136,19 @@ struct NewJobView: View {
             )
             .focused($focusedField, equals: .contactEmail)
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Notes Card
 
     private var notesCard: some View {
-        VStack(alignment: .leading, spacing: Design.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             Label {
                 Text("Notes")
                     .font(.headline)
             } icon: {
                 Image(systemName: "note.text")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
             }
 
             StyledTextField(
@@ -231,17 +161,17 @@ struct NewJobView: View {
             )
             .focused($focusedField, equals: .notes)
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DS.Spacing.s) {
             Button {
                 saveJob()
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: DS.Spacing.xs) {
                     Spacer()
                     Image(systemName: "plus.circle.fill")
                     Text("Create Job")
@@ -251,19 +181,15 @@ struct NewJobView: View {
                 .foregroundStyle(.white)
                 .frame(height: 54)
                 .background(
-                    LinearGradient(
-                        colors: canSave
-                            ? [.orange, .orange.opacity(0.85)]
-                            : [.gray, .gray.opacity(0.85)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
+                    canSave
+                        ? DS.Gradients.primaryButton
+                        : LinearGradient(colors: [.gray, .gray.opacity(0.85)], startPoint: .leading, endPoint: .trailing),
                     in: .capsule
                 )
                 .shadow(
-                    color: canSave ? .orange.opacity(0.3) : .clear,
-                    radius: 12,
-                    y: 4
+                    color: canSave ? DS.Colors.primary.opacity(0.3) : .clear,
+                    radius: DS.Shadow.radius,
+                    y: DS.Shadow.y
                 )
             }
             .disabled(!canSave || showSuccess)
@@ -276,7 +202,7 @@ struct NewJobView: View {
                     .multilineTextAlignment(.center)
             }
         }
-        .padding(.top, 4)
+        .padding(.top, DS.Spacing.micro)
     }
 
     // MARK: - Computed Properties
@@ -299,7 +225,7 @@ struct NewJobView: View {
         }
 
         // Show success overlay then pop back
-        withAnimation(Design.spring) {
+        withAnimation(DS.Animation.defaultSpring) {
             showSuccess = true
         }
 

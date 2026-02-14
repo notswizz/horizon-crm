@@ -17,6 +17,6 @@ struct ContentView: View {
                 SettingsView(store: store)
             }
         }
-        .tint(.orange)
+        .tint(DS.Colors.primary)
     }
 }

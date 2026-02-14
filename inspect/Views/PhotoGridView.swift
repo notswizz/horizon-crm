@@ -59,14 +59,14 @@ struct SinglePhotoPicker: View {
                             Text("Add Photo")
                                 .font(.caption)
                         }
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DS.Colors.primary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 120)
-                        .background(.orange.opacity(0.08), in: .rect(cornerRadius: 10))
+                        .background(DS.Colors.primary.opacity(0.08), in: .rect(cornerRadius: 10))
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
                                 .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6]))
-                                .foregroundStyle(.orange.opacity(0.3))
+                                .foregroundStyle(DS.Colors.primary.opacity(0.3))
                         )
                     }
                     .onChange(of: selectedItem) { _, newItem in

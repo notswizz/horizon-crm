@@ -1,21 +1,6 @@
 import SwiftUI
 import PhotosUI
 
-// MARK: - Design Tokens
-
-private enum CaptureDesign {
-    static let cardRadius: CGFloat = 16
-    static let cardPadding: CGFloat = 20
-    static let shadowColor = Color.black.opacity(0.06)
-    static let shadowRadius: CGFloat = 12
-    static let shadowY: CGFloat = 4
-    static let sectionSpacing: CGFloat = 20
-    static let innerSpacing: CGFloat = 16
-    static let spring = Animation.spring(response: 0.35, dampingFraction: 0.8)
-    static let chipHeight: CGFloat = 36
-    static let severityPillHeight: CGFloat = 32
-}
-
 // MARK: - Quick Capture View
 
 struct QuickCaptureView: View {
@@ -130,7 +115,7 @@ struct QuickCaptureView: View {
 
             Image(systemName: "camera.viewfinder")
                 .font(.system(size: 64))
-                .foregroundStyle(.orange)
+                .foregroundStyle(DS.Colors.primary)
 
             Text("Snap a photo, then tag it")
                 .font(.title3.weight(.medium))
@@ -148,13 +133,13 @@ struct QuickCaptureView: View {
                 .frame(height: 60)
                 .background(
                     LinearGradient(
-                        colors: [.orange, .orange.opacity(0.85)],
+                        colors: [DS.Colors.primary, DS.Colors.primary.opacity(0.85)],
                         startPoint: .leading,
                         endPoint: .trailing
                     ),
                     in: .capsule
                 )
-                .shadow(color: .orange.opacity(0.3), radius: 12, y: 4)
+                .shadow(color: DS.Colors.primary.opacity(0.3), radius: 12, y: 4)
             }
             .padding(.horizontal, 40)
             .onChange(of: selectedItem) { _, newItem in
@@ -171,7 +156,7 @@ struct QuickCaptureView: View {
 
     private var taggingPhase: some View {
         ScrollView {
-            VStack(spacing: CaptureDesign.sectionSpacing) {
+            VStack(spacing: DS.Spacing.l) {
                 photoPreviewCard
                 jobPickerCard
                 typeToggleCard
@@ -200,7 +185,7 @@ struct QuickCaptureView: View {
                         .font(.headline)
                 } icon: {
                     Image(systemName: "photo.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DS.Colors.primary)
                 }
                 Spacer()
                 Button {
@@ -211,7 +196,7 @@ struct QuickCaptureView: View {
                         Text("Retake")
                     }
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
                 }
             }
 
@@ -225,19 +210,19 @@ struct QuickCaptureView: View {
                     .clipShape(.rect(cornerRadius: 12))
             }
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Job Picker Card
 
     private var jobPickerCard: some View {
-        VStack(alignment: .leading, spacing: CaptureDesign.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             Label {
                 Text("Job")
                     .font(.headline)
             } icon: {
                 Image(systemName: "list.clipboard.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
             }
 
             Menu {
@@ -251,7 +236,7 @@ struct QuickCaptureView: View {
             } label: {
                 HStack {
                     Image(systemName: "mappin")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DS.Colors.primary)
                     Text(selectedJob?.address ?? "Select Job")
                         .font(.subheadline.weight(.medium))
                     Spacer()
@@ -264,19 +249,19 @@ struct QuickCaptureView: View {
                 .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 10))
             }
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Type Toggle Card
 
     private var typeToggleCard: some View {
-        VStack(alignment: .leading, spacing: CaptureDesign.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             Label {
                 Text("Type")
                     .font(.headline)
             } icon: {
                 Image(systemName: captureType == .audit ? "clipboard.fill" : "checkmark.shield.fill")
-                    .foregroundStyle(captureType == .audit ? .blue : .green)
+                    .foregroundStyle(captureType == .audit ? DS.Colors.info : DS.Colors.success)
             }
 
             Picker("Type", selection: $captureType) {
@@ -290,19 +275,19 @@ struct QuickCaptureView: View {
                 }
             }
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Issue Details Card (Audit)
 
     private var issueDetailsCard: some View {
-        VStack(alignment: .leading, spacing: CaptureDesign.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             Label {
                 Text("Issue Details")
                     .font(.headline)
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
             }
 
             // Spot picker
@@ -345,13 +330,13 @@ struct QuickCaptureView: View {
                 HStack(spacing: 8) {
                     ForEach(IssueSeverity.allCases) { sev in
                         Button {
-                            withAnimation(CaptureDesign.spring) {
+                            withAnimation(DS.Animation.defaultSpring) {
                                 severity = sev
                             }
                         } label: {
                             Text(sev.rawValue)
                                 .font(.caption.weight(.semibold))
-                                .frame(height: CaptureDesign.severityPillHeight)
+                                .frame(height: DS.Components.stagePill)
                                 .padding(.horizontal, 14)
                                 .foregroundStyle(severityTextColor(sev))
                                 .background(
@@ -388,19 +373,19 @@ struct QuickCaptureView: View {
                     .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
             }
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Fix Details Card (Inspection)
 
     private var fixDetailsCard: some View {
-        VStack(alignment: .leading, spacing: CaptureDesign.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             Label {
                 Text("Fix Details")
                     .font(.headline)
             } icon: {
                 Image(systemName: "wrench.and.screwdriver.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(DS.Colors.success)
             }
 
             // Spot picker
@@ -483,13 +468,13 @@ struct QuickCaptureView: View {
                     .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
             }
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Materials Card (Inspection)
 
     private var materialsCard: some View {
-        VStack(alignment: .leading, spacing: CaptureDesign.innerSpacing) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             HStack {
                 Label {
                     Text("Materials")
@@ -516,13 +501,13 @@ struct QuickCaptureView: View {
                             .font(.subheadline)
 
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DS.Animation.defaultSpring) {
                                 _ = materials.remove(at: index)
                             }
                         } label: {
                             Image(systemName: "trash")
                                 .font(.caption)
-                                .foregroundStyle(.red.opacity(0.7))
+                                .foregroundStyle(DS.Colors.error.opacity(0.7))
                         }
                     }
 
@@ -579,7 +564,7 @@ struct QuickCaptureView: View {
             }
 
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DS.Animation.defaultSpring) {
                     materials.append(Material())
                 }
             } label: {
@@ -600,7 +585,7 @@ struct QuickCaptureView: View {
                 )
             }
         }
-        .cardStyle()
+        .dsCard()
     }
 
     // MARK: - Spot Picker Section
@@ -620,7 +605,7 @@ struct QuickCaptureView: View {
                         Text("Add a Spot")
                             .font(.subheadline.weight(.medium))
                     }
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DS.Colors.primary)
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
@@ -645,7 +630,7 @@ struct QuickCaptureView: View {
                 } label: {
                     HStack {
                         Image(systemName: selectedSpot?.jobType.icon ?? "mappin")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(DS.Colors.primary)
                         Text(selectedSpot?.title ?? "Select Spot")
                             .font(.subheadline.weight(.medium))
                         Spacer()
@@ -685,7 +670,7 @@ struct QuickCaptureView: View {
                 .background(
                     LinearGradient(
                         colors: canSave
-                            ? [.orange, .orange.opacity(0.85)]
+                            ? [DS.Colors.primary, DS.Colors.primary.opacity(0.85)]
                             : [.gray, .gray.opacity(0.85)],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -693,7 +678,7 @@ struct QuickCaptureView: View {
                     in: .capsule
                 )
                 .shadow(
-                    color: canSave ? .orange.opacity(0.3) : .clear,
+                    color: canSave ? DS.Colors.primary.opacity(0.3) : .clear,
                     radius: 12,
                     y: 4
                 )
@@ -708,7 +693,7 @@ struct QuickCaptureView: View {
 
     private var successOverlay: some View {
         let isAudit = savedType == .audit
-        let accentColor: Color = isAudit ? .orange : .green
+        let accentColor: Color = isAudit ? DS.Colors.primary : DS.Colors.success
         let icon = isAudit ? "exclamationmark.triangle.fill" : "wrench.and.screwdriver.fill"
         let title = isAudit ? "Issue Added" : "Fix Added"
 
@@ -736,7 +721,7 @@ struct QuickCaptureView: View {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(DS.Colors.success)
                 Text("Saved to \(isAudit ? "Audit" : "Inspection") form")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
@@ -776,11 +761,11 @@ struct QuickCaptureView: View {
                                             .font(.caption.weight(.medium))
                                     }
                                     .padding(.horizontal, 12)
-                                    .frame(height: CaptureDesign.chipHeight)
+                                    .frame(height: 36)
                                     .foregroundStyle(newSpotJobType == type ? .white : .primary)
                                     .background(
                                         newSpotJobType == type
-                                            ? AnyShapeStyle(.orange)
+                                            ? AnyShapeStyle(DS.Colors.primary)
                                             : AnyShapeStyle(.clear),
                                         in: .capsule
                                     )
@@ -981,12 +966,12 @@ struct QuickCaptureView: View {
             savedJobAddress = job.address
 
             // Show success
-            withAnimation(CaptureDesign.spring) {
+            withAnimation(DS.Animation.defaultSpring) {
                 showSuccess = true
             }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                withAnimation(CaptureDesign.spring) {
+                withAnimation(DS.Animation.defaultSpring) {
                     showSuccess = false
                 }
                 resetAll()
