@@ -87,6 +87,7 @@ export function PhotoLightbox({ photos, initialIndex = 0, onClose }: PhotoLightb
                       <img
                         src={photo.type === "fix" ? photo.linkedPhotoURL : photo.url}
                         alt="Before"
+                        loading="lazy"
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -98,6 +99,7 @@ export function PhotoLightbox({ photos, initialIndex = 0, onClose }: PhotoLightb
                       <img
                         src={photo.type === "fix" ? photo.url : photo.linkedPhotoURL}
                         alt="After"
+                        loading="lazy"
                         className="w-full h-full object-cover"
                       />
                     </div>

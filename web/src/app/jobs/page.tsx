@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StageBadge } from "@/components/shared/stage-badge";
-import { RebateBadge } from "@/components/shared/rebate-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Job, JobStage, RebateStatus } from "@/types";
 import Image from "next/image";
@@ -194,7 +193,6 @@ export default function JobsPage() {
                             height={36}
                             className="rounded-full object-cover flex-shrink-0"
                             style={{ width: 36, height: 36 }}
-                            unoptimized
                           />
                         ) : (
                           <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -224,12 +222,19 @@ export default function JobsPage() {
                       )}
                     </td>
                     <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <RebateBadge status={job.rebateStatus} />
-                        {job.rebateAmount > 0 && (
-                          <span className="text-xs font-semibold text-emerald-600">{formatCurrency(job.rebateAmount)}</span>
-                        )}
-                      </div>
+                      {job.rebateStatus === "none" || (job.rebateStatus === "calculated" && !job.rebateAmount) ? (
+                        <span className="text-xs text-gray-300">—</span>
+                      ) : (
+                        <span className={`text-xs font-semibold ${
+                          job.rebateStatus === "submitted" ? "text-blue-600" :
+                          job.rebateStatus === "declined" ? "text-red-500" :
+                          job.rebateStatus === "accepted" ? "text-emerald-600 border border-yellow-400 rounded px-1.5 py-0.5" :
+                          job.rebateStatus === "paid" ? "text-emerald-600" :
+                          "text-gray-500"
+                        }`}>
+                          {formatCurrency(job.rebateAmount)}
+                        </span>
+                      )}
                     </td>
                     <td className="p-3 text-gray-400 text-xs">{formatDate(job.createdAt)}</td>
                   </tr>

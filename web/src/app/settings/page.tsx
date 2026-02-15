@@ -100,9 +100,9 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] gap-6">
-        {/* Left: Job Types + Material Types */}
-        <div className="space-y-6">
+      {/* Top row: Job Types + Material Types stacked | Issue Categories */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6">
+        <div className="flex flex-col gap-6">
           <SimpleList
             title="Job Types"
             description="Types of work that can be assigned to a job"
@@ -110,6 +110,7 @@ export default function SettingsPage() {
             items={config.jobTypes}
             onChange={(v) => updateList("jobTypes", v)}
             placeholder="e.g. Window Replacement"
+            className="flex-1 min-h-0"
           />
 
           <SimpleList
@@ -119,34 +120,34 @@ export default function SettingsPage() {
             items={config.materialTypes}
             onChange={(v) => updateList("materialTypes", v)}
             placeholder="e.g. Spray Foam"
+            className="flex-1 min-h-0"
           />
         </div>
 
-        {/* Center: Issue Categories */}
         <IssueCategoryList
           categories={config.issueCategories}
           jobTypes={config.jobTypes}
           onChange={updateCategories}
         />
+      </div>
 
-        {/* Right: Dataset Value Formulas stacked */}
-        <div className="space-y-6">
-          <DatasetValueEditor
-            weights={config.datasetValueWeights || DEFAULT_WEIGHTS}
-            onChange={(w) => {
-              setConfig({ ...config, datasetValueWeights: w });
-              setDirty(true);
-            }}
-          />
+      {/* Bottom row: Value Formulas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <DatasetValueEditor
+          weights={config.datasetValueWeights || DEFAULT_WEIGHTS}
+          onChange={(w) => {
+            setConfig({ ...config, datasetValueWeights: w });
+            setDirty(true);
+          }}
+        />
 
-          <DatasetValuationEditor
-            config={config.datasetValuation || DEFAULT_VALUATION}
-            onChange={(v) => {
-              setConfig({ ...config, datasetValuation: v });
-              setDirty(true);
-            }}
-          />
-        </div>
+        <DatasetValuationEditor
+          config={config.datasetValuation || DEFAULT_VALUATION}
+          onChange={(v) => {
+            setConfig({ ...config, datasetValuation: v });
+            setDirty(true);
+          }}
+        />
       </div>
     </div>
   );
@@ -161,6 +162,7 @@ function SimpleList({
   items,
   onChange,
   placeholder,
+  className,
 }: {
   title: string;
   description: string;
@@ -168,6 +170,7 @@ function SimpleList({
   items: string[];
   onChange: (items: string[]) => void;
   placeholder: string;
+  className?: string;
 }) {
   const [adding, setAdding] = useState(false);
   const [newValue, setNewValue] = useState("");
@@ -186,8 +189,8 @@ function SimpleList({
   }, [adding]);
 
   return (
-    <Card>
-      <CardContent className="p-6">
+    <Card className={`flex flex-col ${className || ""}`}>
+      <CardContent className="p-6 flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             {icon}
@@ -197,7 +200,7 @@ function SimpleList({
         </div>
         <p className="text-xs text-gray-400 mb-4">{description}</p>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 overflow-y-auto flex-1 min-h-0 content-start">
           {items.map((item, i) => (
             <div
               key={item}
@@ -302,8 +305,8 @@ function IssueCategoryList({
   }, [adding]);
 
   return (
-    <Card>
-      <CardContent className="p-6">
+    <Card className="flex flex-col">
+      <CardContent className="p-6 flex flex-col min-h-0 flex-1">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -315,7 +318,7 @@ function IssueCategoryList({
           Categories inspectors choose when documenting issues. Link to job types or leave empty for all.
         </p>
 
-        <div className="space-y-0.5 max-h-[500px] overflow-y-auto pr-1">
+        <div className="space-y-0.5 max-h-[500px] overflow-y-auto pr-1 flex-1 min-h-0">
           {categories.map((cat, i) => (
             <div key={cat.name} className="group">
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-50 transition-colors">
@@ -329,6 +332,7 @@ function IssueCategoryList({
                     }`}
                   />
                   <span className="text-xs font-medium text-gray-700 truncate">{cat.name}</span>
+                  <span className="flex-1" />
                   {cat.jobTypes.length === 0 ? (
                     <span className="text-[9px] px-1 py-px rounded bg-gray-100 text-gray-400 flex-shrink-0">
                       All
@@ -384,8 +388,10 @@ function IssueCategoryList({
               )}
             </div>
           ))}
+        </div>
 
-          {/* Add new category */}
+        {/* Sticky add category footer */}
+        <div className="sticky bottom-0 pt-3 mt-3 border-t bg-white flex-shrink-0">
           {adding ? (
             <div className="p-3 rounded-lg border border-[#FF6B35] bg-orange-50/30">
               <input

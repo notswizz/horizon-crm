@@ -236,7 +236,7 @@ export default function DashboardPage() {
                   <Banknote className="h-3.5 w-3.5 text-emerald-500" />
                 </div>
               </div>
-              <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totalPaid)}</p>
+              <p className="text-2xl font-bold text-emerald-600 border border-yellow-400 rounded-md px-2 py-0.5 inline-block">{formatCurrency(totalPaid)}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">Total collected</p>
             </CardContent>
           </Card>
@@ -272,7 +272,7 @@ export default function DashboardPage() {
               <Card className="h-full hover:shadow-lg hover:-translate-y-0.5 transition-all">
                 <div className="h-28 bg-gradient-to-br from-gray-100 to-gray-50 rounded-t-xl overflow-hidden">
                   {job.houseImageURL ? (
-                    <img src={job.houseImageURL} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    <img src={job.houseImageURL} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Camera className="h-8 w-8 text-gray-200" />

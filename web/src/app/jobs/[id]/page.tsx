@@ -19,7 +19,6 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [job, setJob] = useState<Job | null>(null);
   const [forms, setForms] = useState<InspectionForm[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [editStage, setEditStage] = useState<JobStage>("auditPending");
   const [lightboxPhotos, setLightboxPhotos] = useState<ReturnType<typeof buildLightboxPhotos> | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -46,27 +45,37 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   const saveStage = async (stage: JobStage) => {
     if (!job) return;
+    const prevStage = editStage;
+    const prevJob = job;
     setEditStage(stage);
-    setSaving(true);
-    await fetch(`/api/jobs/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ currentStage: stage }),
-    });
     setJob({ ...job, currentStage: stage });
-    setSaving(false);
+    try {
+      const res = await fetch(`/api/jobs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentStage: stage }),
+      });
+      if (!res.ok) throw new Error("Failed to save stage");
+    } catch {
+      setEditStage(prevStage);
+      setJob(prevJob);
+    }
   };
 
   const handleRebateUpdate = async (updates: Partial<Job>) => {
-    await fetch(`/api/jobs/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    // Refresh job data
-    const response = await fetch(`/api/jobs/${id}`);
-    const data = await response.json();
-    setJob(data.job);
+    if (!job) return;
+    const prevJob = job;
+    setJob({ ...job, ...updates });
+    try {
+      const res = await fetch(`/api/jobs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error("Failed to save rebate");
+    } catch {
+      setJob(prevJob);
+    }
   };
 
   if (loading) {
@@ -275,7 +284,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                           className="group relative rounded-lg overflow-hidden border bg-gray-50 text-left flex-shrink-0 w-36"
                         >
                           {photo.photoURL ? (
-                            <img src={photo.photoURL} alt="" className="w-full h-28 object-cover group-hover:scale-105 transition-transform" />
+                            <img src={photo.photoURL} alt="" loading="lazy" className="w-full h-28 object-cover group-hover:scale-105 transition-transform" />
                           ) : (
                             <div className="w-full h-28 flex items-center justify-center text-gray-300">
                               <Camera size={20} />
@@ -343,7 +352,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                             className="group relative rounded-lg overflow-hidden border bg-gray-50 text-left flex-shrink-0 w-36"
                           >
                             {photo.photoURL ? (
-                              <img src={photo.photoURL} alt="" className="w-full h-28 object-cover group-hover:scale-105 transition-transform" />
+                              <img src={photo.photoURL} alt="" loading="lazy" className="w-full h-28 object-cover group-hover:scale-105 transition-transform" />
                             ) : (
                               <div className="w-full h-28 flex items-center justify-center text-gray-300">
                                 <Camera size={20} />
@@ -399,26 +408,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {/* Right sidebar — combined card */}
         <div className="space-y-4">
           {/* Stage selector */}
-          <div className="flex flex-wrap gap-1.5">
-            {(Object.keys(stageConfig) as JobStage[]).map((s) => {
-              const cfg = stageConfig[s];
-              const active = editStage === s;
-              return (
-                <button
-                  key={s}
-                  onClick={() => saveStage(s)}
-                  disabled={saving}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    active
-                      ? `${cfg.bg} ${cfg.color} ring-1 ring-current`
-                      : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                  } ${saving ? "opacity-50" : ""}`}
-                >
-                  {cfg.label}
-                </button>
-              );
-            })}
-          </div>
+          <select
+            value={editStage}
+            onChange={(e) => saveStage(e.target.value as JobStage)}
+            className={`w-full px-3 py-2 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${stageConfig[editStage].bg} ${stageConfig[editStage].color} border-current/20`}
+          >
+            {(Object.keys(stageConfig) as JobStage[]).map((s) => (
+              <option key={s} value={s}>{stageConfig[s].label}</option>
+            ))}
+          </select>
 
           {/* Rebate Calculator */}
           <RebateCalculator job={job} onUpdate={handleRebateUpdate} />

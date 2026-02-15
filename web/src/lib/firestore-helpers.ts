@@ -122,11 +122,116 @@ export function parseForm(doc: FirebaseFirestore.DocumentSnapshot): InspectionFo
   };
 }
 
+// ─── Reverse stage map (camelCase → iOS Firestore string) ───────────────
+
+const STAGE_TO_FIRESTORE: Record<JobStage, string> = {
+  auditPending: "Audit Pending",
+  workInProgress: "Work In Progress",
+  inspectionPending: "Inspection Pending",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+// ─── Firestore sort field map ───────────────────────────────────────────
+
+const SORT_FIELD: Record<string, string> = {
+  newest: "createdAt",
+  oldest: "createdAt",
+  address: "streetAddress",
+};
+const SORT_DIR: Record<string, FirebaseFirestore.OrderByDirection> = {
+  newest: "desc",
+  oldest: "asc",
+  address: "asc",
+};
+
 // ─── Fetch helpers ─────────────────────────────────────────────────────
 
 export async function fetchAllJobs(): Promise<Job[]> {
   const snap = await db.collection("jobs").orderBy("createdAt", "desc").get();
   return snap.docs.map(parseJob);
+}
+
+export interface FilteredJobsParams {
+  search?: string;
+  stage?: string;
+  rebate?: string;
+  sort?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface FilteredJobsResult {
+  jobs: Job[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export async function fetchFilteredJobs(params: FilteredJobsParams): Promise<FilteredJobsResult> {
+  const { search, stage, rebate, sort = "newest", page = 1, limit = 50 } = params;
+
+  const needsMemoryFilter = !!search || !!rebate || sort === "issues";
+
+  // --- Build base query with stage filter pushed to Firestore ---
+  let baseQuery: FirebaseFirestore.Query = db.collection("jobs");
+
+  if (stage && STAGE_TO_FIRESTORE[stage as JobStage]) {
+    baseQuery = baseQuery.where("currentStage", "==", STAGE_TO_FIRESTORE[stage as JobStage]);
+  }
+
+  if (!needsMemoryFilter) {
+    // ── Optimized path: sort + paginate at Firestore level ──
+    const field = SORT_FIELD[sort] || "createdAt";
+    const dir = SORT_DIR[sort] || "desc";
+
+    const countSnap = await baseQuery.count().get();
+    const total = countSnap.data().count;
+
+    const offset = (page - 1) * limit;
+    const snap = await baseQuery.orderBy(field, dir).offset(offset).limit(limit).get();
+    const jobs = snap.docs.map(parseJob);
+
+    return { jobs, total, page, totalPages: Math.ceil(total / limit) };
+  }
+
+  // ── Fallback path: fetch matching docs, filter/sort/paginate in memory ──
+  const snap = await baseQuery.orderBy("createdAt", "desc").get();
+  let filtered = snap.docs.map(parseJob);
+
+  if (search) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter(
+      (j) =>
+        j.address.toLowerCase().includes(q) ||
+        j.contactName.toLowerCase().includes(q) ||
+        j.contactEmail.toLowerCase().includes(q)
+    );
+  }
+
+  if (rebate) {
+    filtered = filtered.filter((j) => j.rebateStatus === rebate);
+  }
+
+  switch (sort) {
+    case "oldest":
+      filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      break;
+    case "address":
+      filtered.sort((a, b) => a.address.localeCompare(b.address));
+      break;
+    case "issues":
+      filtered.sort((a, b) => b.issueCount - a.issueCount);
+      break;
+    default:
+      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  const total = filtered.length;
+  const start = (page - 1) * limit;
+  const paginated = filtered.slice(start, start + limit);
+
+  return { jobs: paginated, total, page, totalPages: Math.ceil(total / limit) };
 }
 
 export async function fetchJob(jobId: string): Promise<Job | null> {
