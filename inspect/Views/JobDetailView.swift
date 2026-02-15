@@ -43,14 +43,17 @@ struct JobDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                contactRow
-                    .padding(.horizontal, DS.Spacing.m)
-                    .padding(.top, DS.Spacing.s)
+                VStack(spacing: DS.Spacing.s) {
+                    contactRow
+                    metricsCard
+                }
+                .padding(.horizontal, DS.Spacing.m)
+                .padding(.top, DS.Spacing.s)
+                .padding(.bottom, DS.Spacing.m)
 
                 heroBanner
 
                 VStack(spacing: DS.Spacing.s) {
-                    metricsCard
                     spotsSection
                     auditSection
                     inspectionsSection

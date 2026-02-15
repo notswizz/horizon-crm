@@ -143,74 +143,75 @@ export default function PhotosPage() {
   }));
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      <div className="flex-shrink-0">
         <h1 className="text-2xl font-bold tracking-tight">Photos</h1>
         <p className="text-sm text-gray-500 mt-1">{photos.length} total photos across all jobs</p>
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="p-4 flex flex-wrap gap-3">
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-40">
+      <Card className="mt-6 flex-shrink-0">
+        <CardContent className="p-3 flex flex-wrap gap-2">
+          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-36 text-xs h-8">
             <option value="">All Types</option>
             <option value="issue">Issues</option>
             <option value="fix">Fixes</option>
           </Select>
-          <Select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="w-40">
+          <Select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="w-36 text-xs h-8">
             <option value="">All Severities</option>
             <option value="critical">Critical</option>
             <option value="major">Major</option>
             <option value="minor">Minor</option>
           </Select>
-          <Select value={inspectorFilter} onChange={(e) => setInspectorFilter(e.target.value)} className="w-48">
+          <Select value={inspectorFilter} onChange={(e) => setInspectorFilter(e.target.value)} className="w-40 text-xs h-8">
             <option value="">All Inspectors</option>
             {inspectorNames.map((name) => (
               <option key={name} value={name}>{name}</option>
             ))}
           </Select>
-          <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-48">
+          <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-44 text-xs h-8">
             <option value="">All Categories</option>
             {categories.map((cat) => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </Select>
-          <div className="ml-auto text-sm text-gray-400 self-center">{filtered.length} photos</div>
+          <div className="ml-auto text-xs text-gray-400 self-center">{filtered.length} photos</div>
         </CardContent>
       </Card>
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center flex-1">
           <Loader2 className="h-8 w-8 animate-spin text-[#FF6B35]" />
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filtered.map((photo, i) => (
-            <button
-              key={`${photo.url}-${i}`}
-              onClick={() => setLightboxIndex(i)}
-              className="group relative rounded-xl overflow-hidden border bg-white shadow-sm hover:shadow-md transition-shadow text-left"
-            >
-              <img src={photo.url} alt="" className="w-full h-40 object-cover group-hover:scale-105 transition-transform" loading="lazy" />
-              <div className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  {photo.type === "issue" ? (
-                    <Badge className="bg-red-50 text-red-600 text-[10px]">Issue</Badge>
-                  ) : (
-                    <Badge className="bg-emerald-50 text-emerald-600 text-[10px]">Fix</Badge>
-                  )}
-                  {photo.severity && severityConfig[photo.severity] && (
-                    <Badge className={`${severityConfig[photo.severity].bg} ${severityConfig[photo.severity].color} text-[10px]`}>
-                      {photo.severity}
-                    </Badge>
-                  )}
+        <div className="mt-4 flex-1 min-h-0 overflow-y-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {filtered.map((photo, i) => (
+              <button
+                key={`${photo.url}-${i}`}
+                onClick={() => setLightboxIndex(i)}
+                className="group relative rounded-xl overflow-hidden border bg-white shadow-sm hover:shadow-md transition-shadow text-left"
+              >
+                <img src={photo.url} alt="" className="w-full h-32 object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+                <div className="p-2">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    {photo.type === "issue" ? (
+                      <Badge className="bg-red-50 text-red-600 text-[9px] px-1.5 py-0">Issue</Badge>
+                    ) : (
+                      <Badge className="bg-emerald-50 text-emerald-600 text-[9px] px-1.5 py-0">Fix</Badge>
+                    )}
+                    {photo.severity && severityConfig[photo.severity] && (
+                      <Badge className={`${severityConfig[photo.severity].bg} ${severityConfig[photo.severity].color} text-[9px] px-1.5 py-0`}>
+                        {photo.severity}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[11px] font-medium truncate">{photo.category || photo.linkedIssueCategory || "Fix photo"}</p>
+                  <p className="text-[10px] text-gray-400 truncate">{photo.jobAddress}</p>
                 </div>
-                <p className="text-xs font-medium truncate">{photo.category || photo.linkedIssueCategory || "Fix photo"}</p>
-                <p className="text-[10px] text-gray-400 truncate mt-0.5">{photo.inspectorName}</p>
-                <p className="text-[10px] text-gray-400 truncate">{photo.jobAddress}</p>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

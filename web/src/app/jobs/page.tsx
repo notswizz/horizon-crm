@@ -87,8 +87,8 @@ export default function JobsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      <div className="flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Jobs</h1>
           <p className="text-sm text-gray-500 mt-1">{total} total jobs</p>
@@ -114,7 +114,7 @@ export default function JobsPage() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="mt-6 flex-shrink-0">
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[200px]">
@@ -149,11 +149,11 @@ export default function JobsPage() {
       </Card>
 
       {/* Table */}
-      <Card>
-        <div className="overflow-x-auto">
+      <Card className="mt-4 flex-1 min-h-0 flex flex-col">
+        <div className="overflow-auto flex-1">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50/50">
+            <thead className="sticky top-0 z-10 bg-white">
+              <tr className="border-b bg-gray-50/80 backdrop-blur">
                 <th className="p-3 text-left w-10">
                   <input type="checkbox" checked={selected.size === jobs.length && jobs.length > 0} onChange={toggleAll} className="rounded" />
                 </th>
@@ -241,7 +241,7 @@ export default function JobsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t">
+          <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0">
             <p className="text-xs text-gray-400">Page {page} of {totalPages}</p>
             <div className="flex gap-1">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>

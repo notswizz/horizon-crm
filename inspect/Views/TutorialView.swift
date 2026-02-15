@@ -10,7 +10,7 @@ struct TutorialView: View {
         switch currentStep {
         case 0: "🏠"
         case 1: "📋"
-        case 2: "📷"
+        case 2: "🔍"
         case 3: "🔧"
         default: "⚡"
         }
@@ -19,9 +19,9 @@ struct TutorialView: View {
     private var stepTitle: String {
         switch currentStep {
         case 0: "Welcome to Horizon Inspect"
-        case 1: "Step 1: Create a Job"
-        case 2: "Step 2: Document Issues"
-        case 3: "Step 3: Submit Fixes"
+        case 1: "Step 1: Create a Job & Spots"
+        case 2: "Step 2: Audit — Find Issues"
+        case 3: "Step 3: Inspection — Fix Issues"
         default: "Quick Tip: Camera Tab"
         }
     }
@@ -110,15 +110,15 @@ struct TutorialView: View {
     }
 
     private func stepIconFor(_ index: Int) -> String {
-        ["🏠", "📋", "📷", "🔧", "⚡"][index]
+        ["🏠", "📋", "🔍", "🔧", "⚡"][index]
     }
 
     private func stepTitleFor(_ index: Int) -> String {
         [
             "Welcome to Horizon Inspect",
-            "Step 1: Create a Job",
-            "Step 2: Document Issues",
-            "Step 3: Submit Fixes",
+            "Step 1: Create a Job & Spots",
+            "Step 2: Audit — Find Issues",
+            "Step 3: Inspection — Fix Issues",
             "Quick Tip: Camera Tab"
         ][index]
     }
@@ -138,19 +138,26 @@ struct TutorialView: View {
 
     private var welcomeContent: some View {
         VStack(spacing: 20) {
-            Text("You're here to document energy retrofit jobs — take photos, tag issues, and track fixes.")
+            Text("Document energy retrofit jobs from start to finish — audit issues, then inspect the fixes.")
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            // Mini metrics preview
-            HStack(spacing: 0) {
-                miniMetric(value: "3", label: "Jobs", color: DS.Colors.primary)
-                miniMetric(value: "12", label: "Photos", color: DS.Colors.info)
-                miniMetric(value: "5", label: "Issues", color: DS.Colors.error)
-                miniMetric(value: "3", label: "Fixes", color: DS.Colors.success)
+            // Workflow summary
+            VStack(spacing: 0) {
+                workflowRow(icon: "plus.circle.fill", color: DS.Colors.primary,
+                            title: "Create a Job", detail: "Address + customer info")
+                workflowDivider()
+                workflowRow(icon: "mappin.circle.fill", color: DS.Colors.info,
+                            title: "Add Spots", detail: "Locations in the home to inspect")
+                workflowDivider()
+                workflowRow(icon: "exclamationmark.triangle.fill", color: DS.Colors.error,
+                            title: "Audit", detail: "Photo + tag each issue per spot")
+                workflowDivider()
+                workflowRow(icon: "checkmark.circle.fill", color: DS.Colors.success,
+                            title: "Inspection", detail: "Photo + document each fix")
             }
-            .padding(.vertical, 14)
+            .padding(14)
             .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
 
             Text("This takes 2 minutes.")
@@ -163,28 +170,11 @@ struct TutorialView: View {
 
     private var createJobContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Tap the \"+\" button to start a new job.")
+            Text("A **Job** is a property you're working on. Tap \"+\" to create one.")
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .multilineTextAlignment(.center)
-
-            // Mini "+" button visual
-            HStack {
-                Spacer()
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
-                    Text("New Job")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(DS.Colors.primary.gradient, in: .capsule)
-                .shadow(color: DS.Colors.primary.opacity(0.3), radius: 8, y: 4)
-                Spacer()
-            }
 
             // Mini form mockup
             VStack(spacing: 10) {
@@ -195,40 +185,63 @@ struct TutorialView: View {
             .padding(16)
             .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
 
+            Text("Then add **Spots** — each spot is a specific location in the home, like \"Attic\" or \"Kitchen Window\".")
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Text("Every spot has a **Job Type** that describes what kind of work it needs.")
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            // Mini spot cards
+            HStack(spacing: 10) {
+                miniSpotCard(title: "Attic", type: "Insulation", icon: "triangle.fill")
+                miniSpotCard(title: "Kitchen Window", type: "Air Sealing", icon: "wind")
+            }
+
             tipCallout(
-                icon: "location.fill",
-                color: DS.Colors.info,
-                text: "The app will find nearby jobs automatically when you're on site."
+                icon: "lightbulb.fill",
+                color: DS.Colors.warning,
+                text: "The spot's job type determines which issue categories show up later."
             )
         }
     }
 
-    // MARK: - Step 2: Document Issues
+    // MARK: - Step 2: Audit
 
     private var documentIssuesContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Each job has **SPOTS** (like \"Attic\" or \"Water Heater\").")
+            Text("An **Audit** is your first visit — you walk through each spot and document every issue you find.")
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .multilineTextAlignment(.center)
 
-            // Mini spot cards
-            HStack(spacing: 10) {
-                miniSpotCard(title: "Attic", type: "Insulation", icon: "house.fill")
-                miniSpotCard(title: "Water Heater", type: "HVAC", icon: "flame.fill")
+            Text("Each spot can have **one or more issues**. The issue categories change based on the spot's job type:")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            // Job type → categories example
+            VStack(spacing: 8) {
+                categoryExample(type: "Insulation", categories: ["Gaps", "Compression", "Low R-Value"])
+                categoryExample(type: "Air Sealing", categories: ["No Caulk", "Gap at Penetration", "No Weatherstrip"])
             }
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
 
             // Numbered steps
             VStack(alignment: .leading, spacing: 12) {
-                numberedStep(n: "1", text: "Tap the spot card")
-                numberedStep(n: "2", text: "Take a photo")
-                numberedStep(n: "3", text: "Pick what's wrong (gap, moisture, etc.)")
+                numberedStep(n: "1", text: "Open a spot")
+                numberedStep(n: "2", text: "Take a photo of the problem")
+                numberedStep(n: "3", text: "Pick the issue category")
 
                 // Step 4 with severity badges inline
                 HStack(spacing: 8) {
                     stepCircle("4")
-                    Text("Pick severity:")
+                    Text("Rate severity:")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                     severityBadge("Critical", color: .red)
@@ -237,57 +250,33 @@ struct TutorialView: View {
                 }
 
                 numberedStep(n: "5", text: "Add notes (optional)")
+                numberedStep(n: "6", text: "Repeat for each issue in the spot")
             }
 
-            // Result preview card
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(.tertiarySystemFill))
-                    .frame(width: 56, height: 56)
-                    .overlay(
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.quaternary)
-                    )
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Air gap in duct seal")
-                        .font(.system(size: 14, weight: .semibold))
-                    HStack(spacing: 6) {
-                        severityBadge("Major", color: .orange)
-                        Text("Attic")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                Spacer()
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(DS.Colors.success)
-            }
-            .padding(12)
-            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
-
-            Text("That's it! The photo + tags get saved.")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .frame(maxWidth: .infinity, alignment: .center)
+            tipCallout(
+                icon: "doc.text.fill",
+                color: DS.Colors.info,
+                text: "One spot can have multiple issues. e.g. an attic might have gaps AND moisture damage."
+            )
         }
     }
 
-    // MARK: - Step 3: Submit Fixes
+    // MARK: - Step 3: Inspection
 
     private var submitFixesContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("After work is done:")
+            Text("An **Inspection** is your follow-up visit after the work is done. Each issue from the audit gets a **Fix**.")
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(.center)
 
             VStack(alignment: .leading, spacing: 12) {
-                numberedStep(n: "1", text: "Go back to the same spot")
+                numberedStep(n: "1", text: "Open the spot you worked on")
                 numberedStep(n: "2", text: "Tap the issue you fixed")
                 numberedStep(n: "3", text: "Take an \"after\" photo")
-                numberedStep(n: "4", text: "Write what you did")
-                numberedStep(n: "5", text: "(Optional) Add materials used")
+                numberedStep(n: "4", text: "Describe what you did to fix it")
+                numberedStep(n: "5", text: "Add materials used (optional)")
             }
 
             // Before / After visual
@@ -301,12 +290,12 @@ struct TutorialView: View {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .font(.system(size: 20))
                                     .foregroundStyle(DS.Colors.error.opacity(0.5))
-                                Text("Before")
+                                Text("Audit")
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundStyle(DS.Colors.error)
                             }
                         )
-                    Text("Issue")
+                    Text("Issue Photo")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
@@ -325,12 +314,12 @@ struct TutorialView: View {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 20))
                                     .foregroundStyle(DS.Colors.success.opacity(0.5))
-                                Text("After")
+                                Text("Inspection")
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundStyle(DS.Colors.success)
                             }
                         )
-                    Text("Fix")
+                    Text("Fix Photo")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
@@ -341,8 +330,14 @@ struct TutorialView: View {
             tipCallout(
                 icon: "link",
                 color: DS.Colors.success,
-                text: "The app links before/after photos automatically."
+                text: "Each fix links back to its issue automatically — before & after."
             )
+
+            Text("When every issue has a fix, the job is marked **Completed**.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(.center)
         }
     }
 
@@ -391,6 +386,53 @@ struct TutorialView: View {
     }
 
     // MARK: - Reusable Pieces
+
+    private func workflowRow(icon: String, color: Color, title: String, detail: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(color)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(detail)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    private func workflowDivider() -> some View {
+        Rectangle()
+            .fill(Color(.separator))
+            .frame(width: 1, height: 10)
+            .padding(.leading, 26)
+    }
+
+    private func categoryExample(type: String, categories: [String]) -> some View {
+        HStack(spacing: 8) {
+            Text(type)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(DS.Colors.primary)
+                .frame(width: 80, alignment: .trailing)
+            Image(systemName: "arrow.right")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.quaternary)
+            HStack(spacing: 4) {
+                ForEach(categories, id: \.self) { cat in
+                    Text(cat)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Color(.tertiarySystemFill), in: .capsule)
+                }
+            }
+        }
+    }
 
     private func miniMetric(value: String, label: String, color: Color) -> some View {
         VStack(spacing: 4) {

@@ -286,30 +286,30 @@ function IssueCategoryList({
           Categories inspectors choose when documenting issues. Link to job types or leave empty for all.
         </p>
 
-        <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+        <div className="space-y-0.5 max-h-[280px] overflow-y-auto pr-1">
           {categories.map((cat, i) => (
             <div key={cat.name} className="group">
-              <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-50 transition-colors">
                 <button
                   onClick={() => setEditingIndex(editingIndex === i ? null : i)}
-                  className="flex-1 flex items-center gap-2 text-left min-w-0"
+                  className="flex-1 flex items-center gap-1.5 text-left min-w-0"
                 >
                   <ChevronDown
-                    className={`h-3.5 w-3.5 text-gray-300 flex-shrink-0 transition-transform ${
+                    className={`h-3 w-3 text-gray-300 flex-shrink-0 transition-transform ${
                       editingIndex === i ? "rotate-0" : "-rotate-90"
                     }`}
                   />
-                  <span className="text-sm font-medium text-gray-700 truncate">{cat.name}</span>
+                  <span className="text-xs font-medium text-gray-700 truncate">{cat.name}</span>
                   {cat.jobTypes.length === 0 ? (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 flex-shrink-0">
-                      All types
+                    <span className="text-[9px] px-1 py-px rounded bg-gray-100 text-gray-400 flex-shrink-0">
+                      All
                     </span>
                   ) : (
-                    <div className="flex gap-1 flex-shrink-0">
+                    <div className="flex gap-0.5 flex-shrink-0">
                       {cat.jobTypes.map((jt) => (
                         <span
                           key={jt}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-[#FF6B35] font-medium"
+                          className="text-[9px] px-1 py-px rounded bg-orange-50 text-[#FF6B35] font-medium"
                         >
                           {jt}
                         </span>
@@ -319,23 +319,23 @@ function IssueCategoryList({
                 </button>
                 <button
                   onClick={() => handleRemove(i)}
-                  className="p-1 rounded hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-0.5 rounded hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" />
                 </button>
               </div>
 
               {editingIndex === i && (
-                <div className="ml-8 mt-1 mb-2 p-3 rounded-lg bg-gray-50">
-                  <p className="text-xs text-gray-500 mb-2">Applies to job types:</p>
-                  <div className="flex flex-wrap gap-1.5">
+                <div className="ml-6 mt-0.5 mb-1 p-2 rounded-md bg-gray-50">
+                  <p className="text-[10px] text-gray-500 mb-1.5">Applies to job types:</p>
+                  <div className="flex flex-wrap gap-1">
                     {jobTypes.map((jt) => {
                       const active = cat.jobTypes.includes(jt);
                       return (
                         <button
                           key={jt}
                           onClick={() => toggleJobType(i, jt)}
-                          className={`text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
+                          className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${
                             active
                               ? "bg-[#FF6B35] text-white"
                               : "bg-white border border-gray-200 text-gray-500 hover:border-[#FF6B35] hover:text-[#FF6B35]"
@@ -346,10 +346,10 @@ function IssueCategoryList({
                       );
                     })}
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-2">
+                  <p className="text-[9px] text-gray-400 mt-1.5">
                     {cat.jobTypes.length === 0
-                      ? "No types selected — this category appears for all job types"
-                      : `Appears for ${cat.jobTypes.length} job type${cat.jobTypes.length === 1 ? "" : "s"}`}
+                      ? "No types selected — appears for all job types"
+                      : `Appears for ${cat.jobTypes.length} type${cat.jobTypes.length === 1 ? "" : "s"}`}
                   </p>
                 </div>
               )}
