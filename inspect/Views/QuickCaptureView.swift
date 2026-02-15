@@ -1,5 +1,40 @@
 import SwiftUI
+import UIKit
 import PhotosUI
+
+// MARK: - Camera Picker (UIImagePickerController wrapper)
+
+struct CameraPickerView: UIViewControllerRepresentable {
+    var onCapture: (UIImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraPickerView
+        init(_ parent: CameraPickerView) { self.parent = parent }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.onCapture(image)
+            }
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
+}
 
 // MARK: - Quick Capture View
 
@@ -13,6 +48,7 @@ struct QuickCaptureView: View {
     @State private var selectedItem: PhotosPickerItem?
     @State private var selectedPhoto: String?
     @State private var displayImage: UIImage?
+    @State private var showCamera = false
 
     // Tagging state
     @State private var selectedJobId: UUID?
@@ -97,6 +133,12 @@ struct QuickCaptureView: View {
             .sheet(isPresented: $showNewSpotSheet) {
                 newSpotSheet
             }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPickerView { image in
+                    importCameraImage(image)
+                }
+                .ignoresSafeArea()
+            }
         }
     }
 
@@ -121,44 +163,131 @@ struct QuickCaptureView: View {
     // MARK: - Phase 1: Capture
 
     private var capturePhase: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 0) {
             Spacer()
 
-            Image(systemName: "camera.viewfinder")
-                .font(.system(size: 64))
-                .foregroundStyle(DS.Colors.primary)
+            // Hero illustration
+            ZStack {
+                Circle()
+                    .fill(DS.Colors.primary.opacity(0.08))
+                    .frame(width: 160, height: 160)
 
-            Text("Snap a photo, then tag it")
-                .font(.title3.weight(.medium))
+                Circle()
+                    .fill(DS.Colors.primary.opacity(0.12))
+                    .frame(width: 110, height: 110)
+
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 44, weight: .medium))
+                    .foregroundStyle(DS.Colors.primary)
+            }
+            .padding(.bottom, 24)
+
+            Text("Capture & Tag")
+                .font(.title2.weight(.bold))
+                .padding(.bottom, 6)
+
+            Text("Take a photo or choose from library,\nthen tag it to a job")
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.bottom, 36)
 
-            PhotosPicker(selection: $selectedItem, matching: .images) {
-                HStack(spacing: 10) {
-                    Image(systemName: "camera.fill")
-                        .font(.title2)
-                    Text("Take / Choose Photo")
-                        .font(.headline)
+            // Two action buttons
+            VStack(spacing: 12) {
+                // Camera button
+                Button {
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        showCamera = true
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(.white.opacity(0.2))
+                                .frame(width: 40, height: 40)
+                            Image(systemName: "camera.fill")
+                                .font(.title3)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Take Photo")
+                                .font(.headline)
+                            Text("Open camera")
+                                .font(.caption)
+                                .opacity(0.8)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.subheadline.weight(.semibold))
+                            .opacity(0.6)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .frame(height: 68)
+                    .background(
+                        LinearGradient(
+                            colors: [DS.Colors.primary, DS.Colors.primaryDark],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: .rect(cornerRadius: 16)
+                    )
+                    .shadow(color: DS.Colors.primary.opacity(0.35), radius: 12, y: 6)
                 }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 60)
-                .background(
-                    LinearGradient(
-                        colors: [DS.Colors.primary, DS.Colors.primary.opacity(0.85)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    in: .capsule
-                )
-                .shadow(color: DS.Colors.primary.opacity(0.3), radius: 12, y: 4)
+
+                // Library button
+                PhotosPicker(selection: $selectedItem, matching: .images) {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(DS.Colors.primary.opacity(0.1))
+                                .frame(width: 40, height: 40)
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.title3)
+                                .foregroundStyle(DS.Colors.primary)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Choose from Library")
+                                .font(.headline)
+                            Text("Pick an existing photo")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 16)
+                    .frame(height: 68)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .onChange(of: selectedItem) { _, newItem in
+                    importPhoto(from: newItem)
+                }
             }
-            .padding(.horizontal, 40)
-            .onChange(of: selectedItem) { _, newItem in
-                importPhoto(from: newItem)
-            }
+            .padding(.horizontal, 24)
 
             Spacer()
             Spacer()
+
+            // Job count hint
+            HStack(spacing: 6) {
+                Image(systemName: "briefcase.fill")
+                    .font(.caption2)
+                    .foregroundStyle(DS.Colors.primary)
+                Text("\(store.jobs.count) jobs available")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Color(.tertiarySystemFill), in: .capsule)
+            .padding(.bottom, 8)
         }
         .padding()
     }
@@ -868,6 +997,16 @@ struct QuickCaptureView: View {
                 }
             }
             selectedItem = nil
+        }
+    }
+
+    private func importCameraImage(_ image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.85) else { return }
+        let filename = store.saveTempPhoto(data)
+        selectedPhoto = filename
+        displayImage = store.loadTempImage(named: filename)
+        if selectedJobId == nil, let first = locationManager.sortedByDistance(store.jobs).first {
+            selectJob(first)
         }
     }
 

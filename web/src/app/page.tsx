@@ -91,24 +91,28 @@ export default function DashboardPage() {
     }));
 
   // Pipeline metrics from rebate data
-  const totalPipeline = allJobs
-    .filter((j) => j.rebate?.status === "submitted")
-    .reduce((sum, j) => sum + (j.rebate?.claimedAmount || j.rebate?.estimatedRebate || 0), 0);
+  const submittedJobs = allJobs.filter((j) => j.rebate?.status === "submitted");
+  const totalPipeline = submittedJobs.reduce((sum, j) => sum + (j.rebate?.claimedAmount || j.rebate?.estimatedRebate || 0), 0);
 
-  const approvedPending = allJobs
-    .filter((j) => j.rebate?.status === "accepted")
-    .reduce((sum, j) => sum + (j.rebate?.approvedAmount || 0), 0);
+  const acceptedJobs = allJobs.filter((j) => j.rebate?.status === "accepted");
+  const approvedPending = acceptedJobs.reduce((sum, j) => sum + (j.rebate?.approvedAmount || 0), 0);
 
-  const totalPaid = allJobs
-    .filter((j) => j.rebate?.status === "paid")
-    .reduce((sum, j) => sum + (j.rebate?.paidAmount || 0), 0);
+  const paidJobs = allJobs.filter((j) => j.rebate?.status === "paid");
+  const totalPaid = paidJobs.reduce((sum, j) => sum + (j.rebate?.paidAmount || 0), 0);
 
   const jobsWithMargin = allJobs.filter((j) => j.profitMargin != null && j.profitMargin !== 0);
   const avgMargin = jobsWithMargin.length > 0
     ? Math.round(jobsWithMargin.reduce((sum, j) => sum + j.profitMargin!, 0) / jobsWithMargin.length * 10) / 10
     : 0;
 
-  const hasPipelineData = totalPipeline > 0 || approvedPending > 0 || totalPaid > 0 || avgMargin > 0;
+  // Profit: (paid + accepted revenue) - project costs
+  const revenueIn = totalPaid + approvedPending;
+  const totalCosts = allJobs
+    .filter((j) => j.rebate?.status === "paid" || j.rebate?.status === "accepted")
+    .reduce((sum, j) => sum + (j.projectCosts?.total || 0), 0);
+  const totalProfit = revenueIn - totalCosts;
+
+  const hasPipelineData = totalPipeline > 0 || approvedPending > 0 || totalPaid > 0 || avgMargin > 0 || totalProfit !== 0;
 
   // Weekly aggregation for jobs over time
   const weeklyJobs = analytics.jobsOverTime.reduce<{ date: string; count: number }[]>((acc, item) => {
@@ -137,7 +141,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="p-5 bg-gradient-to-br from-[#7C3AED] via-[#8B5CF6] to-[#6D28D9] text-white">
-              <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Revenue-Based</span>
+              <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Rebate-Based</span>
               <p className="text-3xl font-extrabold leading-none tracking-tight mt-1">{formatCurrency(analytics.revenueDatasetValue)}</p>
               <p className="text-[11px] text-white/50 mt-2">
                 {formatCurrency(analytics.totalJobs > 0 ? analytics.revenueDatasetValue / analytics.totalJobs : 0)}/avg
@@ -201,7 +205,7 @@ export default function DashboardPage() {
 
       {/* Rebate Pipeline Row */}
       {hasPipelineData && (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
@@ -211,7 +215,10 @@ export default function DashboardPage() {
                 </div>
               </div>
               <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalPipeline)}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Submitted claims</p>
+              <div className="flex items-center justify-between mt-0.5">
+                <p className="text-[10px] text-gray-400">Submitted claims</p>
+                <p className="text-[10px] font-semibold text-gray-400">{submittedJobs.length} job{submittedJobs.length !== 1 ? "s" : ""}</p>
+              </div>
             </CardContent>
           </Card>
 
@@ -224,7 +231,10 @@ export default function DashboardPage() {
                 </div>
               </div>
               <p className="text-2xl font-bold text-green-600">{formatCurrency(approvedPending)}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Pending payment</p>
+              <div className="flex items-center justify-between mt-0.5">
+                <p className="text-[10px] text-gray-400">Pending payment</p>
+                <p className="text-[10px] font-semibold text-gray-400">{acceptedJobs.length} job{acceptedJobs.length !== 1 ? "s" : ""}</p>
+              </div>
             </CardContent>
           </Card>
 
@@ -237,24 +247,34 @@ export default function DashboardPage() {
                 </div>
               </div>
               <p className="text-2xl font-bold text-emerald-600 border border-yellow-400 rounded-md px-2 py-0.5 inline-block">{formatCurrency(totalPaid)}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Total collected</p>
+              <div className="flex items-center justify-between mt-0.5">
+                <p className="text-[10px] text-gray-400">Total collected</p>
+                <p className="text-[10px] font-semibold text-gray-400">{paidJobs.length} job{paidJobs.length !== 1 ? "s" : ""}</p>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
-            <CardContent className="p-4">
+          {/* Profit + Margin combined card with rainbow border */}
+          <div className="relative rounded-xl p-[2px] bg-[length:300%_300%] hover:scale-[1.02] transition-all" style={{ background: "linear-gradient(135deg, #FF6B35, #F59E0B, #10B981, #3B82F6, #8B5CF6, #FF6B35)", backgroundSize: "300% 300%", animation: "gradient-spin 3s linear infinite" }}>
+            <style>{`@keyframes gradient-spin { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }`}</style>
+            <div className="rounded-[10px] bg-white h-full p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Avg Margin</span>
-                <div className="p-1.5 rounded-lg bg-orange-50">
-                  <TrendingUp className="h-3.5 w-3.5 text-[#FF6B35]" />
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Profit</span>
+                <div className={`p-1.5 rounded-lg ${totalProfit >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
+                  <DollarSign className={`h-3.5 w-3.5 ${totalProfit >= 0 ? "text-emerald-500" : "text-red-500"}`} />
                 </div>
               </div>
-              <p className={`text-2xl font-bold ${avgMargin > 20 ? "text-green-600" : avgMargin > 10 ? "text-orange-600" : "text-red-600"}`}>
-                {avgMargin}%
+              <p className={`text-2xl font-bold ${totalProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                {formatCurrency(totalProfit)}
               </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">{jobsWithMargin.length} jobs with data</p>
-            </CardContent>
-          </Card>
+              <div className="flex items-center justify-between mt-1.5">
+                <p className="text-[10px] text-gray-400">Rebates − costs</p>
+                <p className={`text-sm font-bold ${avgMargin > 20 ? "text-green-600" : avgMargin > 10 ? "text-orange-600" : "text-red-600"}`}>
+                  {avgMargin}% <span className="text-[10px] font-medium text-gray-400">margin</span>
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

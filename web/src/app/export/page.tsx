@@ -276,7 +276,7 @@ export default function ExportPage() {
                   { icon: AlertTriangle, label: "Issues", value: stats.issues, color: "text-red-500" },
                   { icon: Wrench, label: "Fixes", value: stats.fixes, color: "text-emerald-500" },
                   { icon: DollarSign, label: "Pts Value", value: formatCurrency(stats.value), color: "text-[#FF6B35]" },
-                  { icon: DollarSign, label: "Rev Value", value: formatCurrency(stats.revenueValue), color: "text-purple-500" },
+                  { icon: DollarSign, label: "Rebate Val", value: formatCurrency(stats.revenueValue), color: "text-purple-500" },
                 ].map((s) => (
                   <div key={s.label} className="flex items-center gap-3">
                     <s.icon size={16} className={s.color} />
