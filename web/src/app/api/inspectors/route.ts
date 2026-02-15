@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
+import { getAuthSession } from "@/lib/auth-helpers";
 
 export async function PATCH(req: NextRequest) {
   try {
+    const session = await getAuthSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session.isAdmin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
     const { oldName, newName } = await req.json();
 
     if (!oldName || !newName || typeof oldName !== "string" || typeof newName !== "string") {

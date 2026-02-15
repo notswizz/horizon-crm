@@ -4,6 +4,7 @@ struct ContentView: View {
     var store: JobStore
     var locationManager: LocationManager
     var configStore: ConfigStore
+    var authManager: AuthManager
 
     var body: some View {
         TabView {
@@ -16,7 +17,7 @@ struct ContentView: View {
             }
 
             Tab("Settings", systemImage: "gearshape.fill") {
-                SettingsView(store: store)
+                SettingsView(store: store, authManager: authManager)
             }
         }
         .tint(DS.Colors.primary)

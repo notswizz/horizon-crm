@@ -12,23 +12,34 @@ import {
   Settings,
   ChevronsLeft,
   ChevronsRight,
+  Shield,
+  LogOut,
 } from "lucide-react";
 
-const navItems = [
+const baseNavItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jobs", label: "Jobs", icon: Briefcase },
   { href: "/photos", label: "Photos", icon: Camera },
-  { href: "/export", label: "Export", icon: Download },
   { href: "/settings", label: "Settings", icon: Settings },
+];
+
+const adminNavItems = [
+  { href: "/export", label: "Export", icon: Download },
+  { href: "/admin", label: "Admin", icon: Shield },
 ];
 
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  isAdmin: boolean;
+  companyName: string;
+  onLogout: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, isAdmin, companyName, onLogout }: SidebarProps) {
   const pathname = usePathname();
+
+  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
 
   return (
     <aside
@@ -37,13 +48,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         collapsed ? "w-16" : "w-64"
       )}
     >
-      {/* Logo */}
+      {/* Logo + Company Name */}
       <div className={cn("flex items-center border-b", collapsed ? "justify-center px-2 py-5" : "gap-3 px-6 py-5")}>
-        <Image src="/logo.png" alt="Inspect logo" width={36} height={36} className="rounded-lg flex-shrink-0" />
+        <Image src="/logo.png" alt="RetrofitIQ" width={36} height={36} className="rounded-lg flex-shrink-0" />
         {!collapsed && (
           <div className="min-w-0">
-            <h1 className="text-sm font-bold tracking-tight">Horizon</h1>
-            <p className="text-[10px] text-gray-400 font-medium">Energy South</p>
+            <h1 className="text-sm font-bold tracking-tight truncate">{companyName || "RetrofitIQ"}</h1>
           </div>
         )}
       </div>
@@ -80,14 +90,27 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
       </button>
 
+      {/* Logout */}
+      <button
+        onClick={onLogout}
+        title={collapsed ? "Logout" : undefined}
+        className={cn(
+          "mx-2 mb-2 flex items-center rounded-lg text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors",
+          collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+        )}
+      >
+        <LogOut size={16} />
+        {!collapsed && "Logout"}
+      </button>
+
       {/* Footer */}
       <div className={cn("border-t px-4 py-3", collapsed && "px-2 text-center")}>
         {collapsed ? (
-          <p className="text-[10px] text-gray-400 font-medium">HES</p>
+          <p className="text-[10px] text-gray-400 font-medium">{companyName?.slice(0, 3) || "..."}</p>
         ) : (
           <>
-            <p className="text-sm font-medium">Admin</p>
-            <p className="text-[10px] text-gray-400">Horizon Energy South</p>
+            <p className="text-sm font-medium truncate">{isAdmin ? "Admin" : "User"}</p>
+            <p className="text-[10px] text-gray-400 truncate">{companyName}</p>
           </>
         )}
       </div>

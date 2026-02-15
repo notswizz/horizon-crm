@@ -1,12 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, estimateJobValue, DEFAULT_WEIGHTS, calculateJobRevenueValue, DEFAULT_VALUATION } from "@/lib/utils";
 import { Job, InspectionForm, DatasetValueWeights, DatasetValuationConfig } from "@/types";
 import { Download, Loader2, FileJson, FileSpreadsheet, Shield, Briefcase, Camera, AlertTriangle, Wrench, DollarSign, Filter } from "lucide-react";
 
 export default function ExportPage() {
+  const { appUser } = useAuth();
+  const router = useRouter();
+
+  // Redirect non-admin users
+  if (appUser && appUser.role !== "admin") {
+    router.push("/");
+    return null;
+  }
   const [format, setFormat] = useState("jsonl");
   const [anonymize, setAnonymize] = useState(false);
   const [rebateFilters, setRebateFilters] = useState<string[]>([]);

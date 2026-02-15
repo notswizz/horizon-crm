@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchFilteredJobs } from "@/lib/firestore-helpers";
 import { db } from "@/lib/firebase-admin";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { Timestamp } from "firebase-admin/firestore";
 import { randomUUID } from "crypto";
+import { getAuthSession } from "@/lib/auth-helpers";
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getAuthSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await req.json();
     const { streetAddress, city, state, zipCode, contactName, contactPhone, contactEmail, notes, latitude, longitude } = body;
 
@@ -13,7 +17,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Street address is required" }, { status: 400 });
     }
 
-    // iOS uses UUID for document IDs and decodes id as UUID — must match
     const jobId = randomUUID().toUpperCase();
     const now = Timestamp.now();
     const docRef = db.collection("jobs").doc(jobId);
@@ -38,6 +41,7 @@ export async function POST(req: NextRequest) {
       photoCount: 0,
       issueCount: 0,
       fixCount: 0,
+      companyId: session.companyId,
       createdAt: now,
       updatedAt: now,
     });
@@ -51,6 +55,9 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await getAuthSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const url = new URL(req.url);
     const result = await fetchFilteredJobs({
       search: url.searchParams.get("search") || undefined,
@@ -59,6 +66,7 @@ export async function GET(req: NextRequest) {
       sort: url.searchParams.get("sort") || "newest",
       page: parseInt(url.searchParams.get("page") || "1"),
       limit: parseInt(url.searchParams.get("limit") || "50"),
+      companyId: session.isAdmin ? undefined : session.companyId,
     });
 
     return NextResponse.json(result);

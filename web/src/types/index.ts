@@ -123,6 +123,7 @@ export interface Job {
   rebate?: RebateInfo;
   profitMargin?: number;
   netProfit?: number;
+  companyId?: string;
 }
 
 export interface IssuePhoto {
@@ -196,6 +197,36 @@ export interface DropdownConfig {
   inspectorNames?: string[];
   datasetValueWeights?: DatasetValueWeights;
   datasetValuation?: DatasetValuationConfig;
+}
+
+// ─── Multi-Tenant Auth Types ──────────────────────────────────────────
+
+export interface Company {
+  id: string;
+  name: string;
+  email: string;
+  joinCode: string;
+  createdAt: Date;
+}
+
+export interface AppUser {
+  uid: string;
+  email: string;
+  companyId: string;
+  companyName: string;
+  role: "admin" | "user";
+  joinCode?: string;
+  webAccess?: boolean;
+}
+
+export interface AuthSession {
+  uid: string;
+  email: string;
+  companyId: string;
+  companyName: string;
+  role: "admin" | "user";
+  isAdmin: boolean;
+  webAccess: boolean;
 }
 
 // ─── Derived / UI Types ────────────────────────────────────────────────

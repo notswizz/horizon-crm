@@ -90,6 +90,9 @@ struct JobsListView: View {
                 .padding(.bottom, DS.Spacing.xl)
             }
         }
+        .refreshable {
+            await store.refreshJobs()
+        }
         .background(DS.Colors.background)
     }
 

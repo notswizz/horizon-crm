@@ -22,6 +22,7 @@ import {
   Banknote,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/context/auth-context";
 import {
   PieChart,
   Pie,
@@ -54,6 +55,8 @@ const tooltipStyle = {
 };
 
 export default function DashboardPage() {
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === "admin";
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
@@ -62,9 +65,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/analytics").then((r) => r.json()),
-      fetch("/api/jobs?limit=5&sort=newest").then((r) => r.json()),
-      fetch("/api/jobs?limit=500").then((r) => r.json()),
+      fetch("/api/analytics").then((r) => r.ok ? r.json() : null),
+      fetch("/api/jobs?limit=5&sort=newest").then((r) => r.ok ? r.json() : { jobs: [] }),
+      fetch("/api/jobs?limit=500").then((r) => r.ok ? r.json() : { jobs: [] }),
     ]).then(([a, j, all]) => {
       setAnalytics(a);
       setRecentJobs(j.jobs || []);
@@ -83,7 +86,7 @@ export default function DashboardPage() {
 
   if (!analytics) return null;
 
-  const stageData = Object.entries(analytics.jobsByStage)
+  const stageData = Object.entries(analytics.jobsByStage || {})
     .filter(([key]) => key in stageConfig)
     .map(([key, value]) => ({
       name: stageConfig[key as keyof typeof stageConfig].label,
@@ -115,7 +118,7 @@ export default function DashboardPage() {
   const hasPipelineData = totalPipeline > 0 || approvedPending > 0 || totalPaid > 0 || avgMargin > 0 || totalProfit !== 0;
 
   // Weekly aggregation for jobs over time
-  const weeklyJobs = analytics.jobsOverTime.reduce<{ date: string; count: number }[]>((acc, item) => {
+  const weeklyJobs = (analytics.jobsOverTime || []).reduce<{ date: string; count: number }[]>((acc, item) => {
     const d = new Date(item.date);
     const weekStart = new Date(d);
     weekStart.setDate(d.getDate() - d.getDay());
@@ -130,25 +133,27 @@ export default function DashboardPage() {
     <div className="space-y-8 max-w-[1400px]">
       {/* Row 1: KPI Cards */}
       <div className="grid grid-cols-12 gap-4">
-        {/* Hero: Dataset Values — split card */}
-        <Card className="col-span-12 lg:col-span-4 overflow-hidden border-0 shadow-lg">
-          <div className="grid grid-cols-2 h-full">
-            <div className="p-5 bg-gradient-to-br from-[#FF6B35] via-[#FF8C61] to-[#E5532D] text-white">
-              <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Point-Based</span>
-              <p className="text-3xl font-extrabold leading-none tracking-tight mt-1">{formatCurrency(analytics.estimatedValue)}</p>
-              <p className="text-[11px] text-white/50 mt-2">
-                {formatCurrency(analytics.totalJobs > 0 ? analytics.estimatedValue / analytics.totalJobs : 0)}/avg
-              </p>
+        {/* Hero: Dataset Values — split card (admin only) */}
+        {isAdmin && (
+          <Card className="col-span-12 lg:col-span-4 overflow-hidden border-0 shadow-lg">
+            <div className="grid grid-cols-2 h-full">
+              <div className="p-5 bg-gradient-to-br from-[#FF6B35] via-[#FF8C61] to-[#E5532D] text-white">
+                <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Point-Based</span>
+                <p className="text-3xl font-extrabold leading-none tracking-tight mt-1">{formatCurrency(analytics.estimatedValue)}</p>
+                <p className="text-[11px] text-white/50 mt-2">
+                  {formatCurrency(analytics.totalJobs > 0 ? analytics.estimatedValue / analytics.totalJobs : 0)}/avg
+                </p>
+              </div>
+              <div className="p-5 bg-gradient-to-br from-[#7C3AED] via-[#8B5CF6] to-[#6D28D9] text-white">
+                <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Rebate-Based</span>
+                <p className="text-3xl font-extrabold leading-none tracking-tight mt-1">{formatCurrency(analytics.revenueDatasetValue)}</p>
+                <p className="text-[11px] text-white/50 mt-2">
+                  {formatCurrency(analytics.totalJobs > 0 ? analytics.revenueDatasetValue / analytics.totalJobs : 0)}/avg
+                </p>
+              </div>
             </div>
-            <div className="p-5 bg-gradient-to-br from-[#7C3AED] via-[#8B5CF6] to-[#6D28D9] text-white">
-              <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Rebate-Based</span>
-              <p className="text-3xl font-extrabold leading-none tracking-tight mt-1">{formatCurrency(analytics.revenueDatasetValue)}</p>
-              <p className="text-[11px] text-white/50 mt-2">
-                {formatCurrency(analytics.totalJobs > 0 ? analytics.revenueDatasetValue / analytics.totalJobs : 0)}/avg
-              </p>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         {/* Jobs — 2 cols */}
         <Card className="col-span-6 lg:col-span-2 hover:shadow-md hover:scale-[1.02] transition-all">
@@ -203,8 +208,8 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Rebate Pipeline Row */}
-      {hasPipelineData && (
+      {/* Rebate Pipeline Row (admin only) */}
+      {isAdmin && hasPipelineData && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
             <CardContent className="p-4">
@@ -397,7 +402,7 @@ export default function DashboardPage() {
           <CardContent className="p-6">
             <h3 className="text-sm font-semibold mb-6">Top Issues by Category</h3>
             <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={analytics.issuesByCategory.slice(0, 8)} margin={{ bottom: 40 }}>
+              <BarChart data={(analytics.issuesByCategory || []).slice(0, 8)} margin={{ bottom: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                 <XAxis
                   dataKey="category"
@@ -411,7 +416,7 @@ export default function DashboardPage() {
                 <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} allowDecimals={false} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={32} label={{ position: "top", fontSize: 11, fill: "#6B7280", fontWeight: 600 }}>
-                  {analytics.issuesByCategory.slice(0, 8).map((entry, i) => (
+                  {(analytics.issuesByCategory || []).slice(0, 8).map((entry, i) => (
                     <Cell key={entry.category} fill={i < 2 ? "#EF4444" : i < 5 ? "#FF6B35" : "#F59E0B"} />
                   ))}
                 </Bar>
@@ -441,7 +446,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={320}>
-              <AreaChart data={analytics.photosTrend.slice(-photoDays)}>
+              <AreaChart data={(analytics.photosTrend || []).slice(-photoDays)}>
                 <defs>
                   <linearGradient id="photosGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.2} />
@@ -476,10 +481,10 @@ export default function DashboardPage() {
               <Users className="h-4 w-4 text-gray-400" />
               <h3 className="text-sm font-semibold">Top Inspectors</h3>
             </div>
-            {analytics.topInspectors.length > 0 ? (
+            {(analytics.topInspectors || []).length > 0 ? (
               <div className="space-y-2.5">
-                {analytics.topInspectors.slice(0, 5).map((inspector, i) => {
-                  const max = analytics.topInspectors[0].count;
+                {(analytics.topInspectors || []).slice(0, 5).map((inspector, i) => {
+                  const max = (analytics.topInspectors || [])[0].count;
                   const pct = max > 0 ? (inspector.count / max) * 100 : 0;
                   return (
                     <div key={inspector.name} className="flex items-center gap-2.5">
@@ -574,9 +579,9 @@ export default function DashboardPage() {
               <Package className="h-4 w-4 text-gray-400" />
               <h3 className="text-sm font-semibold">Materials Used</h3>
             </div>
-            {analytics.materialsByType.length > 0 ? (
+            {(analytics.materialsByType || []).length > 0 ? (
               <div className="space-y-2">
-                {analytics.materialsByType.map((mat) => (
+                {(analytics.materialsByType || []).map((mat) => (
                   <div
                     key={mat.type}
                     className="flex items-center justify-between p-2.5 rounded-lg bg-gray-50"

@@ -11,6 +11,9 @@ final class JobStore {
     var isLoading = false
     var errorMessage: String?
 
+    /// The companyId to scope queries to. Set by AuthManager after sign-in.
+    var companyId: String?
+
     private var db: Firestore { Firestore.firestore() }
     private var storage: Storage { Storage.storage() }
     private var jobsListener: ListenerRegistration?
@@ -50,10 +53,16 @@ final class JobStore {
     // MARK: - Jobs Listener
 
     func startListening() {
+        jobsListener?.remove()
         isLoading = true
-        jobsListener = db.collection(collectionName)
-            .order(by: "createdAt", descending: true)
-            .addSnapshotListener { [weak self] snapshot, error in
+
+        var query: Query = db.collection(collectionName)
+        if let companyId {
+            query = query.whereField("companyId", isEqualTo: companyId)
+        }
+        query = query.order(by: "createdAt", descending: true)
+
+        jobsListener = query.addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
                 self.isLoading = false
                 if let error {
@@ -112,6 +121,23 @@ final class JobStore {
         listeningJobId = nil
     }
 
+    // MARK: - Refresh Jobs (pull-to-refresh)
+
+    func refreshJobs() async {
+        var query: Query = db.collection(collectionName)
+        if let companyId {
+            query = query.whereField("companyId", isEqualTo: companyId)
+        }
+        query = query.order(by: "createdAt", descending: true)
+
+        do {
+            let snapshot = try await query.getDocuments()
+            jobs = snapshot.documents.compactMap { try? $0.data(as: Job.self) }
+        } catch {
+            errorMessage = "Failed to refresh: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Refresh Forms (pull-to-refresh)
 
     func refreshForms(for jobId: UUID) async {
@@ -124,6 +150,7 @@ final class JobStore {
     func addJob(_ job: Job) {
         do {
             var newJob = job
+            newJob.companyId = companyId
             newJob.updatedAt = Date()
             try db.collection(collectionName)
                 .document(newJob.id.uuidString)

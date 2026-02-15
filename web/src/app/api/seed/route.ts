@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { randomUUID } from "crypto";
+import { getAuthSession } from "@/lib/auth-helpers";
 
 function uid() {
   return randomUUID().toUpperCase();
@@ -679,6 +680,10 @@ function getQuantity(jobType: string): string {
 
 export async function DELETE() {
   try {
+    const session = await getAuthSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session.isAdmin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
+
     const snapshot = await db.collection("jobs").get();
     let deleted = 0;
     for (const doc of snapshot.docs) {
@@ -698,6 +703,10 @@ export async function DELETE() {
 
 export async function POST() {
   try {
+    const session = await getAuthSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session.isAdmin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
+
     const results: string[] = [];
 
     for (let i = 0; i < JOBS.length; i++) {

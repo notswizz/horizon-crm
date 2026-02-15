@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { DropdownConfig, DatasetValuationConfig } from "@/types";
+import { getAuthSession } from "@/lib/auth-helpers";
 
 const CONFIG_DOC = "config/dropdowns";
 
@@ -62,6 +63,9 @@ const DEFAULTS: DropdownConfig = {
 
 export async function GET() {
   try {
+    const session = await getAuthSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const doc = await db.doc(CONFIG_DOC).get();
     if (!doc.exists) {
       await db.doc(CONFIG_DOC).set(DEFAULTS);
@@ -92,6 +96,10 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    const session = await getAuthSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session.isAdmin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
+
     const body = (await request.json()) as Partial<DropdownConfig>;
     const update: Partial<DropdownConfig> = {};
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownConfig, IssueCategoryConfig, DatasetValueWeights, DatasetValuationConfig } from "@/types";
 import { DEFAULT_WEIGHTS, DEFAULT_VALUATION } from "@/lib/utils";
+import { useAuth } from "@/context/auth-context";
 import {
   Loader2,
   Plus,
@@ -19,29 +20,57 @@ import {
   Info,
   Users,
   Pencil,
+  Copy,
+  KeyRound,
+  Mail,
+  Monitor,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 
 export default function SettingsPage() {
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === "admin";
   const [config, setConfig] = useState<DropdownConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<{ uid: string; email: string; displayName: string; webAccess: boolean; isSelf: boolean }[]>([]);
+  const [togglingUid, setTogglingUid] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/config").then((r) => r.json()),
-      fetch("/api/analytics").then((r) => r.json()),
-    ]).then(([cfg, analytics]) => {
+      fetch("/api/analytics").then((r) => r.ok ? r.json() : { topInspectors: [] }),
+      fetch("/api/team").then((r) => r.ok ? r.json() : { members: [] }),
+    ]).then(([cfg, analytics, team]) => {
       // Merge discovered inspector names into config list
       const saved: string[] = cfg.inspectorNames || [];
       const discovered: string[] = (analytics.topInspectors || []).map((i: { name: string }) => i.name);
       const merged = Array.from(new Set([...saved, ...discovered]));
       cfg.inspectorNames = merged;
       setConfig(cfg);
+      setTeamMembers(team.members || []);
       setLoading(false);
     });
   }, []);
+
+  async function toggleWebAccess(uid: string, webAccess: boolean) {
+    setTogglingUid(uid);
+    const res = await fetch("/api/team", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, webAccess }),
+    });
+    if (res.ok) {
+      setTeamMembers((prev) =>
+        prev.map((m) => (m.uid === uid ? { ...m, webAccess } : m))
+      );
+    }
+    setTogglingUid(null);
+  }
 
   async function handleSave() {
     if (!config) return;
@@ -108,6 +137,103 @@ export default function SettingsPage() {
         </button>
       </div>
 
+      {/* Account + Join Code row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Signed-in email */}
+        <Card>
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-50">
+              <Mail className="h-4 w-4 text-blue-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-gray-400">Signed in as</p>
+              <p className="text-sm font-semibold truncate">{appUser?.email}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Join Code */}
+        {appUser?.joinCode && (
+          <Card>
+            <CardContent className="p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-50">
+                  <KeyRound className="h-4 w-4 text-[#FF6B35]" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Company Join Code</p>
+                  <p className="text-lg font-bold font-mono tracking-widest">{appUser.joinCode}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(appUser.joinCode!);
+                  setCodeCopied(true);
+                  setTimeout(() => setCodeCopied(false), 2000);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  codeCopied
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                {codeCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {codeCopied ? "Copied" : "Copy"}
+              </button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Team Web Access */}
+      {teamMembers.length > 0 && (
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Monitor className="h-4 w-4 text-indigo-500" />
+              <h3 className="text-sm font-semibold">Web Dashboard Access</h3>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">
+              Control which team members can access the web dashboard. Workers without access can still use the iOS app.
+            </p>
+            <div className="space-y-1">
+              {teamMembers.map((member) => (
+                <div
+                  key={member.uid}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {member.displayName || member.email}
+                      {member.isSelf && (
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-500 font-semibold">You</span>
+                      )}
+                    </p>
+                    {member.displayName && (
+                      <p className="text-xs text-gray-400 truncate">{member.email}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => toggleWebAccess(member.uid, !member.webAccess)}
+                    disabled={member.isSelf || togglingUid === member.uid}
+                    className="flex-shrink-0 disabled:opacity-40"
+                    title={member.isSelf ? "Cannot revoke your own access" : (member.webAccess ? "Revoke web access" : "Grant web access")}
+                  >
+                    {togglingUid === member.uid ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-gray-300" />
+                    ) : member.webAccess ? (
+                      <ToggleRight className="h-6 w-6 text-emerald-500" />
+                    ) : (
+                      <ToggleLeft className="h-6 w-6 text-gray-300" />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Top row: Job Types + Material Types stacked | Issue Categories */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6">
         <div className="flex flex-col gap-6">
@@ -139,26 +265,28 @@ export default function SettingsPage() {
         />
       </div>
 
-      {/* Bottom row: Combined Value Formulas + Inspector Names */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CombinedValueEditor
-          weights={config.datasetValueWeights || DEFAULT_WEIGHTS}
-          valuation={config.datasetValuation || DEFAULT_VALUATION}
-          onWeightsChange={(w) => {
-            setConfig({ ...config, datasetValueWeights: w });
-            setDirty(true);
-          }}
-          onValuationChange={(v) => {
-            setConfig({ ...config, datasetValuation: v });
-            setDirty(true);
-          }}
-        />
+      {/* Bottom row: Combined Value Formulas + Inspector Names (admin only) */}
+      {isAdmin && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <CombinedValueEditor
+            weights={config.datasetValueWeights || DEFAULT_WEIGHTS}
+            valuation={config.datasetValuation || DEFAULT_VALUATION}
+            onWeightsChange={(w) => {
+              setConfig({ ...config, datasetValueWeights: w });
+              setDirty(true);
+            }}
+            onValuationChange={(v) => {
+              setConfig({ ...config, datasetValuation: v });
+              setDirty(true);
+            }}
+          />
 
-        <InspectorNameList
-          names={config.inspectorNames || []}
-          onChange={(v) => updateList("inspectorNames", v)}
-        />
-      </div>
+          <InspectorNameList
+            names={config.inspectorNames || []}
+            onChange={(v) => updateList("inspectorNames", v)}
+          />
+        </div>
+      )}
     </div>
   );
 }

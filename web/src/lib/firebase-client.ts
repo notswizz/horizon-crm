@@ -2,6 +2,7 @@ import { initializeApp, getApps } from "firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   User,
@@ -18,6 +19,10 @@ export const clientAuth = getAuth(app);
 
 export async function signIn(email: string, password: string) {
   return signInWithEmailAndPassword(clientAuth, email, password);
+}
+
+export async function signUp(email: string, password: string) {
+  return createUserWithEmailAndPassword(clientAuth, email, password);
 }
 
 export async function signOut() {

@@ -422,6 +422,7 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
 
 struct Job: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
+    var companyId: String?
     var streetAddress: String
     var city: String
     var state: String
@@ -453,6 +454,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
 
     init(
         id: UUID = UUID(),
+        companyId: String? = nil,
         streetAddress: String = "",
         city: String = "",
         state: String = "",
@@ -476,6 +478,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
         updatedAt: Date = Date()
     ) {
         self.id = id
+        self.companyId = companyId
         self.streetAddress = streetAddress
         self.city = city
         self.state = state
@@ -501,7 +504,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
 
     // Exclude computed `address` from Codable
     private enum CodingKeys: String, CodingKey {
-        case id, streetAddress, city, state, zipCode, address
+        case id, companyId, streetAddress, city, state, zipCode, address
         case contactName, contactPhone, contactEmail, notes
         case currentStage, rebateAmount, rebateOutcome, spots
         case formCount, photoCount, issueCount, fixCount
@@ -513,6 +516,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(companyId, forKey: .companyId)
         try c.encode(streetAddress, forKey: .streetAddress)
         try c.encode(city, forKey: .city)
         try c.encode(state, forKey: .state)
@@ -539,6 +543,7 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
+        companyId = try c.decodeIfPresent(String.self, forKey: .companyId)
         // Migrate old single `address` field → streetAddress
         if let sa = try c.decodeIfPresent(String.self, forKey: .streetAddress), !sa.isEmpty {
             streetAddress = sa

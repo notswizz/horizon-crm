@@ -3,9 +3,13 @@ import { fetchAllJobs, fetchForms } from "@/lib/firestore-helpers";
 import { db } from "@/lib/firebase-admin";
 import { estimateJobValue, DEFAULT_WEIGHTS, calculateJobRevenueValue, DEFAULT_VALUATION } from "@/lib/utils";
 import { DatasetValueWeights, DatasetValuationConfig } from "@/types";
+import { getAuthSession } from "@/lib/auth-helpers";
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getAuthSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session.isAdmin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
     const body = await req.json();
     const {
       format = "jsonl",

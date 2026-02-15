@@ -11,11 +11,14 @@ import {
   ChevronRight, Package, CheckCircle, Database, DollarSign,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/context/auth-context";
 import { RebateCalculator } from "@/components/rebate/rebate-calculator";
 import { RebatePipeline } from "@/components/rebate/rebate-pipeline";
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === "admin";
   const [job, setJob] = useState<Job | null>(null);
   const [forms, setForms] = useState<InspectionForm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,7 +199,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         ))}
 
-        {(datasetValue > 0 || revenueValue > 0) && (
+        {isAdmin && (datasetValue > 0 || revenueValue > 0) && (
           <>
             <div className="w-px h-4 bg-gray-200 mx-1" />
             {datasetValue > 0 && (

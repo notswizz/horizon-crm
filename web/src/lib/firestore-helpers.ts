@@ -93,6 +93,7 @@ export function parseJob(doc: FirebaseFirestore.DocumentSnapshot): Job {
     rebate: rebateData,
     profitMargin: typeof d.profitMargin === "number" ? d.profitMargin : undefined,
     netProfit: typeof d.netProfit === "number" ? d.netProfit : undefined,
+    companyId: d.companyId || undefined,
   };
 }
 
@@ -147,8 +148,12 @@ const SORT_DIR: Record<string, FirebaseFirestore.OrderByDirection> = {
 
 // ─── Fetch helpers ─────────────────────────────────────────────────────
 
-export async function fetchAllJobs(): Promise<Job[]> {
-  const snap = await db.collection("jobs").orderBy("createdAt", "desc").get();
+export async function fetchAllJobs(companyId?: string): Promise<Job[]> {
+  let query: FirebaseFirestore.Query = db.collection("jobs");
+  if (companyId) {
+    query = query.where("companyId", "==", companyId);
+  }
+  const snap = await query.orderBy("createdAt", "desc").get();
   return snap.docs.map(parseJob);
 }
 
@@ -159,6 +164,7 @@ export interface FilteredJobsParams {
   sort?: string;
   page?: number;
   limit?: number;
+  companyId?: string;
 }
 
 export interface FilteredJobsResult {
@@ -169,12 +175,16 @@ export interface FilteredJobsResult {
 }
 
 export async function fetchFilteredJobs(params: FilteredJobsParams): Promise<FilteredJobsResult> {
-  const { search, stage, rebate, sort = "newest", page = 1, limit = 50 } = params;
+  const { search, stage, rebate, sort = "newest", page = 1, limit = 50, companyId } = params;
 
   const needsMemoryFilter = !!search || !!rebate || sort === "issues";
 
   // --- Build base query with stage filter pushed to Firestore ---
   let baseQuery: FirebaseFirestore.Query = db.collection("jobs");
+
+  if (companyId) {
+    baseQuery = baseQuery.where("companyId", "==", companyId);
+  }
 
   if (stage && STAGE_TO_FIRESTORE[stage as JobStage]) {
     baseQuery = baseQuery.where("currentStage", "==", STAGE_TO_FIRESTORE[stage as JobStage]);
@@ -245,8 +255,8 @@ export async function fetchForms(jobId: string): Promise<InspectionForm[]> {
   return snap.docs.map(parseForm);
 }
 
-export async function fetchAllForms(): Promise<{ jobId: string; forms: InspectionForm[] }[]> {
-  const jobs = await fetchAllJobs();
+export async function fetchAllForms(companyId?: string): Promise<{ jobId: string; forms: InspectionForm[] }[]> {
+  const jobs = await fetchAllJobs(companyId);
   const results = await Promise.all(
     jobs.map(async (job) => {
       const forms = await fetchForms(job.id);

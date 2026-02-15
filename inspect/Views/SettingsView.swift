@@ -2,9 +2,11 @@ import SwiftUI
 
 struct SettingsView: View {
     var store: JobStore
-    @AppStorage("inspectorName") private var inspectorName = ""
+    var authManager: AuthManager
     @State private var showTutorial = false
     @AppStorage("hasSeenTutorial") private var hasSeenTutorial = false
+    @State private var isEditingName = false
+    @State private var editedName = ""
 
     var body: some View {
         NavigationStack {
@@ -12,6 +14,7 @@ struct SettingsView: View {
                 VStack(spacing: 20) {
                     inspectorCard
                     tutorialCard
+                    signOutCard
                 }
                 .padding()
             }
@@ -40,22 +43,44 @@ struct SettingsView: View {
     // MARK: - Inspector Card
 
     private var inspectorCard: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "person.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(DS.Colors.primary.gradient, in: .circle)
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+            HStack(spacing: 12) {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(DS.Colors.primary.gradient, in: .circle)
 
-            if inspectorName.trimmingCharacters(in: .whitespaces).isEmpty {
-                TextField("Your name", text: $inspectorName)
-                    .font(.system(size: 16, weight: .medium))
-                    .textContentType(.name)
-                    .submitLabel(.done)
-            } else {
-                Text(inspectorName)
-                    .font(.system(size: 16, weight: .semibold))
-                Spacer()
+                if isEditingName {
+                    TextField("Your name", text: $editedName)
+                        .font(.system(size: 16, weight: .medium))
+                        .textContentType(.name)
+                        .submitLabel(.done)
+                        .onSubmit { Task { await saveName() } }
+                    Button("Save") {
+                        Task { await saveName() }
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(DS.Colors.primary)
+                } else {
+                    Text(authManager.displayName.isEmpty ? "No name set" : authManager.displayName)
+                        .font(.system(size: 16, weight: .semibold))
+                    Spacer()
+                    Button {
+                        editedName = authManager.displayName
+                        isEditingName = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if let email = authManager.email {
+                Text(email)
+                    .font(DS.Typography.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .dsCard()
@@ -89,5 +114,32 @@ struct SettingsView: View {
             }
         }
         .dsCard()
+    }
+
+    // MARK: - Sign Out Card
+
+    private var signOutCard: some View {
+        Button {
+            authManager.signOut()
+        } label: {
+            HStack(spacing: 8) {
+                Spacer()
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                Text("Sign Out")
+                Spacer()
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(DS.Colors.error)
+            .frame(height: 44)
+            .background(DS.Colors.error.opacity(0.1), in: .rect(cornerRadius: 10))
+        }
+        .dsCard()
+    }
+
+    // MARK: - Save Name
+
+    private func saveName() async {
+        await authManager.saveDisplayName(editedName)
+        isEditingName = false
     }
 }

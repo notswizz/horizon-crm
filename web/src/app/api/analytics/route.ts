@@ -3,39 +3,38 @@ import { db } from "@/lib/firebase-admin";
 import { fetchAllJobs, fetchAllForms } from "@/lib/firestore-helpers";
 import { estimateJobValue, DEFAULT_WEIGHTS, calculateTotalRevenueValue, DEFAULT_VALUATION } from "@/lib/utils";
 import { AnalyticsData, JobStage, DatasetValueWeights, DatasetValuationConfig } from "@/types";
+import { getAuthSession } from "@/lib/auth-helpers";
 
 export async function GET() {
   try {
-    const jobs = await fetchAllJobs();
-    const allFormsData = await fetchAllForms();
+    const session = await getAuthSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Fetch dataset value weights from config
+    const companyId = session.isAdmin ? undefined : session.companyId;
+    const jobs = await fetchAllJobs(companyId);
+    const allFormsData = await fetchAllForms(companyId);
+
     const configDoc = await db.doc("config/dropdowns").get();
     const weights: DatasetValueWeights = (configDoc.exists && configDoc.data()?.datasetValueWeights) || DEFAULT_WEIGHTS;
     const valuation: DatasetValuationConfig = (configDoc.exists && configDoc.data()?.datasetValuation) || DEFAULT_VALUATION;
 
-    // Jobs by stage
     const jobsByStage: Record<JobStage, number> = {
       auditPending: 0, workInProgress: 0, inspectionPending: 0, completed: 0, cancelled: 0,
     };
     jobs.forEach((j) => { jobsByStage[j.currentStage]++; });
 
-    // Totals
     const totalPhotos = jobs.reduce((s, j) => s + j.photoCount, 0);
     const totalIssues = jobs.reduce((s, j) => s + j.issueCount, 0);
     const totalFixes = jobs.reduce((s, j) => s + j.fixCount, 0);
 
-    // Estimated value with full multipliers
     let estimatedValue = 0;
     for (const job of jobs) {
       const jobForms = allFormsData.find((f) => f.jobId === job.id)?.forms || [];
       estimatedValue += estimateJobValue(job, jobForms, weights);
     }
 
-    // Revenue-based dataset value
     const revenueResult = calculateTotalRevenueValue(jobs, valuation);
 
-    // Issues by category
     const categoryMap: Record<string, number> = {};
     allFormsData.forEach(({ forms }) => {
       forms.forEach((f) => {
@@ -51,12 +50,10 @@ export async function GET() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 15);
 
-    // Rebate breakdown
     const rebateMap: Record<string, number> = { none: 0, calculated: 0, submitted: 0, accepted: 0, declined: 0, paid: 0 };
     jobs.forEach((j) => { rebateMap[j.rebateStatus]++; });
     const rebateBreakdown = Object.entries(rebateMap).map(([outcome, count]) => ({ outcome, count }));
 
-    // Jobs over time (last 30 days)
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const dateMap: Record<string, number> = {};
@@ -69,7 +66,6 @@ export async function GET() {
     });
     const jobsOverTime = Object.entries(dateMap).map(([date, count]) => ({ date, count }));
 
-    // Photos trend (last 90 days for flexible timeframe)
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     const photoDateMap: Record<string, number> = {};
     for (let d = new Date(ninetyDaysAgo); d <= now; d.setDate(d.getDate() + 1)) {
@@ -81,7 +77,6 @@ export async function GET() {
     });
     const photosTrend = Object.entries(photoDateMap).map(([date, count]) => ({ date, count }));
 
-    // Top inspectors
     const inspectorMap: Record<string, number> = {};
     allFormsData.forEach(({ forms }) => {
       forms.forEach((f) => {
@@ -95,7 +90,6 @@ export async function GET() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    // Materials by type
     const matTypeMap: Record<string, number> = {};
     allFormsData.forEach(({ forms }) => {
       forms.forEach((f) => {
