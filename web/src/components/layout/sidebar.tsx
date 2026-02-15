@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   Briefcase,
   Camera,
-  BarChart3,
   Download,
   Settings,
 } from "lucide-react";
@@ -17,7 +16,6 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jobs", label: "Jobs", icon: Briefcase },
   { href: "/photos", label: "Photos", icon: Camera },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/export", label: "Export", icon: Download },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

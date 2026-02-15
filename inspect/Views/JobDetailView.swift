@@ -6,13 +6,14 @@ import PhotosUI
 struct JobDetailView: View {
     let job: Job
     var store: JobStore
+    var configStore: ConfigStore
 
     @State private var editedStage: JobStage
     @State private var rebateText: String
     @State private var showRebateAlert = false
     @State private var showNewSpotSheet = false
     @State private var newSpotTitle = ""
-    @State private var newSpotJobType: JobType = .insulation
+    @State private var newSpotJobType = "Insulation"
     @State private var selectedSpotForIssue: Spot?
     @State private var selectedHousePhoto: PhotosPickerItem?
     @State private var isUploadingHouseImage = false
@@ -23,9 +24,10 @@ struct JobDetailView: View {
         store.jobs.first { $0.id == job.id } ?? job
     }
 
-    init(job: Job, store: JobStore) {
+    init(job: Job, store: JobStore, configStore: ConfigStore) {
         self.job = job
         self.store = store
+        self.configStore = configStore
         self._editedStage = State(initialValue: job.currentStage)
         self._rebateText = State(initialValue: job.rebateAmount > 0 ? String(format: "%.0f", job.rebateAmount) : "")
     }
@@ -41,10 +43,13 @@ struct JobDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
+                contactRow
+                    .padding(.horizontal, DS.Spacing.m)
+                    .padding(.top, DS.Spacing.s)
+
                 heroBanner
 
                 VStack(spacing: DS.Spacing.s) {
-                    contactRow
                     metricsCard
                     spotsSection
                     auditSection
@@ -70,7 +75,7 @@ struct JobDetailView: View {
         .sheet(isPresented: $showNewSpotSheet) { newSpotSheet }
         .sheet(item: $selectedSpotForIssue) { spot in
             NavigationStack {
-                AddIssueView(job: liveJob, spot: spot, store: store)
+                AddIssueView(job: liveJob, spot: spot, store: store, configStore: configStore)
             }
         }
         .alert("Rebate Amount", isPresented: $showRebateAlert) {
@@ -502,7 +507,7 @@ struct JobDetailView: View {
                                 selectedSpotForIssue = spot
                             } label: {
                                 HStack(spacing: 10) {
-                                    Image(systemName: spot.jobType.icon)
+                                    Image(systemName: JobType.icon(for: spot.jobType))
                                         .font(.system(size: 14, weight: .medium))
                                         .foregroundStyle(.white)
                                         .frame(width: 36, height: 36)
@@ -513,7 +518,7 @@ struct JobDetailView: View {
                                             .font(.system(size: 14, weight: .semibold))
                                             .foregroundStyle(.primary)
                                             .lineLimit(1)
-                                        Text(spot.jobType.rawValue)
+                                        Text(spot.jobType)
                                             .font(.system(size: 11))
                                             .foregroundStyle(.secondary)
                                             .lineLimit(1)
@@ -580,7 +585,7 @@ struct JobDetailView: View {
 
             // Content
             if let audit {
-                NavigationLink(destination: FormDetailView(form: audit, job: liveJob, store: store)) {
+                NavigationLink(destination: FormDetailView(form: audit, job: liveJob, store: store, configStore: configStore)) {
                     HStack(spacing: 12) {
                         Image(systemName: "person.fill")
                             .font(.system(size: 14, weight: .medium))
@@ -662,12 +667,17 @@ struct JobDetailView: View {
 
                 Spacer()
 
-                if !inspections.isEmpty {
-                    Text("\(inspections.count)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(DS.Colors.success)
-                        .frame(width: 24, height: 24)
-                        .background(DS.Colors.success.opacity(0.1), in: .circle)
+                if inspections.flatMap(\.fixPhotos).count > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "wrench.and.screwdriver.fill")
+                            .font(.system(size: 9))
+                        Text("\(inspections.flatMap(\.fixPhotos).count) fix\(inspections.flatMap(\.fixPhotos).count == 1 ? "" : "es")")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundStyle(DS.Colors.success)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(DS.Colors.success.opacity(0.1), in: .capsule)
                 }
             }
             .padding(.horizontal, 18)
@@ -690,7 +700,7 @@ struct JobDetailView: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(inspections) { inspection in
-                        NavigationLink(destination: FormDetailView(form: inspection, job: liveJob, store: store)) {
+                        NavigationLink(destination: FormDetailView(form: inspection, job: liveJob, store: store, configStore: configStore)) {
                             HStack(spacing: 12) {
                                 Image(systemName: "person.fill")
                                     .font(.system(size: 14, weight: .medium))
@@ -709,11 +719,11 @@ struct JobDetailView: View {
                                                 .font(.system(size: 10))
                                             Text(inspection.date.formatted(date: .abbreviated, time: .omitted))
                                         }
-                                        if inspection.fixPhotos.count > 0 {
+                                        if inspection.photoCount > 0 {
                                             HStack(spacing: 4) {
-                                                Image(systemName: "wrench.and.screwdriver.fill")
+                                                Image(systemName: "camera.fill")
                                                     .font(.system(size: 10))
-                                                Text("\(inspection.fixPhotos.count) fix\(inspection.fixPhotos.count == 1 ? "" : "es")")
+                                                Text("\(inspection.photoCount)")
                                             }
                                         }
                                     }
@@ -760,14 +770,14 @@ struct JobDetailView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: DS.Spacing.xs) {
-                            ForEach(JobType.allCases) { type in
+                            ForEach(configStore.jobTypes, id: \.self) { type in
                                 Button {
                                     newSpotJobType = type
                                 } label: {
                                     HStack(spacing: DS.Spacing.micro) {
-                                        Image(systemName: type.icon)
+                                        Image(systemName: JobType.icon(for: type))
                                             .font(.caption2)
-                                        Text(type.rawValue)
+                                        Text(type)
                                             .font(.caption.weight(.medium))
                                     }
                                     .padding(.horizontal, DS.Spacing.s)
@@ -851,7 +861,7 @@ struct JobDetailView: View {
         if !liveJob.spots.isEmpty {
             text += "\n\n--- SPOTS ---"
             for spot in liveJob.spots {
-                text += "\n  - \(spot.title) (\(spot.jobType.rawValue))"
+                text += "\n  - \(spot.title) (\(spot.jobType))"
             }
         }
 
@@ -859,7 +869,7 @@ struct JobDetailView: View {
             text += "\n\n--- ALL MATERIALS ---"
             for mat in store.allMaterials {
                 let costStr = mat.cost.map { " — $\(String(format: "%.2f", $0))" } ?? ""
-                text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)\(costStr)"
+                text += "\n  - \(mat.name) (\(mat.type)) — \(mat.quantity)\(costStr)"
             }
         }
 
@@ -888,15 +898,15 @@ struct JobDetailView: View {
             text += "\nMaterials:"
             for mat in form.allMaterials {
                 let costStr = mat.cost.map { " — $\(String(format: "%.2f", $0))" } ?? ""
-                text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)\(costStr)"
+                text += "\n  - \(mat.name) (\(mat.type)) — \(mat.quantity)\(costStr)"
             }
         }
 
         if form.formType == .audit {
             for spot in form.spots where !spot.issuePhotos.isEmpty {
-                text += "\n\n  Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType.rawValue))"
+                text += "\n\n  Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType))"
                 for photo in spot.issuePhotos {
-                    text += "\n    Issue: \(photo.category.rawValue) (\(photo.severity.rawValue))"
+                    text += "\n    Issue: \(photo.category) (\(photo.severity.rawValue))"
                     if !photo.notes.isEmpty {
                         text += "\n    Notes: \(photo.notes)"
                     }
@@ -904,11 +914,11 @@ struct JobDetailView: View {
             }
         } else {
             for spot in form.spots where !spot.fixPhotos.isEmpty {
-                text += "\n\n  Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType.rawValue))"
+                text += "\n\n  Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType))"
                 for photo in spot.fixPhotos {
                     if let linkedId = photo.linkedAuditIssueId,
                        let issue = store.auditIssuePhotos.first(where: { $0.id == linkedId }) {
-                        text += "\n    Fixes: \(issue.category.rawValue) (\(issue.severity.rawValue))"
+                        text += "\n    Fixes: \(issue.category) (\(issue.severity.rawValue))"
                     }
                     if !photo.resolutionNotes.isEmpty {
                         text += "\n    Resolution: \(photo.resolutionNotes)"

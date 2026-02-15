@@ -3,6 +3,7 @@ import SwiftUI
 struct JobsListView: View {
     var store: JobStore
     var locationManager: LocationManager
+    var configStore: ConfigStore
     @State private var searchText = ""
     @State private var selectedStage: JobStage? = nil
     @State private var sortOrder: JobSortOrder = .nearest
@@ -78,7 +79,7 @@ struct JobsListView: View {
             } else {
                 LazyVStack(spacing: DS.Spacing.m) {
                     ForEach(filteredJobs) { job in
-                        NavigationLink(destination: JobDetailView(job: job, store: store)) {
+                        NavigationLink(destination: JobDetailView(job: job, store: store, configStore: configStore)) {
                             JobCard(job: job)
                         }
                         .buttonStyle(DSCardPressStyle())
@@ -130,11 +131,6 @@ private struct JobCard: View {
     let job: Job
     @Environment(\.colorScheme) private var colorScheme
 
-    private var progressRatio: CGFloat {
-        if job.issueCount == 0 { return job.currentStage == .completed ? 1.0 : 0.0 }
-        return min(CGFloat(job.fixCount) / CGFloat(job.issueCount), 1.0)
-    }
-
     private var displayStreet: String {
         if !job.streetAddress.isEmpty { return job.streetAddress }
         if !job.address.isEmpty { return job.address }
@@ -146,220 +142,96 @@ private struct JobCard: View {
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
-    private var hasMetrics: Bool {
-        job.photoCount > 0 || job.issueCount > 0 || job.fixCount > 0
-    }
-
-    private var progressColor: Color {
-        if progressRatio >= 1.0 { return DS.Colors.success }
-        if progressRatio >= 0.5 { return job.currentStage.color }
-        return DS.Colors.warning
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            // ── Main content ──────────────────────────────
-            VStack(alignment: .leading, spacing: DS.Spacing.m) {
+        HStack(spacing: 14) {
+            // Property Photo
+            AsyncImage(url: job.houseImageURL.flatMap { URL(string: $0) }) { phase in
+                if let image = phase.image {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color(.quaternaryLabel))
+                }
+            }
+            .frame(width: 72, height: 72)
+            .background(Color(.tertiarySystemFill))
+            .clipShape(.rect(cornerRadius: 14))
+            .id(job.houseImageURL)
 
-                // Row 1: House thumbnail + Address + Rebate
-                HStack(alignment: .top, spacing: DS.Spacing.s) {
-                    // House thumbnail
-                    AsyncImage(url: job.houseImageURL.flatMap { URL(string: $0) }) { phase in
-                        if let image = phase.image {
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        } else {
-                            Image(systemName: "house.fill")
-                                .font(.system(size: 18))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .frame(width: 48, height: 48)
-                    .background(Color(.tertiarySystemFill))
-                    .clipShape(.circle)
-                    .id(job.houseImageURL)
+            // Content
+            VStack(alignment: .leading, spacing: 6) {
+                // Address
+                Text(displayStreet)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(displayStreet)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(2)
-
-                        if let locality = displayLocality {
-                            Text(locality)
-                                .font(.system(size: 13))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-
-                    Spacer(minLength: DS.Spacing.s)
-
-                    if job.rebateAmount > 0 {
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text("$\(Int(job.rebateAmount))")
-                                .font(.system(size: 22, weight: .heavy, design: .rounded))
-                                .foregroundStyle(DS.Colors.success)
-                            Text("REBATE")
-                                .font(.system(size: 9, weight: .bold))
-                                .tracking(1)
-                                .foregroundStyle(DS.Colors.success.opacity(0.6))
-                        }
-                    }
+                if let locality = displayLocality {
+                    Text(locality)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
                 }
 
-                // Row 2: Contact + Stage badge
-                HStack(spacing: 0) {
-                    if !job.contactName.isEmpty {
-                        HStack(spacing: 6) {
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.quaternary)
-                            Text(job.contactName)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
+                // Metrics + Stage
+                HStack(spacing: 14) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(DS.Colors.info)
+                        Text("\(job.photoCount)")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(DS.Colors.info)
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(DS.Colors.error)
+                        Text("\(job.issueCount)")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(DS.Colors.error)
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(DS.Colors.success)
+                        Text("\(job.fixCount)")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(DS.Colors.success)
                     }
 
-                    Spacer(minLength: DS.Spacing.xs)
+                    Spacer()
 
                     // Stage pill
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(job.currentStage.color)
-                            .frame(width: 7, height: 7)
-                        Text(job.currentStage.rawValue)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(job.currentStage.color)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(job.currentStage.color.opacity(0.1), in: .capsule)
+                    Text(job.currentStage.shortLabel)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(job.currentStage.color)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(job.currentStage.color.opacity(0.1), in: .capsule)
                 }
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 22)
-            .padding(.bottom, DS.Spacing.m)
 
-            // ── Metrics footer ────────────────────────────
-            if hasMetrics {
-                // Separator
-                Rectangle()
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.04))
-                    .frame(height: 1)
-
-                HStack(spacing: 0) {
-                    // Metric chips
-                    HStack(spacing: 6) {
-                        if job.photoCount > 0 {
-                            CompactMetric(icon: "camera.fill", value: "\(job.photoCount)", color: DS.Colors.info)
-                        }
-                        if job.issueCount > 0 {
-                            CompactMetric(icon: "exclamationmark.triangle.fill", value: "\(job.issueCount)", color: DS.Colors.error)
-                        }
-                        if job.fixCount > 0 {
-                            CompactMetric(icon: "checkmark.circle.fill", value: "\(job.fixCount)", color: DS.Colors.success)
-                        }
-                    }
-
-                    Spacer(minLength: DS.Spacing.xs)
-
-                    Text(job.createdAt.formatted(date: .abbreviated, time: .omitted))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.quaternary)
-                }
-                .padding(.horizontal, 22)
-                .padding(.vertical, DS.Spacing.s)
-            } else {
-                // Just date when no metrics
-                HStack {
-                    Spacer()
-                    Text(job.createdAt.formatted(date: .abbreviated, time: .omitted))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.quaternary)
-                }
-                .padding(.horizontal, 22)
-                .padding(.bottom, DS.Spacing.s)
-            }
-
-            // ── Bottom progress bar ──────────────────────
-            if job.issueCount > 0 {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(progressColor.opacity(0.08))
-
-                        Rectangle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [progressColor, progressColor.opacity(0.7)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: geo.size.width * progressRatio)
-                    }
-                }
-                .frame(height: 3)
-            }
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.quaternary)
         }
-        .clipShape(.rect(cornerRadius: 20))
-        .background(
-            ZStack {
-                // Base surface
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(DS.Colors.surface)
-
-                // Subtle stage glow at top-leading
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                job.currentStage.color.opacity(colorScheme == .dark ? 0.06 : 0.04),
-                                .clear
-                            ],
-                            center: .topLeading,
-                            startRadius: 0,
-                            endRadius: 180
-                        )
-                    )
-            }
-        )
+        .padding(16)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: 18))
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(
                     colorScheme == .dark
                         ? DS.Colors.border.opacity(0.8)
-                        : Color.black.opacity(0.06),
+                        : Color.black.opacity(0.05),
                     lineWidth: 1
                 )
         )
-        // Double shadow for realistic depth
         .shadow(color: .black.opacity(0.03), radius: 3, y: 1)
-        .shadow(color: .black.opacity(0.08), radius: 16, y: 6)
-    }
-}
-
-// MARK: - Compact Metric Chip
-
-private struct CompactMetric: View {
-    let icon: String
-    let value: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(color)
-            Text(value)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(color)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(color.opacity(0.1), in: .capsule)
+        .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
     }
 }
 

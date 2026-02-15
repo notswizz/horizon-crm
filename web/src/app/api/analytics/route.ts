@@ -60,9 +60,12 @@ export async function GET() {
     });
     const jobsOverTime = Object.entries(dateMap).map(([date, count]) => ({ date, count }));
 
-    // Photos trend
-    const photoDateMap: Record<string, number> = { ...dateMap };
-    Object.keys(photoDateMap).forEach((k) => (photoDateMap[k] = 0));
+    // Photos trend (last 90 days for flexible timeframe)
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const photoDateMap: Record<string, number> = {};
+    for (let d = new Date(ninetyDaysAgo); d <= now; d.setDate(d.getDate() + 1)) {
+      photoDateMap[d.toISOString().split("T")[0]] = 0;
+    }
     jobs.forEach((j) => {
       const key = new Date(j.createdAt).toISOString().split("T")[0];
       if (key in photoDateMap) photoDateMap[key] += j.photoCount;

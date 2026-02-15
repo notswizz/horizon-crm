@@ -6,6 +6,7 @@ struct SubmitFixView: View {
     let issue: IssuePhoto
     let spotId: UUID
     var store: JobStore
+    var configStore: ConfigStore
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("inspectorName") private var inspectorName = ""
@@ -58,7 +59,7 @@ struct SubmitFixView: View {
                     }
                     Text("Fix Submitted")
                         .font(.title3.weight(.bold))
-                    Text(issue.category.rawValue)
+                    Text(issue.category)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -90,7 +91,7 @@ struct SubmitFixView: View {
                     .font(.subheadline)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(issue.category.rawValue)
+                    Text(issue.category)
                         .font(.subheadline.weight(.semibold))
 
                     HStack(spacing: 8) {
@@ -275,14 +276,14 @@ struct SubmitFixView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
-                            ForEach(MaterialType.allCases) { type in
+                            ForEach(configStore.materialTypes, id: \.self) { type in
                                 Button {
                                     materials[index].type = type
                                 } label: {
                                     HStack(spacing: 3) {
-                                        Image(systemName: type.icon)
+                                        Image(systemName: MaterialType.icon(for: type))
                                             .font(.caption2)
-                                        Text(type.rawValue)
+                                        Text(type)
                                             .font(.caption.weight(.medium))
                                     }
                                     .padding(.horizontal, 10)
@@ -290,7 +291,7 @@ struct SubmitFixView: View {
                                     .foregroundStyle(materials[index].type == type ? .white : .primary)
                                     .background(
                                         materials[index].type == type
-                                            ? AnyShapeStyle(type.color)
+                                            ? AnyShapeStyle(MaterialType.color(for: type))
                                             : AnyShapeStyle(.clear),
                                         in: .capsule
                                     )

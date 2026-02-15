@@ -4,6 +4,7 @@ struct FormDetailView: View {
     let form: InspectionForm
     let job: Job
     var store: JobStore
+    var configStore: ConfigStore
 
     /// Live version of the form from the store's listener, falls back to the passed-in snapshot
     private var liveForm: InspectionForm {
@@ -210,9 +211,9 @@ struct FormDetailView: View {
 
             ForEach(liveForm.allMaterials) { material in
                 HStack(spacing: 10) {
-                    Image(systemName: material.type.icon)
+                    Image(systemName: MaterialType.icon(for: material.type))
                         .font(.caption)
-                        .foregroundStyle(material.type.color)
+                        .foregroundStyle(MaterialType.color(for: material.type))
                         .frame(width: 24)
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -234,12 +235,12 @@ struct FormDetailView: View {
 
                     Spacer()
 
-                    Text(material.type.rawValue)
+                    Text(material.type)
                         .font(.caption2.weight(.medium))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(material.type.color.opacity(0.15), in: .capsule)
-                        .foregroundStyle(material.type.color)
+                        .background(MaterialType.color(for: material.type).opacity(0.15), in: .capsule)
+                        .foregroundStyle(MaterialType.color(for: material.type))
                 }
                 .padding(10)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
@@ -266,13 +267,13 @@ struct FormDetailView: View {
                     Text(spot.title.isEmpty ? "Unknown Spot" : spot.title)
                         .font(.headline)
                 } icon: {
-                    Image(systemName: spot.jobType.icon)
+                    Image(systemName: JobType.icon(for: spot.jobType))
                         .foregroundStyle(DS.Colors.primary)
                 }
 
                 Spacer()
 
-                Text(spot.jobType.rawValue)
+                Text(spot.jobType)
                     .font(.caption.weight(.medium))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -304,7 +305,7 @@ struct FormDetailView: View {
     }
 
     private func issuePhotoCard(_ photo: IssuePhoto, spotId: UUID) -> some View {
-        NavigationLink(destination: IssueDetailView(issueId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store)) {
+        NavigationLink(destination: IssueDetailView(issueId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store, configStore: configStore)) {
             VStack(alignment: .leading, spacing: 8) {
                 // Category + severity
                 HStack(spacing: 6) {
@@ -312,7 +313,7 @@ struct FormDetailView: View {
                         .foregroundStyle(photo.severity.color)
                         .font(.caption)
 
-                    Text(photo.category.rawValue)
+                    Text(photo.category)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -392,13 +393,13 @@ struct FormDetailView: View {
                     Text(spot.title.isEmpty ? "Unknown Spot" : spot.title)
                         .font(.headline)
                 } icon: {
-                    Image(systemName: spot.jobType.icon)
+                    Image(systemName: JobType.icon(for: spot.jobType))
                         .foregroundStyle(DS.Colors.success)
                 }
 
                 Spacer()
 
-                Text(spot.jobType.rawValue)
+                Text(spot.jobType)
                     .font(.caption.weight(.medium))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -440,7 +441,7 @@ struct FormDetailView: View {
                             Image(systemName: "link")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
-                            Text("Fixes: \(issue.category.rawValue)")
+                            Text("Fixes: \(issue.category)")
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
@@ -553,16 +554,16 @@ struct FormDetailView: View {
             text += "\n\nMaterials:"
             for mat in f.allMaterials {
                 let costStr = mat.cost.map { " — $\(String(format: "%.2f", $0))" } ?? ""
-                text += "\n  - \(mat.name) (\(mat.type.rawValue)) — \(mat.quantity)\(costStr)"
+                text += "\n  - \(mat.name) (\(mat.type)) — \(mat.quantity)\(costStr)"
             }
         }
 
         // Group by spot
         if f.formType == .audit {
             for spot in f.spots where !spot.issuePhotos.isEmpty {
-                text += "\n\n--- Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType.rawValue)) ---"
+                text += "\n\n--- Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType)) ---"
                 for photo in spot.issuePhotos {
-                    text += "\n  Issue: \(photo.category.rawValue) (\(photo.severity.rawValue))"
+                    text += "\n  Issue: \(photo.category) (\(photo.severity.rawValue))"
                     if !photo.notes.isEmpty {
                         text += "\n  Notes: \(photo.notes)"
                     }
@@ -570,11 +571,11 @@ struct FormDetailView: View {
             }
         } else {
             for spot in f.spots where !spot.fixPhotos.isEmpty {
-                text += "\n\n--- Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType.rawValue)) ---"
+                text += "\n\n--- Spot: \(spot.title.isEmpty ? "Unknown" : spot.title) (\(spot.jobType)) ---"
                 for photo in spot.fixPhotos {
                     if let linkedId = photo.linkedAuditIssueId,
                        let issue = store.auditIssuePhotos.first(where: { $0.id == linkedId }) {
-                        text += "\n  Fixes: \(issue.category.rawValue) (\(issue.severity.rawValue))"
+                        text += "\n  Fixes: \(issue.category) (\(issue.severity.rawValue))"
                     }
                     if !photo.resolutionNotes.isEmpty {
                         text += "\n  Resolution: \(photo.resolutionNotes)"

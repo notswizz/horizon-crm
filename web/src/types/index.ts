@@ -102,6 +102,19 @@ export interface InspectionForm {
   spots: FormSpot[];
 }
 
+// ─── Configurable Dropdown Options ────────────────────────────────────
+
+export interface IssueCategoryConfig {
+  name: string;
+  jobTypes: string[]; // empty = applies to ALL job types
+}
+
+export interface DropdownConfig {
+  jobTypes: string[];
+  issueCategories: IssueCategoryConfig[];
+  materialTypes: string[];
+}
+
 // ─── Derived / UI Types ────────────────────────────────────────────────
 
 export interface JobWithForms extends Job {

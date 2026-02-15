@@ -1,44 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Job, InspectionForm } from "@/types";
-import { Loader2, Database, Users, CheckCircle } from "lucide-react";
+import { DropdownConfig, IssueCategoryConfig } from "@/types";
+import {
+  Loader2,
+  Plus,
+  X,
+  Save,
+  Briefcase,
+  AlertTriangle,
+  Package,
+  Check,
+  ChevronDown,
+} from "lucide-react";
 
 export default function SettingsPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [inspectors, setInspectors] = useState<{ name: string; count: number }[]>([]);
+  const [config, setConfig] = useState<DropdownConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    async function load() {
-      const jobsRes = await fetch("/api/jobs?limit=1000");
-      const { jobs: allJobs } = await jobsRes.json();
-      setJobs(allJobs || []);
-
-      const inspectorMap: Record<string, number> = {};
-      for (const job of allJobs as Job[]) {
-        const formsRes = await fetch(`/api/forms/${job.id}`);
-        const { forms } = await formsRes.json();
-        (forms as InspectionForm[]).forEach((f) => {
-          if (f.inspectorName) {
-            inspectorMap[f.inspectorName] = (inspectorMap[f.inspectorName] || 0) + 1;
-          }
-        });
-      }
-
-      setInspectors(
-        Object.entries(inspectorMap)
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count)
-      );
-      setLoading(false);
-    }
-    load();
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((d) => {
+        setConfig(d);
+        setLoading(false);
+      });
   }, []);
 
-  if (loading) {
+  async function handleSave() {
+    if (!config) return;
+    setSaving(true);
+    await fetch("/api/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config),
+    });
+    setSaving(false);
+    setDirty(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  function updateList(key: "jobTypes" | "materialTypes", values: string[]) {
+    if (!config) return;
+    setConfig({ ...config, [key]: values });
+    setDirty(true);
+  }
+
+  function updateCategories(categories: IssueCategoryConfig[]) {
+    if (!config) return;
+    setConfig({ ...config, issueCategories: categories });
+    setDirty(true);
+  }
+
+  if (loading || !config) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-[#FF6B35]" />
@@ -48,86 +67,356 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">System configuration and status</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Configure dropdown options used across the app
+          </p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={!dirty || saving}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            saved
+              ? "bg-emerald-500 text-white"
+              : dirty
+                ? "bg-[#FF6B35] text-white hover:bg-[#E5532D] shadow-sm"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+          }`}
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : saved ? (
+            <Check className="h-4 w-4" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          {saving ? "Saving..." : saved ? "Saved" : "Save Changes"}
+        </button>
       </div>
 
-      {/* Firebase connection */}
-      <Card>
-        <CardContent className="p-6">
-          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-            <Database size={14} className="text-[#FF6B35]" /> Firebase Connection
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Project ID</span>
-              <code className="text-sm bg-gray-100 px-2 py-0.5 rounded">
-                {process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "Not configured"}
-              </code>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Status</span>
-              <Badge className="bg-emerald-50 text-emerald-600">
-                <CheckCircle size={12} className="mr-1" /> Connected
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Total Jobs in Database</span>
-              <span className="text-sm font-semibold">{jobs.length}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Total Photos</span>
-              <span className="text-sm font-semibold">{jobs.reduce((s, j) => s + j.photoCount, 0)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <SimpleList
+        title="Job Types"
+        description="Types of work that can be assigned to a job"
+        icon={<Briefcase className="h-4 w-4 text-[#FF6B35]" />}
+        items={config.jobTypes}
+        onChange={(v) => updateList("jobTypes", v)}
+        placeholder="e.g. Window Replacement"
+      />
 
-      {/* Inspectors */}
-      <Card>
-        <CardContent className="p-6">
-          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-            <Users size={14} className="text-blue-500" /> Inspectors
-          </h3>
-          {inspectors.length > 0 ? (
-            <div className="space-y-2">
-              {inspectors.map((ins) => (
-                <div key={ins.name} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <span className="text-sm font-medium">{ins.name}</span>
-                  <span className="text-xs text-gray-400">{ins.count} form{ins.count === 1 ? "" : "s"}</span>
-                </div>
-              ))}
+      <IssueCategoryList
+        categories={config.issueCategories}
+        jobTypes={config.jobTypes}
+        onChange={updateCategories}
+      />
+
+      <SimpleList
+        title="Material Types"
+        description="Types of materials used in fixes"
+        icon={<Package className="h-4 w-4 text-blue-500" />}
+        items={config.materialTypes}
+        onChange={(v) => updateList("materialTypes", v)}
+        placeholder="e.g. Spray Foam"
+      />
+    </div>
+  );
+}
+
+// ─── Simple Editable List (Job Types, Materials) ─────────────────────
+
+function SimpleList({
+  title,
+  description,
+  icon,
+  items,
+  onChange,
+  placeholder,
+}: {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  items: string[];
+  onChange: (items: string[]) => void;
+  placeholder: string;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [newValue, setNewValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleAdd() {
+    const trimmed = newValue.trim();
+    if (!trimmed || items.includes(trimmed)) return;
+    onChange([...items, trimmed]);
+    setNewValue("");
+    setAdding(false);
+  }
+
+  useEffect(() => {
+    if (adding) inputRef.current?.focus();
+  }, [adding]);
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            {icon}
+            <h3 className="text-sm font-semibold">{title}</h3>
+          </div>
+          <span className="text-xs text-gray-400">{items.length} items</span>
+        </div>
+        <p className="text-xs text-gray-400 mb-4">{description}</p>
+
+        <div className="flex flex-wrap gap-2">
+          {items.map((item, i) => (
+            <div
+              key={item}
+              className="group flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
+              <span className="text-sm text-gray-700">{item}</span>
+              <button
+                onClick={() => onChange(items.filter((_, j) => j !== i))}
+                className="p-0.5 rounded hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+
+          {adding ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                ref={inputRef}
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); handleAdd(); }
+                  if (e.key === "Escape") { setAdding(false); setNewValue(""); }
+                }}
+                onBlur={() => { if (!newValue.trim()) { setAdding(false); setNewValue(""); } }}
+                placeholder={placeholder}
+                className="text-sm px-3 py-1.5 rounded-lg border border-[#FF6B35] bg-white outline-none w-48"
+              />
+              <button
+                onClick={handleAdd}
+                disabled={!newValue.trim()}
+                className="p-1.5 rounded-lg bg-[#FF6B35] text-white hover:bg-[#E5532D] disabled:opacity-30 transition-colors"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
             </div>
           ) : (
-            <p className="text-sm text-gray-400 text-center py-6">No inspector data yet</p>
+            <button
+              onClick={() => setAdding(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-gray-300 text-sm text-gray-400 hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-      {/* Environment */}
-      <Card>
-        <CardContent className="p-6">
-          <h3 className="text-sm font-semibold mb-4">Environment</h3>
-          <div className="space-y-3">
-            {[
-              { key: "NEXT_PUBLIC_FIREBASE_PROJECT_ID", set: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID },
-              { key: "NEXT_PUBLIC_FIREBASE_API_KEY", set: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY },
-              { key: "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", set: !!process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN },
-              { key: "FIREBASE_PROJECT_ID", set: true },
-              { key: "FIREBASE_CLIENT_EMAIL", set: true },
-              { key: "FIREBASE_PRIVATE_KEY", set: true },
-            ].map((env) => (
-              <div key={env.key} className="flex items-center justify-between">
-                <code className="text-xs bg-gray-50 px-2 py-0.5 rounded text-gray-600">{env.key}</code>
-                <Badge className={env.set ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}>
-                  {env.set ? "Set" : "Missing"}
-                </Badge>
-              </div>
-            ))}
+// ─── Issue Categories with Job Type Links ────────────────────────────
+
+function IssueCategoryList({
+  categories,
+  jobTypes,
+  onChange,
+}: {
+  categories: IssueCategoryConfig[];
+  jobTypes: string[];
+  onChange: (categories: IssueCategoryConfig[]) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newJobTypes, setNewJobTypes] = useState<string[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleAdd() {
+    const trimmed = newName.trim();
+    if (!trimmed || categories.some((c) => c.name === trimmed)) return;
+    onChange([...categories, { name: trimmed, jobTypes: newJobTypes }]);
+    setNewName("");
+    setNewJobTypes([]);
+    setAdding(false);
+  }
+
+  function handleRemove(index: number) {
+    onChange(categories.filter((_, i) => i !== index));
+    if (editingIndex === index) setEditingIndex(null);
+  }
+
+  function toggleJobType(catIndex: number, jt: string) {
+    const cat = categories[catIndex];
+    const updated = cat.jobTypes.includes(jt)
+      ? cat.jobTypes.filter((t) => t !== jt)
+      : [...cat.jobTypes, jt];
+    const newCats = [...categories];
+    newCats[catIndex] = { ...cat, jobTypes: updated };
+    onChange(newCats);
+  }
+
+  function toggleNewJobType(jt: string) {
+    setNewJobTypes((prev) =>
+      prev.includes(jt) ? prev.filter((t) => t !== jt) : [...prev, jt]
+    );
+  }
+
+  useEffect(() => {
+    if (adding) inputRef.current?.focus();
+  }, [adding]);
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+            <h3 className="text-sm font-semibold">Issue Categories</h3>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+          <span className="text-xs text-gray-400">{categories.length} items</span>
+        </div>
+        <p className="text-xs text-gray-400 mb-4">
+          Categories inspectors choose when documenting issues. Link to job types or leave empty for all.
+        </p>
+
+        <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+          {categories.map((cat, i) => (
+            <div key={cat.name} className="group">
+              <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                <button
+                  onClick={() => setEditingIndex(editingIndex === i ? null : i)}
+                  className="flex-1 flex items-center gap-2 text-left min-w-0"
+                >
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 text-gray-300 flex-shrink-0 transition-transform ${
+                      editingIndex === i ? "rotate-0" : "-rotate-90"
+                    }`}
+                  />
+                  <span className="text-sm font-medium text-gray-700 truncate">{cat.name}</span>
+                  {cat.jobTypes.length === 0 ? (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 flex-shrink-0">
+                      All types
+                    </span>
+                  ) : (
+                    <div className="flex gap-1 flex-shrink-0">
+                      {cat.jobTypes.map((jt) => (
+                        <span
+                          key={jt}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-[#FF6B35] font-medium"
+                        >
+                          {jt}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleRemove(i)}
+                  className="p-1 rounded hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {editingIndex === i && (
+                <div className="ml-8 mt-1 mb-2 p-3 rounded-lg bg-gray-50">
+                  <p className="text-xs text-gray-500 mb-2">Applies to job types:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {jobTypes.map((jt) => {
+                      const active = cat.jobTypes.includes(jt);
+                      return (
+                        <button
+                          key={jt}
+                          onClick={() => toggleJobType(i, jt)}
+                          className={`text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
+                            active
+                              ? "bg-[#FF6B35] text-white"
+                              : "bg-white border border-gray-200 text-gray-500 hover:border-[#FF6B35] hover:text-[#FF6B35]"
+                          }`}
+                        >
+                          {jt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-2">
+                    {cat.jobTypes.length === 0
+                      ? "No types selected — this category appears for all job types"
+                      : `Appears for ${cat.jobTypes.length} job type${cat.jobTypes.length === 1 ? "" : "s"}`}
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Add new category */}
+          {adding ? (
+            <div className="p-3 rounded-lg border border-[#FF6B35] bg-orange-50/30">
+              <input
+                ref={inputRef}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); handleAdd(); }
+                  if (e.key === "Escape") { setAdding(false); setNewName(""); setNewJobTypes([]); }
+                }}
+                placeholder="Category name, e.g. Missing Insulation"
+                className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 bg-white outline-none w-full mb-3"
+              />
+              <p className="text-xs text-gray-500 mb-2">Applies to job types:</p>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {jobTypes.map((jt) => {
+                  const active = newJobTypes.includes(jt);
+                  return (
+                    <button
+                      key={jt}
+                      onClick={() => toggleNewJobType(jt)}
+                      className={`text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
+                        active
+                          ? "bg-[#FF6B35] text-white"
+                          : "bg-white border border-gray-200 text-gray-500 hover:border-[#FF6B35] hover:text-[#FF6B35]"
+                      }`}
+                    >
+                      {jt}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAdd}
+                  disabled={!newName.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF6B35] text-white text-sm font-medium hover:bg-[#E5532D] disabled:opacity-30 transition-colors"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Add Category
+                </button>
+                <button
+                  onClick={() => { setAdding(false); setNewName(""); setNewJobTypes([]); }}
+                  className="px-3 py-1.5 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAdding(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-gray-300 text-sm text-gray-400 hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors w-full justify-center"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Category
+            </button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

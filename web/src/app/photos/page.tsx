@@ -6,7 +6,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { PhotoLightbox } from "@/components/shared/photo-lightbox";
 import { severityConfig, formatDate } from "@/lib/utils";
-import { Job, InspectionForm, IssuePhoto, IssueSeverity } from "@/types";
+import { Job, InspectionForm, IssuePhoto, FixPhoto, IssueSeverity } from "@/types";
 import { Loader2, Camera } from "lucide-react";
 
 interface PhotoItem {
@@ -22,6 +22,11 @@ interface PhotoItem {
   jobId: string;
   linkedIssueCategory?: string;
   inspectorName: string;
+  linkedPhotoURL?: string;
+  linkedSeverity?: IssueSeverity;
+  linkedCategory?: string;
+  linkedNotes?: string;
+  linkedDate?: Date;
 }
 
 export default function PhotosPage() {
@@ -48,10 +53,16 @@ export default function PhotosPage() {
           f.spots.forEach((s) => allIssues.push(...s.issuePhotos));
         });
 
+        const allFixes: FixPhoto[] = [];
+        (forms as InspectionForm[]).forEach((f) => {
+          f.spots.forEach((s) => allFixes.push(...s.fixPhotos));
+        });
+
         (forms as InspectionForm[]).forEach((f) => {
           f.spots.forEach((spot) => {
             spot.issuePhotos.forEach((p) => {
               if (p.photoURL) {
+                const linkedFix = allFixes.find((fx) => fx.linkedAuditIssueId === p.id);
                 items.push({
                   url: p.photoURL,
                   type: "issue",
@@ -63,6 +74,8 @@ export default function PhotosPage() {
                   jobAddress: job.address,
                   jobId: job.id,
                   inspectorName: f.inspectorName || "Unknown",
+                  linkedPhotoURL: linkedFix?.photoURL || undefined,
+                  resolutionNotes: linkedFix?.resolutionNotes,
                 });
               }
             });
@@ -79,6 +92,11 @@ export default function PhotosPage() {
                   jobId: job.id,
                   linkedIssueCategory: linked?.category,
                   inspectorName: f.inspectorName || "Unknown",
+                  linkedPhotoURL: linked?.photoURL || undefined,
+                  linkedSeverity: linked?.severity,
+                  linkedCategory: linked?.category,
+                  linkedNotes: linked?.notes,
+                  linkedDate: linked?.dateTaken,
                 });
               }
             });
@@ -117,6 +135,11 @@ export default function PhotosPage() {
     dateTaken: p.dateTaken,
     spotTitle: p.spotTitle,
     linkedIssueCategory: p.linkedIssueCategory,
+    linkedPhotoURL: p.linkedPhotoURL,
+    linkedSeverity: p.linkedSeverity,
+    linkedCategory: p.linkedCategory,
+    linkedNotes: p.linkedNotes,
+    linkedDate: p.linkedDate,
   }));
 
   return (

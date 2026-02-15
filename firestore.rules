@@ -2,6 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // App config (dropdown options etc.)
+    match /config/{docId} {
+      allow read: if true;
+    }
+
     // Jobs collection
     match /jobs/{jobId} {
       allow read, write: if true;

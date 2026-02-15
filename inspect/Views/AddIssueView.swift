@@ -7,6 +7,7 @@ struct AddIssueView: View {
     let job: Job
     let initialSpot: Spot
     var store: JobStore
+    var configStore: ConfigStore
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("inspectorName") private var inspectorName = ""
@@ -18,7 +19,7 @@ struct AddIssueView: View {
 
     // Issue state
     @State private var spotId: UUID
-    @State private var category: IssueCategory = .other
+    @State private var category = "Other"
     @State private var severity: IssueSeverity = .major
     @State private var notes = ""
 
@@ -26,7 +27,7 @@ struct AddIssueView: View {
     @State private var localSpots: [Spot]
     @State private var showNewSpotSheet = false
     @State private var newSpotTitle = ""
-    @State private var newSpotJobType: JobType = .insulation
+    @State private var newSpotJobType = "Insulation"
 
     // Save state
     @State private var isSaving = false
@@ -34,10 +35,11 @@ struct AddIssueView: View {
     @State private var errorMessage: String?
     @State private var showError = false
 
-    init(job: Job, spot: Spot, store: JobStore) {
+    init(job: Job, spot: Spot, store: JobStore, configStore: ConfigStore) {
         self.job = job
         self.initialSpot = spot
         self.store = store
+        self.configStore = configStore
         self._spotId = State(initialValue: spot.id)
         self._localSpots = State(initialValue: job.spots)
     }
@@ -46,8 +48,8 @@ struct AddIssueView: View {
         localSpots.first { $0.id == spotId }
     }
 
-    private var spotJobType: JobType {
-        selectedSpot?.jobType ?? .insulation
+    private var spotJobType: String {
+        selectedSpot?.jobType ?? "Insulation"
     }
 
     private var canSave: Bool {
@@ -173,14 +175,14 @@ struct AddIssueView: View {
                     .foregroundStyle(.secondary)
 
                 Menu {
-                    ForEach(IssueCategory.categories(for: spotJobType)) { cat in
-                        Button(cat.rawValue) {
+                    ForEach(configStore.categories(for: spotJobType), id: \.self) { cat in
+                        Button(cat) {
                             category = cat
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Text(category.rawValue)
+                        Text(category)
                             .font(.subheadline.weight(.medium))
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.caption2)
@@ -260,7 +262,7 @@ struct AddIssueView: View {
                     Button {
                         spotId = spot.id
                     } label: {
-                        Label(spot.title.isEmpty ? "Untitled" : spot.title, systemImage: spot.jobType.icon)
+                        Label(spot.title.isEmpty ? "Untitled" : spot.title, systemImage: JobType.icon(for: spot.jobType))
                     }
                 }
 
@@ -273,7 +275,7 @@ struct AddIssueView: View {
                 }
             } label: {
                 HStack {
-                    Image(systemName: selectedSpot?.jobType.icon ?? "mappin")
+                    Image(systemName: selectedSpot.map { JobType.icon(for: $0.jobType) } ?? "mappin")
                         .foregroundStyle(DS.Colors.primary)
                     Text(selectedSpot?.title ?? "Select Spot")
                         .font(.subheadline.weight(.medium))
@@ -372,14 +374,14 @@ struct AddIssueView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(JobType.allCases) { type in
+                            ForEach(configStore.jobTypes, id: \.self) { type in
                                 Button {
                                     newSpotJobType = type
                                 } label: {
                                     HStack(spacing: 4) {
-                                        Image(systemName: type.icon)
+                                        Image(systemName: JobType.icon(for: type))
                                             .font(.caption2)
-                                        Text(type.rawValue)
+                                        Text(type)
                                             .font(.caption.weight(.medium))
                                     }
                                     .padding(.horizontal, 12)

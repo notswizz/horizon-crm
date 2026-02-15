@@ -6,6 +6,7 @@ import PhotosUI
 struct QuickCaptureView: View {
     var store: JobStore
     var locationManager: LocationManager
+    var configStore: ConfigStore
     @AppStorage("inspectorName") private var inspectorName = ""
 
     // Photo state
@@ -17,7 +18,7 @@ struct QuickCaptureView: View {
     @State private var selectedJobId: UUID?
     @State private var captureType: FormType = .audit
     @State private var spotId: UUID?
-    @State private var category: IssueCategory = .other
+    @State private var category = "Other"
     @State private var severity: IssueSeverity = .major
     @State private var notes = ""
     @State private var linkedAuditIssueId: UUID?
@@ -26,7 +27,7 @@ struct QuickCaptureView: View {
     // New spot sheet
     @State private var showNewSpotSheet = false
     @State private var newSpotTitle = ""
-    @State private var newSpotJobType: JobType = .insulation
+    @State private var newSpotJobType = "Insulation"
     @State private var localSpots: [Spot] = []
 
     // Audit issues for fix linkage
@@ -51,8 +52,8 @@ struct QuickCaptureView: View {
         localSpots.first { $0.id == spotId }
     }
 
-    private var spotJobType: JobType {
-        selectedSpot?.jobType ?? .insulation
+    private var spotJobType: String {
+        selectedSpot?.jobType ?? "Insulation"
     }
 
     private var issuesAtSpot: [IssuePhoto] {
@@ -312,14 +313,14 @@ struct QuickCaptureView: View {
                     .foregroundStyle(.secondary)
 
                 Menu {
-                    ForEach(IssueCategory.categories(for: spotJobType)) { cat in
-                        Button(cat.rawValue) {
+                    ForEach(configStore.categories(for: spotJobType), id: \.self) { cat in
+                        Button(cat) {
                             category = cat
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Text(category.rawValue)
+                        Text(category)
                             .font(.subheadline.weight(.medium))
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.caption2)
@@ -427,7 +428,7 @@ struct QuickCaptureView: View {
                                 linkedAuditIssueId = issue.id
                             } label: {
                                 Label(
-                                    "\(issue.category.rawValue) (\(issue.severity.rawValue))",
+                                    "\(issue.category) (\(issue.severity.rawValue))",
                                     systemImage: issue.severity.icon
                                 )
                             }
@@ -438,7 +439,7 @@ struct QuickCaptureView: View {
                                let linked = issuesAtSpot.first(where: { $0.id == linkedId }) {
                                 Image(systemName: linked.severity.icon)
                                     .foregroundStyle(linked.severity.color)
-                                Text(linked.category.rawValue)
+                                Text(linked.category)
                                     .font(.subheadline.weight(.medium))
                                 Text(linked.severity.rawValue)
                                     .font(.caption2.weight(.medium))
@@ -538,14 +539,14 @@ struct QuickCaptureView: View {
                     // Type chips
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
-                            ForEach(MaterialType.allCases) { type in
+                            ForEach(configStore.materialTypes, id: \.self) { type in
                                 Button {
                                     materials[index].type = type
                                 } label: {
                                     HStack(spacing: 3) {
-                                        Image(systemName: type.icon)
+                                        Image(systemName: MaterialType.icon(for: type))
                                             .font(.caption2)
-                                        Text(type.rawValue)
+                                        Text(type)
                                             .font(.caption.weight(.medium))
                                     }
                                     .padding(.horizontal, 10)
@@ -553,7 +554,7 @@ struct QuickCaptureView: View {
                                     .foregroundStyle(materials[index].type == type ? .white : .primary)
                                     .background(
                                         materials[index].type == type
-                                            ? AnyShapeStyle(type.color)
+                                            ? AnyShapeStyle(MaterialType.color(for: type))
                                             : AnyShapeStyle(.clear),
                                         in: .capsule
                                     )
@@ -626,7 +627,7 @@ struct QuickCaptureView: View {
                         Button {
                             spotId = spot.id
                         } label: {
-                            Label(spot.title.isEmpty ? "Untitled" : spot.title, systemImage: spot.jobType.icon)
+                            Label(spot.title.isEmpty ? "Untitled" : spot.title, systemImage: JobType.icon(for: spot.jobType))
                         }
                     }
 
@@ -639,7 +640,7 @@ struct QuickCaptureView: View {
                     }
                 } label: {
                     HStack {
-                        Image(systemName: selectedSpot?.jobType.icon ?? "mappin")
+                        Image(systemName: selectedSpot.map { JobType.icon(for: $0.jobType) } ?? "mappin")
                             .foregroundStyle(DS.Colors.primary)
                         Text(selectedSpot?.title ?? "Select Spot")
                             .font(.subheadline.weight(.medium))
@@ -760,14 +761,14 @@ struct QuickCaptureView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(JobType.allCases) { type in
+                            ForEach(configStore.jobTypes, id: \.self) { type in
                                 Button {
                                     newSpotJobType = type
                                 } label: {
                                     HStack(spacing: 4) {
-                                        Image(systemName: type.icon)
+                                        Image(systemName: JobType.icon(for: type))
                                             .font(.caption2)
-                                        Text(type.rawValue)
+                                        Text(type)
                                             .font(.caption.weight(.medium))
                                     }
                                     .padding(.horizontal, 12)
@@ -880,7 +881,7 @@ struct QuickCaptureView: View {
         resetPhoto()
         captureType = .audit
         spotId = nil
-        category = .other
+        category = "Other"
         severity = .major
         notes = ""
         linkedAuditIssueId = nil

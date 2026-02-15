@@ -30,6 +30,7 @@ struct NewFormView: View {
     let job: Job
     let formType: FormType
     var store: JobStore
+    var configStore: ConfigStore
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("inspectorName") private var savedInspectorName = ""
@@ -40,7 +41,7 @@ struct NewFormView: View {
     @State private var showError = false
     @State private var showNewSpotSheet = false
     @State private var newSpotTitle = ""
-    @State private var newSpotJobType: JobType = .insulation
+    @State private var newSpotJobType = "Insulation"
     @State private var pendingSpotCallback: ((Spot) -> Void)?
     @State private var localSpots: [Spot]
     @State private var localMaterials: [Material] = []
@@ -48,10 +49,11 @@ struct NewFormView: View {
 
     let initialSpotId: UUID?
 
-    init(job: Job, formType: FormType, store: JobStore, initialSpotId: UUID? = nil) {
+    init(job: Job, formType: FormType, store: JobStore, configStore: ConfigStore, initialSpotId: UUID? = nil) {
         self.job = job
         self.formType = formType
         self.store = store
+        self.configStore = configStore
         self.initialSpotId = initialSpotId
         self._form = State(initialValue: InspectionForm(formType: formType))
         self._localSpots = State(initialValue: job.spots)
@@ -170,6 +172,7 @@ struct NewFormView: View {
                 spots: localSpots,
                 number: index + 1,
                 store: store,
+                configStore: configStore,
                 focusedField: $focusedField,
                 onRequestNewSpot: { callback in
                     pendingSpotCallback = callback
@@ -309,7 +312,7 @@ struct NewFormView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(JobType.allCases) { type in
+                            ForEach(configStore.jobTypes, id: \.self) { type in
                                 JobTypeChip(
                                     type: type,
                                     isSelected: newSpotJobType == type
@@ -391,14 +394,14 @@ struct NewFormView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
-                            ForEach(MaterialType.allCases) { type in
+                            ForEach(configStore.materialTypes, id: \.self) { type in
                                 Button {
                                     localMaterials[i].type = type
                                 } label: {
                                     HStack(spacing: 3) {
-                                        Image(systemName: type.icon)
+                                        Image(systemName: MaterialType.icon(for: type))
                                             .font(.caption2)
-                                        Text(type.rawValue)
+                                        Text(type)
                                             .font(.caption.weight(.medium))
                                     }
                                     .padding(.horizontal, 10)
@@ -406,7 +409,7 @@ struct NewFormView: View {
                                     .foregroundStyle(localMaterials[i].type == type ? .white : .primary)
                                     .background(
                                         localMaterials[i].type == type
-                                            ? AnyShapeStyle(type.color)
+                                            ? AnyShapeStyle(MaterialType.color(for: type))
                                             : AnyShapeStyle(.clear),
                                         in: .capsule
                                     )
@@ -668,7 +671,7 @@ struct NewFormView: View {
             if !validMaterials.isEmpty {
                 if updatedForm.spots.isEmpty {
                     // No spots yet — create one from the first job spot (or a default)
-                    let fallbackSpot = localSpots.first ?? Spot(title: "General", jobType: .insulation)
+                    let fallbackSpot = localSpots.first ?? Spot(title: "General", jobType: "Insulation")
                     updatedForm.spots.append(FormSpot(from: fallbackSpot))
                 }
                 let targetIdx = updatedForm.spots.firstIndex { !$0.issuePhotos.isEmpty || !$0.fixPhotos.isEmpty } ?? 0
@@ -756,7 +759,7 @@ private struct SpotPicker: View {
                     Button {
                         selectedSpotId = spot.id
                     } label: {
-                        Label(spot.title.isEmpty ? "Untitled" : spot.title, systemImage: spot.jobType.icon)
+                        Label(spot.title.isEmpty ? "Untitled" : spot.title, systemImage: JobType.icon(for: spot.jobType))
                     }
                 }
 
@@ -771,7 +774,7 @@ private struct SpotPicker: View {
                 }
             } label: {
                 HStack {
-                    Image(systemName: selectedSpot?.jobType.icon ?? "mappin")
+                    Image(systemName: selectedSpot.map { JobType.icon(for: $0.jobType) } ?? "mappin")
                         .foregroundStyle(DS.Colors.primary)
                     Text(selectedSpot?.title ?? "Select Spot")
                         .font(.subheadline.weight(.medium))
@@ -796,13 +799,14 @@ private struct IssuePhotoCard: View {
     let spots: [Spot]
     let number: Int
     var store: JobStore
+    var configStore: ConfigStore
     var focusedField: FocusState<FormField?>.Binding
     var onRequestNewSpot: (@escaping (Spot) -> Void) -> Void
     var onChangeSpot: (UUID) -> Void
     var onDelete: () -> Void
 
-    private var spotJobType: JobType {
-        spots.first { $0.id == currentSpotId }?.jobType ?? .insulation
+    private var spotJobType: String {
+        spots.first { $0.id == currentSpotId }?.jobType ?? "Insulation"
     }
 
     var body: some View {
@@ -882,14 +886,14 @@ private struct IssuePhotoCard: View {
                     .foregroundStyle(.secondary)
 
                 Menu {
-                    ForEach(IssueCategory.categories(for: spotJobType)) { cat in
-                        Button(cat.rawValue) {
+                    ForEach(configStore.categories(for: spotJobType), id: \.self) { cat in
+                        Button(cat) {
                             issuePhoto.category = cat
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Text(issuePhoto.category.rawValue)
+                        Text(issuePhoto.category)
                             .font(.subheadline.weight(.medium))
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.caption2)
@@ -1037,7 +1041,7 @@ private struct FixPhotoCard: View {
                                 fixPhoto.linkedAuditIssueId = issue.id
                             } label: {
                                 Label(
-                                    "\(issue.category.rawValue) (\(issue.severity.rawValue))",
+                                    "\(issue.category) (\(issue.severity.rawValue))",
                                     systemImage: issue.severity.icon
                                 )
                             }
@@ -1047,7 +1051,7 @@ private struct FixPhotoCard: View {
                             if let linked = linkedIssue {
                                 Image(systemName: linked.severity.icon)
                                     .foregroundStyle(linked.severity.color)
-                                Text(linked.category.rawValue)
+                                Text(linked.category)
                                     .font(.subheadline.weight(.medium))
                                 Text(linked.severity.rawValue)
                                     .font(.caption2.weight(.medium))
@@ -1112,6 +1116,7 @@ private struct FixPhotoCard: View {
 
 private struct MaterialEntryCard: View {
     @Binding var material: Material
+    var configStore: ConfigStore
     var focusedField: FocusState<FormField?>.Binding
     var onDelete: () -> Void
 
@@ -1142,14 +1147,14 @@ private struct MaterialEntryCard: View {
             // Type chips
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    ForEach(MaterialType.allCases) { type in
+                    ForEach(configStore.materialTypes, id: \.self) { type in
                         Button {
                             material.type = type
                         } label: {
                             HStack(spacing: 3) {
-                                Image(systemName: type.icon)
+                                Image(systemName: MaterialType.icon(for: type))
                                     .font(.caption2)
-                                Text(type.rawValue)
+                                Text(type)
                                     .font(.caption.weight(.medium))
                             }
                             .padding(.horizontal, 10)
@@ -1157,7 +1162,7 @@ private struct MaterialEntryCard: View {
                             .foregroundStyle(material.type == type ? .white : .primary)
                             .background(
                                 material.type == type
-                                    ? AnyShapeStyle(type.color)
+                                    ? AnyShapeStyle(MaterialType.color(for: type))
                                     : AnyShapeStyle(.clear),
                                 in: .capsule
                             )
@@ -1200,16 +1205,16 @@ private struct MaterialEntryCard: View {
 // MARK: - Job Type Chip
 
 private struct JobTypeChip: View {
-    let type: JobType
+    let type: String
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 4) {
-                Image(systemName: type.icon)
+                Image(systemName: JobType.icon(for: type))
                     .font(.caption2)
-                Text(type.rawValue)
+                Text(type)
                     .font(.caption.weight(.medium))
             }
             .padding(.horizontal, 12)

@@ -16,6 +16,11 @@ interface LightboxPhoto {
   dateTaken?: Date;
   spotTitle?: string;
   linkedIssueCategory?: string;
+  linkedPhotoURL?: string;
+  linkedSeverity?: "critical" | "major" | "minor";
+  linkedCategory?: string;
+  linkedNotes?: string;
+  linkedDate?: Date;
 }
 
 interface PhotoLightboxProps {
@@ -71,6 +76,50 @@ export function PhotoLightbox({ photos, initialIndex = 0, onClose }: PhotoLightb
           </div>
 
           <div className="space-y-4">
+            {photo.linkedPhotoURL && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-2">
+                  {photo.type === "issue" ? "Before & After" : "Before & After"}
+                </p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <div className="relative rounded-lg overflow-hidden border aspect-[4/3]">
+                      <img
+                        src={photo.type === "fix" ? photo.linkedPhotoURL : photo.url}
+                        alt="Before"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-red-500 text-center mt-1.5">Before</p>
+                  </div>
+                  <div className="flex items-center text-gray-300 text-xs">→</div>
+                  <div className="flex-1">
+                    <div className="relative rounded-lg overflow-hidden border aspect-[4/3]">
+                      <img
+                        src={photo.type === "fix" ? photo.url : photo.linkedPhotoURL}
+                        alt="After"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-500 text-center mt-1.5">After</p>
+                  </div>
+                </div>
+                {photo.type === "fix" && photo.linkedCategory && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    {photo.linkedSeverity && severityConfig[photo.linkedSeverity] && (
+                      <Badge className={`${severityConfig[photo.linkedSeverity].bg} ${severityConfig[photo.linkedSeverity].color} text-[9px]`}>
+                        {severityConfig[photo.linkedSeverity].label}
+                      </Badge>
+                    )}
+                    <span className="text-xs text-gray-500">{photo.linkedCategory}</span>
+                  </div>
+                )}
+                {photo.type === "issue" && photo.resolutionNotes && (
+                  <p className="mt-2 text-xs text-emerald-600 italic">&ldquo;{photo.resolutionNotes}&rdquo;</p>
+                )}
+              </div>
+            )}
+
             {photo.spotTitle && (
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Spot</p>
@@ -108,7 +157,7 @@ export function PhotoLightbox({ photos, initialIndex = 0, onClose }: PhotoLightb
               </div>
             )}
 
-            {photo.resolutionNotes && (
+            {photo.resolutionNotes && !(photo.type === "issue" && photo.linkedPhotoURL) && (
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Resolution</p>
                 <p className="text-sm text-gray-600">{photo.resolutionNotes}</p>
@@ -133,20 +182,29 @@ export function buildLightboxPhotos(
   issuePhotos: IssuePhoto[],
   fixPhotos: FixPhoto[],
   spotTitle: string,
-  allIssues?: IssuePhoto[]
+  allIssues?: IssuePhoto[],
+  allFixes?: FixPhoto[]
 ): LightboxPhoto[] {
-  const issues: LightboxPhoto[] = issuePhotos.map((p) => ({
-    url: p.photoURL || "",
-    type: "issue" as const,
-    category: p.category,
-    severity: p.severity,
-    notes: p.notes,
-    dateTaken: p.dateTaken,
-    spotTitle,
-  }));
+  const fixPool = allFixes || fixPhotos;
+  const issuePool = allIssues || issuePhotos;
+
+  const issues: LightboxPhoto[] = issuePhotos.map((p) => {
+    const linkedFix = fixPool.find((f) => f.linkedAuditIssueId === p.id);
+    return {
+      url: p.photoURL || "",
+      type: "issue" as const,
+      category: p.category,
+      severity: p.severity,
+      notes: p.notes,
+      dateTaken: p.dateTaken,
+      spotTitle,
+      linkedPhotoURL: linkedFix?.photoURL || undefined,
+      resolutionNotes: linkedFix?.resolutionNotes,
+    };
+  });
 
   const fixes: LightboxPhoto[] = fixPhotos.map((p) => {
-    const linkedIssue = allIssues?.find((i) => i.id === p.linkedAuditIssueId);
+    const linkedIssue = issuePool.find((i) => i.id === p.linkedAuditIssueId);
     return {
       url: p.photoURL || "",
       type: "fix" as const,
@@ -154,6 +212,11 @@ export function buildLightboxPhotos(
       dateTaken: p.dateTaken,
       spotTitle,
       linkedIssueCategory: linkedIssue?.category,
+      linkedPhotoURL: linkedIssue?.photoURL || undefined,
+      linkedSeverity: linkedIssue?.severity,
+      linkedCategory: linkedIssue?.category,
+      linkedNotes: linkedIssue?.notes,
+      linkedDate: linkedIssue?.dateTaken,
     };
   });
 

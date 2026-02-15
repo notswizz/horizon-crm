@@ -16,10 +16,11 @@ struct inspectApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @State private var store = JobStore()
     @State private var locationManager = LocationManager()
+    @State private var configStore = ConfigStore()
 
     var body: some Scene {
         WindowGroup {
-            ContentView(store: store, locationManager: locationManager)
+            ContentView(store: store, locationManager: locationManager, configStore: configStore)
                 .onAppear { store.startListening() }
         }
     }

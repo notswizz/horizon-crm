@@ -6,10 +6,11 @@ struct IssueDetailView: View {
     let spotId: UUID
     let job: Job
     var store: JobStore
+    var configStore: ConfigStore
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var category: IssueCategory = .other
+    @State private var category = "Other"
     @State private var severity: IssueSeverity = .major
     @State private var notes: String = ""
     @State private var hasLoaded = false
@@ -89,13 +90,13 @@ struct IssueDetailView: View {
             // Spot info
             if let spot {
                 HStack(spacing: 8) {
-                    Image(systemName: spot.jobType.icon)
+                    Image(systemName: JobType.icon(for: spot.jobType))
                         .font(.caption)
                         .foregroundStyle(DS.Colors.primary)
                     Text(spot.title)
                         .font(.subheadline.weight(.medium))
                     Spacer()
-                    Text(spot.jobType.rawValue)
+                    Text(spot.jobType)
                         .font(.caption2.weight(.medium))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
@@ -113,17 +114,12 @@ struct IssueDetailView: View {
                     .foregroundStyle(.tertiary)
 
                 Menu {
-                    let categories: [IssueCategory] = if let spot {
-                        IssueCategory.categories(for: spot.jobType)
-                    } else {
-                        IssueCategory.allCases.map { $0 }
-                    }
-                    ForEach(categories) { cat in
-                        Button(cat.rawValue) { category = cat }
+                    ForEach(configStore.categories(for: spot?.jobType ?? ""), id: \.self) { cat in
+                        Button(cat) { category = cat }
                     }
                 } label: {
                     HStack {
-                        Text(category.rawValue)
+                        Text(category)
                             .font(.subheadline)
                         Spacer()
                         Image(systemName: "chevron.up.chevron.down")
@@ -302,7 +298,7 @@ struct IssueDetailView: View {
 
                     // ── View Inspection link ──
                     if let inspectionForm {
-                        NavigationLink(destination: FormDetailView(form: inspectionForm, job: job, store: store)) {
+                        NavigationLink(destination: FormDetailView(form: inspectionForm, job: job, store: store, configStore: configStore)) {
                             HStack(spacing: 8) {
                                 Image(systemName: "doc.text.magnifyingglass")
                                     .font(.system(size: 13, weight: .medium))
@@ -329,7 +325,7 @@ struct IssueDetailView: View {
                 .shadow(color: DS.Colors.success.opacity(0.08), radius: 12, y: 4)
 
             } else if let issue {
-                NavigationLink(destination: SubmitFixView(job: job, issue: issue, spotId: spotId, store: store)) {
+                NavigationLink(destination: SubmitFixView(job: job, issue: issue, spotId: spotId, store: store, configStore: configStore)) {
                     HStack(spacing: 8) {
                         Spacer()
                         Image(systemName: "wrench.and.screwdriver.fill")

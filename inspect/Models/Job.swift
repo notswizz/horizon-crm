@@ -36,6 +36,14 @@ enum JobType: String, CaseIterable, Codable, Identifiable, Sendable {
     }
 }
 
+// MARK: - JobType Lookup
+
+extension JobType {
+    static func icon(for value: String) -> String {
+        JobType(rawValue: value)?.icon ?? "wrench.fill"
+    }
+}
+
 // MARK: - Issue Category
 
 enum IssueCategory: String, CaseIterable, Codable, Identifiable, Sendable {
@@ -77,27 +85,7 @@ enum IssueCategory: String, CaseIterable, Codable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    static func categories(for jobType: JobType) -> [IssueCategory] {
-        let general: [IssueCategory] = [
-            .codeViolation, .safetyHazard, .incompleteWork, .poorWorkmanship, .other
-        ]
-        let specific: [IssueCategory]
-        switch jobType {
-        case .insulation, .attic, .crawlspace:
-            specific = [.gaps, .compression, .insufficientRValue, .blockedVents,
-                        .moisture, .vaporBarrier]
-        case .airSealing, .weatherization:
-            specific = [.missingSealant, .gapsAtPenetrations, .incompleteFoam,
-                        .overApplication, .missingWeatherstrip]
-        case .hvac:
-            specific = [.unitNotLevel, .lineInsulationMissing, .noPTrap,
-                        .improperClearance, .electricalIssue]
-        case .ductSealing:
-            specific = [.tapeNotMastic, .unsealedJoints, .disconnectedRun,
-                        .missingDuctInsulation, .improperSupport]
-        }
-        return specific + general
-    }
+    // Category filtering is now handled by ConfigStore.categories(for:)
 }
 
 // MARK: - Issue Severity
@@ -131,12 +119,12 @@ enum IssueSeverity: String, CaseIterable, Codable, Identifiable, Sendable {
 struct Spot: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var title: String
-    var jobType: JobType
+    var jobType: String
 
     init(
         id: UUID = UUID(),
         title: String = "",
-        jobType: JobType = .insulation
+        jobType: String = "Insulation"
     ) {
         self.id = id
         self.title = title
@@ -149,12 +137,12 @@ struct Spot: Identifiable, Codable, Equatable, Sendable {
 struct FormSpot: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var title: String
-    var jobType: JobType
+    var jobType: String
     var issuePhotos: [IssuePhoto]
     var fixPhotos: [FixPhoto]
     var materials: [Material]
 
-    init(id: UUID = UUID(), title: String = "", jobType: JobType = .insulation,
+    init(id: UUID = UUID(), title: String = "", jobType: String = "Insulation",
          issuePhotos: [IssuePhoto] = [], fixPhotos: [FixPhoto] = [], materials: [Material] = []) {
         self.id = id
         self.title = title
@@ -177,7 +165,7 @@ struct FormSpot: Identifiable, Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         title = try c.decode(String.self, forKey: .title)
-        jobType = try c.decode(JobType.self, forKey: .jobType)
+        jobType = try c.decode(String.self, forKey: .jobType)
         issuePhotos = try c.decodeIfPresent([IssuePhoto].self, forKey: .issuePhotos) ?? []
         fixPhotos = try c.decodeIfPresent([FixPhoto].self, forKey: .fixPhotos) ?? []
         materials = try c.decodeIfPresent([Material].self, forKey: .materials) ?? []
@@ -189,7 +177,7 @@ struct FormSpot: Identifiable, Codable, Equatable, Sendable {
 struct IssuePhoto: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var photoURL: String?
-    var category: IssueCategory
+    var category: String
     var severity: IssueSeverity
     var notes: String
     var dateTaken: Date
@@ -197,7 +185,7 @@ struct IssuePhoto: Identifiable, Codable, Equatable, Sendable {
     init(
         id: UUID = UUID(),
         photoURL: String? = nil,
-        category: IssueCategory = .other,
+        category: String = "Other",
         severity: IssueSeverity = .major,
         notes: String = "",
         dateTaken: Date = Date()
@@ -232,6 +220,18 @@ struct FixPhoto: Identifiable, Codable, Equatable, Sendable {
         self.photoURL = photoURL
         self.resolutionNotes = resolutionNotes
         self.dateTaken = dateTaken
+    }
+}
+
+// MARK: - MaterialType Lookup
+
+extension MaterialType {
+    static func icon(for value: String) -> String {
+        MaterialType(rawValue: value)?.icon ?? "shippingbox.fill"
+    }
+
+    static func color(for value: String) -> Color {
+        MaterialType(rawValue: value)?.color ?? DS.Colors.stageCancelled
     }
 }
 
@@ -272,14 +272,14 @@ enum MaterialType: String, Codable, CaseIterable, Identifiable, Sendable {
 struct Material: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var name: String
-    var type: MaterialType
+    var type: String
     var quantity: String
     var cost: Double?
 
     init(
         id: UUID = UUID(),
         name: String = "",
-        type: MaterialType = .insulation,
+        type: String = "Insulation",
         quantity: String = "",
         cost: Double? = nil
     ) {
@@ -329,6 +329,16 @@ enum JobStage: String, Codable, CaseIterable, Identifiable, Sendable {
         case .inspectionPending: "checkmark.shield"
         case .completed: "checkmark.circle.fill"
         case .cancelled: "xmark.circle.fill"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .auditPending: "Audit"
+        case .workInProgress: "In Progress"
+        case .inspectionPending: "Inspection"
+        case .completed: "Completed"
+        case .cancelled: "Cancelled"
         }
     }
 }
@@ -574,8 +584,8 @@ extension Job {
             currentStage: .workInProgress,
             rebateAmount: 2500,
             spots: [
-                Spot(title: "Attic Hatch", jobType: .attic),
-                Spot(title: "Kitchen Window", jobType: .airSealing),
+                Spot(title: "Attic Hatch", jobType: "Attic Insulation"),
+                Spot(title: "Kitchen Window", jobType: "Air Sealing"),
             ],
             formCount: 1,
             photoCount: 2,
@@ -593,7 +603,7 @@ extension Job {
             currentStage: .inspectionPending,
             rebateAmount: 4000,
             spots: [
-                Spot(title: "Heat Pump Pad", jobType: .hvac),
+                Spot(title: "Heat Pump Pad", jobType: "HVAC Installation"),
             ],
             formCount: 2,
             photoCount: 3,
@@ -619,25 +629,25 @@ extension InspectionForm {
                     FormSpot(
                         id: atticSpotId,
                         title: "Attic Hatch",
-                        jobType: .attic,
+                        jobType: "Attic Insulation",
                         issuePhotos: [
                             IssuePhoto(
-                                category: .insufficientRValue,
+                                category: "Insufficient R-Value",
                                 severity: .major,
                                 notes: "R-value measured at R-13, well below the recommended R-38 for this climate zone."
                             ),
                         ],
                         materials: [
-                            Material(name: "R-38 Fiberglass Batts", type: .insulation, quantity: "200 sq ft"),
+                            Material(name: "R-38 Fiberglass Batts", type: "Insulation", quantity: "200 sq ft"),
                         ]
                     ),
                     FormSpot(
                         id: kitchenSpotId,
                         title: "Kitchen Window",
-                        jobType: .airSealing,
+                        jobType: "Air Sealing",
                         issuePhotos: [
                             IssuePhoto(
-                                category: .missingWeatherstrip,
+                                category: "Missing Weatherstripping",
                                 severity: .minor,
                                 notes: "Visible gaps around window frame. Weatherstripping worn and missing in places."
                             ),
@@ -654,7 +664,7 @@ extension InspectionForm {
                     FormSpot(
                         id: hvacSpotId,
                         title: "Heat Pump Pad",
-                        jobType: .hvac,
+                        jobType: "HVAC Installation",
                         fixPhotos: [
                             FixPhoto(
                                 linkedAuditIssueId: issue1Id,
@@ -662,8 +672,8 @@ extension InspectionForm {
                             ),
                         ],
                         materials: [
-                            Material(name: "Carrier 25VNA0 Heat Pump", type: .hvacUnit, quantity: "1 unit"),
-                            Material(name: "Foam Line Insulation", type: .insulation, quantity: "30 ft"),
+                            Material(name: "Carrier 25VNA0 Heat Pump", type: "HVAC Unit", quantity: "1 unit"),
+                            Material(name: "Foam Line Insulation", type: "Insulation", quantity: "30 ft"),
                         ]
                     ),
                 ]

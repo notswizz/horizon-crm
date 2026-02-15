@@ -504,14 +504,14 @@ final class JobStore {
                 let formSpot = jobForms.flatMap { $0.spots }.first { $0.id == spotId }
                 let jobSpot = job.spots.first { $0.id == spotId }
                 let title = formSpot?.title ?? jobSpot?.title ?? "Unknown"
-                let jobType = formSpot?.jobType.rawValue ?? jobSpot?.jobType.rawValue ?? "Unknown"
+                let jobType = formSpot?.jobType ?? jobSpot?.jobType ?? "Unknown"
 
                 // Build findings: each audit issue + its linked fix (if any)
                 let issues = issuesBySpot[spotId] ?? []
                 var findings: [FindingExport] = issues.map { issue in
                     let fix = allFixesByLinkedId[issue.id]
                     return FindingExport(
-                        category: issue.category.rawValue,
+                        category: issue.category,
                         severity: issue.severity.rawValue,
                         issueNotes: issue.notes,
                         beforePhotoURL: issue.photoURL,
@@ -544,7 +544,7 @@ final class JobStore {
 
                 // Materials for this spot
                 let spotMats = (materialsBySpot[spotId] ?? []).map { mat in
-                    MaterialExport(name: mat.name, type: mat.type.rawValue, quantity: mat.quantity, cost: mat.cost)
+                    MaterialExport(name: mat.name, type: mat.type, quantity: mat.quantity, cost: mat.cost)
                 }
 
                 if !findings.isEmpty || !spotMats.isEmpty {

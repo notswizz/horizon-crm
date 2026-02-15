@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { PhotoLightbox, buildLightboxPhotos } from "@/components/shared/photo-lightbox";
 import { formatDate, formatDateTime, formatCurrency, severityConfig, estimateJobValue, stageConfig } from "@/lib/utils";
-import { Job, InspectionForm, JobStage, RebateOutcome, IssuePhoto } from "@/types";
+import { Job, InspectionForm, JobStage, RebateOutcome, IssuePhoto, FixPhoto } from "@/types";
 import {
   Loader2, MapPin, User, Phone, Mail, Camera, AlertTriangle,
   Wrench, Save, ChevronRight, Package, CheckCircle,
@@ -74,6 +74,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const audit = forms.find((f) => f.formType === "audit");
   const inspections = forms.filter((f) => f.formType === "inspection");
   const allIssues: IssuePhoto[] = forms.flatMap((f) => f.spots.flatMap((s) => s.issuePhotos));
+  const allFixes: FixPhoto[] = forms.flatMap((f) => f.spots.flatMap((s) => s.fixPhotos));
   const allMaterials = forms.flatMap((f) => f.spots.flatMap((s) => s.materials));
   const datasetValue = estimateJobValue(job, forms);
 
@@ -235,7 +236,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   const allAuditPhotos = audit.spots.flatMap((spot) =>
                     spot.issuePhotos.map((photo) => ({ ...photo, spotTitle: spot.title }))
                   );
-                  const lbPhotos = buildLightboxPhotos(allAuditPhotos, [], "");
+                  const lbPhotos = buildLightboxPhotos(allAuditPhotos, [], "", undefined, allFixes);
                   return (
                     <div className="flex gap-3 overflow-x-auto pb-2">
                       {allAuditPhotos.map((photo, pi) => (

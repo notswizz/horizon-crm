@@ -97,7 +97,7 @@ struct FixDetailView: View {
                             .font(.subheadline)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(issue.category.rawValue)
+                            Text(issue.category)
                                 .font(.subheadline.weight(.semibold))
 
                             HStack(spacing: 8) {
@@ -149,13 +149,13 @@ struct FixDetailView: View {
             // Spot info
             if let spot {
                 HStack(spacing: 8) {
-                    Image(systemName: spot.jobType.icon)
+                    Image(systemName: JobType.icon(for: spot.jobType))
                         .font(.caption)
                         .foregroundStyle(DS.Colors.success)
                     Text(spot.title)
                         .font(.subheadline.weight(.medium))
                     Spacer()
-                    Text(spot.jobType.rawValue)
+                    Text(spot.jobType)
                         .font(.caption2.weight(.medium))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
