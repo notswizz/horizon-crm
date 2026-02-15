@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchAllJobs, fetchForms } from "@/lib/firestore-helpers";
+import { db } from "@/lib/firebase-admin";
+import { estimateJobValue, DEFAULT_WEIGHTS, calculateJobRevenueValue, DEFAULT_VALUATION } from "@/lib/utils";
+import { DatasetValueWeights, DatasetValuationConfig } from "@/types";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,11 +13,17 @@ export async function POST(req: NextRequest) {
       rebateFilter = "all",
     } = body;
 
+    // Fetch config for dataset value calculations
+    const configDoc = await db.doc("config/dropdowns").get();
+    const configData = configDoc.exists ? configDoc.data() : {};
+    const weights: DatasetValueWeights = configData?.datasetValueWeights || DEFAULT_WEIGHTS;
+    const valuation: DatasetValuationConfig = configData?.datasetValuation || DEFAULT_VALUATION;
+
     let jobs = await fetchAllJobs();
 
     // Rebate filter
     if (rebateFilter !== "all") {
-      jobs = jobs.filter((j) => j.rebateOutcome === rebateFilter);
+      jobs = jobs.filter((j) => j.rebateStatus === rebateFilter);
     }
 
     // Fetch forms for each job
@@ -28,12 +37,12 @@ export async function POST(req: NextRequest) {
     if (format === "csv") {
       // Flattened CSV
       const rows: string[] = [];
-      rows.push("job_id,address,contact_name,stage,rebate_outcome,rebate_amount,photo_count,issue_count,fix_count,created_at");
+      rows.push("job_id,address,contact_name,stage,rebate_status,rebate_amount,photo_count,issue_count,fix_count,created_at");
       jobsWithForms.forEach(({ job }) => {
         const address = anonymize ? "REDACTED" : job.address.replace(/,/g, ";");
         const contact = anonymize ? "REDACTED" : job.contactName.replace(/,/g, ";");
         rows.push(
-          `${job.id},${address},${contact},${job.currentStage},${job.rebateOutcome},${job.rebateAmount},${job.photoCount},${job.issueCount},${job.fixCount},${new Date(job.createdAt).toISOString()}`
+          `${job.id},${address},${contact},${job.currentStage},${job.rebateStatus},${job.rebateAmount},${job.photoCount},${job.issueCount},${job.fixCount},${new Date(job.createdAt).toISOString()}`
         );
       });
 
@@ -70,11 +79,13 @@ export async function POST(req: NextRequest) {
         notes: job.notes,
         currentStage: job.currentStage,
         rebateAmount: job.rebateAmount,
-        rebateOutcome: job.rebateOutcome,
+        rebateStatus: job.rebateStatus,
         spots: job.spots,
         photoCount: job.photoCount,
         issueCount: job.issueCount,
         fixCount: job.fixCount,
+        datasetValuePoints: estimateJobValue(job, forms, weights),
+        datasetValueRevenue: calculateJobRevenueValue(job, valuation),
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,
         forms: forms.map((f) => ({

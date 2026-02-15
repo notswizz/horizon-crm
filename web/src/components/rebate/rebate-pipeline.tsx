@@ -19,9 +19,10 @@ interface Props {
 }
 
 const statusConfig: Record<RebateStatus, { label: string; color: string; icon: typeof Clock }> = {
-  not_submitted: { label: "Not Submitted", color: "bg-gray-100 text-gray-700", icon: Clock },
+  none: { label: "None", color: "bg-gray-100 text-gray-700", icon: Clock },
+  calculated: { label: "Calculated", color: "bg-orange-100 text-orange-700", icon: FileText },
   submitted: { label: "Submitted", color: "bg-blue-100 text-blue-700", icon: FileText },
-  approved: { label: "Approved", color: "bg-green-100 text-green-700", icon: CheckCircle },
+  accepted: { label: "Accepted", color: "bg-green-100 text-green-700", icon: CheckCircle },
   declined: { label: "Declined", color: "bg-red-100 text-red-700", icon: XCircle },
   paid: { label: "Paid", color: "bg-emerald-100 text-emerald-700", icon: DollarSign },
 };
@@ -52,7 +53,9 @@ export function RebatePipeline({ job, onUpdate }: Props) {
   const [declineReason, setDeclineReason] = useState(rebate.declineReason || "");
   const [paidAmount, setPaidAmount] = useState(rebate.paidAmount || 0);
   const [paidDate, setPaidDate] = useState(rebate.paidDate || "");
-  const [status, setStatus] = useState<RebateStatus>(rebate.status);
+  const [status, setStatus] = useState<RebateStatus>(
+    statusConfig[rebate.status] ? rebate.status : "none"
+  );
 
   const handleSave = async () => {
     setSaving(true);
@@ -66,8 +69,8 @@ export function RebatePipeline({ job, onUpdate }: Props) {
         submittedDate: submittedDate || undefined,
         claimNumber: claimNumber || undefined,
         status,
-        approvedAmount: status === "approved" || status === "paid" ? approvedAmount : undefined,
-        approvedDate: status === "approved" || status === "paid" ? approvedDate || undefined : undefined,
+        approvedAmount: status === "accepted" || status === "paid" ? approvedAmount : undefined,
+        approvedDate: status === "accepted" || status === "paid" ? approvedDate || undefined : undefined,
         declineReason: status === "declined" ? declineReason : undefined,
         paidAmount: status === "paid" ? paidAmount : undefined,
         paidDate: status === "paid" ? paidDate || undefined : undefined,
@@ -81,7 +84,7 @@ export function RebatePipeline({ job, onUpdate }: Props) {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const cfg = statusConfig[status];
+  const cfg = statusConfig[status] || statusConfig.none;
   const Icon = cfg.icon;
 
   return (
@@ -192,15 +195,16 @@ export function RebatePipeline({ job, onUpdate }: Props) {
             <div>
               <label className="block text-[11px] font-medium text-gray-500 mb-1">Status</label>
               <Select value={status} onChange={(e) => setStatus(e.target.value as RebateStatus)} className="text-sm h-9">
-                <option value="not_submitted">Not Submitted</option>
+                <option value="none">None</option>
+                <option value="calculated">Calculated</option>
                 <option value="submitted">Submitted</option>
-                <option value="approved">Approved</option>
+                <option value="accepted">Accepted</option>
                 <option value="declined">Declined</option>
                 <option value="paid">Paid</option>
               </Select>
             </div>
 
-            {status !== "not_submitted" && (
+            {status !== "none" && status !== "calculated" && (
               <>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-500 mb-1">Claimed Amount ($)</label>
@@ -234,7 +238,7 @@ export function RebatePipeline({ job, onUpdate }: Props) {
               </>
             )}
 
-            {(status === "approved" || status === "paid") && (
+            {(status === "accepted" || status === "paid") && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-gray-500 mb-1">Approved Amount ($)</label>

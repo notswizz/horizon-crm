@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
+import { db } from "@/lib/firebase-admin";
 import { fetchAllJobs, fetchAllForms } from "@/lib/firestore-helpers";
-import { estimateJobValue } from "@/lib/utils";
-import { AnalyticsData, JobStage } from "@/types";
+import { estimateJobValue, DEFAULT_WEIGHTS, calculateTotalRevenueValue, DEFAULT_VALUATION } from "@/lib/utils";
+import { AnalyticsData, JobStage, DatasetValueWeights, DatasetValuationConfig } from "@/types";
 
 export async function GET() {
   try {
     const jobs = await fetchAllJobs();
     const allFormsData = await fetchAllForms();
+
+    // Fetch dataset value weights from config
+    const configDoc = await db.doc("config/dropdowns").get();
+    const weights: DatasetValueWeights = (configDoc.exists && configDoc.data()?.datasetValueWeights) || DEFAULT_WEIGHTS;
+    const valuation: DatasetValuationConfig = (configDoc.exists && configDoc.data()?.datasetValuation) || DEFAULT_VALUATION;
 
     // Jobs by stage
     const jobsByStage: Record<JobStage, number> = {
@@ -23,8 +29,11 @@ export async function GET() {
     let estimatedValue = 0;
     for (const job of jobs) {
       const jobForms = allFormsData.find((f) => f.jobId === job.id)?.forms || [];
-      estimatedValue += estimateJobValue(job, jobForms);
+      estimatedValue += estimateJobValue(job, jobForms, weights);
     }
+
+    // Revenue-based dataset value
+    const revenueResult = calculateTotalRevenueValue(jobs, valuation);
 
     // Issues by category
     const categoryMap: Record<string, number> = {};
@@ -43,8 +52,8 @@ export async function GET() {
       .slice(0, 15);
 
     // Rebate breakdown
-    const rebateMap: Record<string, number> = { pending: 0, approved: 0, declined: 0 };
-    jobs.forEach((j) => { rebateMap[j.rebateOutcome]++; });
+    const rebateMap: Record<string, number> = { none: 0, calculated: 0, submitted: 0, accepted: 0, declined: 0, paid: 0 };
+    jobs.forEach((j) => { rebateMap[j.rebateStatus]++; });
     const rebateBreakdown = Object.entries(rebateMap).map(([outcome, count]) => ({ outcome, count }));
 
     // Jobs over time (last 30 days)
@@ -107,6 +116,9 @@ export async function GET() {
       totalIssues,
       totalFixes,
       estimatedValue,
+      revenueDatasetValue: revenueResult.totalValue,
+      acceptedRevenue: revenueResult.totalRevenue,
+      paidRevenue: 0,
       jobsByStage,
       issuesByCategory,
       rebateBreakdown,

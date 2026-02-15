@@ -47,12 +47,6 @@ const STAGE_COLORS: Record<string, string> = {
   Cancelled: "#EF4444",
 };
 
-const REBATE_COLORS: Record<string, string> = {
-  pending: "#9CA3AF",
-  approved: "#10B981",
-  declined: "#EF4444",
-};
-
 const tooltipStyle = {
   borderRadius: 8,
   border: "1px solid #e5e7eb",
@@ -96,17 +90,13 @@ export default function DashboardPage() {
       value,
     }));
 
-  const totalRebates = analytics.rebateBreakdown.reduce((s, r) => s + r.count, 0);
-  const approvedRebates = analytics.rebateBreakdown.find((r) => r.outcome === "approved");
-  const approvalRate = totalRebates > 0 && approvedRebates ? Math.round((approvedRebates.count / totalRebates) * 100) : 0;
-
   // Pipeline metrics from rebate data
   const totalPipeline = allJobs
     .filter((j) => j.rebate?.status === "submitted")
     .reduce((sum, j) => sum + (j.rebate?.claimedAmount || j.rebate?.estimatedRebate || 0), 0);
 
   const approvedPending = allJobs
-    .filter((j) => j.rebate?.status === "approved")
+    .filter((j) => j.rebate?.status === "accepted")
     .reduce((sum, j) => sum + (j.rebate?.approvedAmount || 0), 0);
 
   const totalPaid = allJobs
@@ -136,19 +126,23 @@ export default function DashboardPage() {
     <div className="space-y-8 max-w-[1400px]">
       {/* Row 1: KPI Cards */}
       <div className="grid grid-cols-12 gap-4">
-        {/* Hero: Dataset Value — 4 cols */}
+        {/* Hero: Dataset Values — split card */}
         <Card className="col-span-12 lg:col-span-4 overflow-hidden border-0 shadow-lg">
-          <div className="relative p-6 bg-gradient-to-br from-[#FF6B35] via-[#FF8C61] to-[#E5532D] text-white">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-medium text-white/70 uppercase tracking-wider">Dataset Value</span>
-              <div className="p-2 rounded-lg bg-white/15 backdrop-blur">
-                <DollarSign className="h-5 w-5" />
-              </div>
+          <div className="grid grid-cols-2 h-full">
+            <div className="p-5 bg-gradient-to-br from-[#FF6B35] via-[#FF8C61] to-[#E5532D] text-white">
+              <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Point-Based</span>
+              <p className="text-3xl font-extrabold leading-none tracking-tight mt-1">{formatCurrency(analytics.estimatedValue)}</p>
+              <p className="text-[11px] text-white/50 mt-2">
+                {formatCurrency(analytics.totalJobs > 0 ? analytics.estimatedValue / analytics.totalJobs : 0)}/avg
+              </p>
             </div>
-            <p className="text-[44px] font-extrabold leading-none tracking-tight">{formatCurrency(analytics.estimatedValue)}</p>
-            <p className="text-sm text-white/60 mt-2">
-              {formatCurrency(analytics.totalJobs > 0 ? analytics.estimatedValue / analytics.totalJobs : 0)}/avg
-            </p>
+            <div className="p-5 bg-gradient-to-br from-[#7C3AED] via-[#8B5CF6] to-[#6D28D9] text-white">
+              <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Revenue-Based</span>
+              <p className="text-3xl font-extrabold leading-none tracking-tight mt-1">{formatCurrency(analytics.revenueDatasetValue)}</p>
+              <p className="text-[11px] text-white/50 mt-2">
+                {formatCurrency(analytics.totalJobs > 0 ? analytics.revenueDatasetValue / analytics.totalJobs : 0)}/avg
+              </p>
+            </div>
           </div>
         </Card>
 
@@ -224,7 +218,7 @@ export default function DashboardPage() {
           <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Approved</span>
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Accepted</span>
                 <div className="p-1.5 rounded-lg bg-green-50">
                   <CheckCircle className="h-3.5 w-3.5 text-green-500" />
                 </div>
@@ -263,6 +257,46 @@ export default function DashboardPage() {
           </Card>
         </div>
       )}
+
+      {/* Recent Jobs — full width */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold">Recent Jobs</h3>
+          <Link href="/jobs" className="text-xs text-[#FF6B35] font-semibold hover:underline flex items-center gap-1">
+            View all <ArrowRight size={12} />
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+          {recentJobs.slice(0, 5).map((job) => (
+            <Link key={job.id} href={`/jobs/${job.id}`} className="group">
+              <Card className="h-full hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                <div className="h-28 bg-gradient-to-br from-gray-100 to-gray-50 rounded-t-xl overflow-hidden">
+                  {job.houseImageURL ? (
+                    <img src={job.houseImageURL} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Camera className="h-8 w-8 text-gray-200" />
+                    </div>
+                  )}
+                </div>
+                <CardContent className="p-4">
+                  <p className="text-sm font-semibold leading-snug group-hover:text-[#FF6B35] transition-colors mb-2">
+                    {job.streetAddress || "Untitled"}
+                  </p>
+                  <p className="text-xs text-gray-400 mb-3">
+                    {job.photoCount} photo{job.photoCount !== 1 ? "s" : ""} &middot; {job.issueCount} issue{job.issueCount !== 1 ? "s" : ""}
+                    {job.fixCount > 0 && <> &middot; {job.fixCount} fix{job.fixCount !== 1 ? "es" : ""}</>}
+                  </p>
+                  <div className="flex items-center justify-between text-[11px] text-gray-400">
+                    <span>{formatDate(job.createdAt)}</span>
+                    <StageBadge stage={job.currentStage} size="sm" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </div>
 
       {/* Row 2: Jobs Over Time + Stage Donut — 8+4 */}
       <div className="grid grid-cols-12 gap-6">
@@ -414,28 +448,28 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Row 4: Top Inspectors + Rebate Outcomes — 8+4 */}
-      <div className="grid grid-cols-12 gap-6">
-        <Card className="col-span-12 lg:col-span-8">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-6">
+      {/* Row 4: Top Inspectors + Rebate Outcomes + Materials — 4+4+4 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-4">
               <Users className="h-4 w-4 text-gray-400" />
               <h3 className="text-sm font-semibold">Top Inspectors</h3>
             </div>
             {analytics.topInspectors.length > 0 ? (
-              <div className="space-y-3">
-                {analytics.topInspectors.slice(0, 6).map((inspector, i) => {
+              <div className="space-y-2.5">
+                {analytics.topInspectors.slice(0, 5).map((inspector, i) => {
                   const max = analytics.topInspectors[0].count;
                   const pct = max > 0 ? (inspector.count / max) * 100 : 0;
                   return (
-                    <div key={inspector.name} className="flex items-center gap-3">
-                      <div className="w-6 text-xs font-bold text-gray-300 text-right">{i + 1}</div>
+                    <div key={inspector.name} className="flex items-center gap-2.5">
+                      <div className="w-5 text-[11px] font-bold text-gray-300 text-right">{i + 1}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium truncate">{inspector.name}</span>
-                          <span className="text-sm font-bold text-gray-700 ml-2">{inspector.count}</span>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-xs font-medium truncate">{inspector.name}</span>
+                          <span className="text-xs font-bold text-gray-700 ml-2">{inspector.count}</span>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all"
                             style={{
@@ -454,123 +488,92 @@ export default function DashboardPage() {
                 })}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-300">
-                <Users className="h-10 w-10 mb-2" />
-                <p className="text-sm">No inspector data yet</p>
+              <div className="flex flex-col items-center justify-center py-8 text-gray-300">
+                <Users className="h-8 w-8 mb-2" />
+                <p className="text-xs">No inspector data yet</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="col-span-12 lg:col-span-4">
-          <CardContent className="p-6">
-            <h3 className="text-sm font-semibold mb-6">Rebate Outcomes</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={analytics.rebateBreakdown}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={85}
-                  dataKey="count"
-                  paddingAngle={3}
-                  strokeWidth={0}
-                >
-                  {analytics.rebateBreakdown.map((entry) => (
-                    <Cell key={entry.outcome} fill={REBATE_COLORS[entry.outcome] || "#9CA3AF"} />
-                  ))}
-                  <Label
-                    value={`${approvalRate}%`}
-                    position="center"
-                    className="text-xl font-bold"
-                    fill="#10B981"
-                  />
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-            <p className="text-center text-xs text-gray-400 mt-2">{approvalRate}% approval rate</p>
-            <div className="flex justify-center gap-5 mt-4">
-              {analytics.rebateBreakdown.map((r) => (
-                <div key={r.outcome} className="flex items-center gap-2 text-sm">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: REBATE_COLORS[r.outcome] || "#9CA3AF" }} />
-                  <span className="capitalize text-gray-600">{r.outcome}</span>
-                  <span className="font-bold">{r.count}</span>
-                </div>
-              ))}
-            </div>
+        <Card>
+          <CardContent className="p-5">
+            <h3 className="text-sm font-semibold mb-4">Fix Rate</h3>
+            {(() => {
+              const fixRate = analytics.totalIssues > 0
+                ? Math.round((analytics.totalFixes / analytics.totalIssues) * 100)
+                : 0;
+              const circumference = 2 * Math.PI * 62;
+              const offset = circumference - (fixRate / 100) * circumference;
+              const color = fixRate >= 80 ? "#10B981" : fixRate >= 50 ? "#F59E0B" : "#EF4444";
+              return (
+                <>
+                  <div className="flex justify-center">
+                    <div className="relative w-[160px] h-[160px]">
+                      <svg viewBox="0 0 140 140" className="w-full h-full -rotate-90">
+                        <circle cx="70" cy="70" r="62" fill="none" stroke="#f3f4f6" strokeWidth="10" />
+                        <circle
+                          cx="70" cy="70" r="62" fill="none"
+                          stroke={color}
+                          strokeWidth="10"
+                          strokeLinecap="round"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={offset}
+                          className="transition-all duration-700"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-3xl font-bold" style={{ color }}>{fixRate}%</span>
+                        <span className="text-[10px] text-gray-400">resolved</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-center gap-6 mt-3">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-red-500">{analytics.totalIssues}</p>
+                      <p className="text-[10px] text-gray-400">Issues</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-emerald-500">{analytics.totalFixes}</p>
+                      <p className="text-[10px] text-gray-400">Fixes</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-gray-400">{analytics.totalIssues - analytics.totalFixes}</p>
+                      <p className="text-[10px] text-gray-400">Open</p>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Row 5: Materials + Recent Jobs */}
-      <div className="grid grid-cols-12 gap-6">
-        {/* Materials */}
-        {analytics.materialsByType.length > 0 && (
-          <Card className="col-span-12 lg:col-span-4">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Package className="h-4 w-4 text-gray-400" />
-                <h3 className="text-sm font-semibold">Materials Used</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Package className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold">Materials Used</h3>
+            </div>
+            {analytics.materialsByType.length > 0 ? (
+              <div className="space-y-2">
                 {analytics.materialsByType.map((mat) => (
                   <div
                     key={mat.type}
-                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-gray-50"
                   >
                     <span className="text-xs font-medium capitalize text-gray-600 truncate">{mat.type}</span>
                     <span className="text-sm font-bold text-gray-800 ml-2">{mat.count}</span>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Recent Jobs */}
-        <div className={analytics.materialsByType.length > 0 ? "col-span-12 lg:col-span-8" : "col-span-12"}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold">Recent Jobs</h3>
-            <Link href="/jobs" className="text-xs text-[#FF6B35] font-semibold hover:underline flex items-center gap-1">
-              View all <ArrowRight size={12} />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {recentJobs.slice(0, 4).map((job) => (
-              <Link key={job.id} href={`/jobs/${job.id}`} className="group">
-                <Card className="h-full hover:shadow-lg hover:-translate-y-0.5 transition-all">
-                  <div className="h-28 bg-gradient-to-br from-gray-100 to-gray-50 rounded-t-xl overflow-hidden">
-                    {job.houseImageURL ? (
-                      <img src={job.houseImageURL} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Camera className="h-8 w-8 text-gray-200" />
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <p className="text-sm font-semibold truncate group-hover:text-[#FF6B35] transition-colors">
-                        {job.address || "Untitled"}
-                      </p>
-                      <StageBadge stage={job.currentStage} size="sm" />
-                    </div>
-                    <p className="text-xs text-gray-400 mb-3">
-                      {job.photoCount} photo{job.photoCount !== 1 ? "s" : ""} &middot; {job.issueCount} issue{job.issueCount !== 1 ? "s" : ""}
-                      {job.fixCount > 0 && <> &middot; {job.fixCount} fix{job.fixCount !== 1 ? "es" : ""}</>}
-                    </p>
-                    <div className="flex items-center justify-between text-[11px] text-gray-400">
-                      <span>{formatDate(job.createdAt)}</span>
-                      <ArrowUpRight size={14} className="text-gray-300 group-hover:text-[#FF6B35] transition-colors" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-gray-300">
+                <Package className="h-8 w-8 mb-2" />
+                <p className="text-xs">No materials yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -4,11 +4,11 @@ import { useEffect, useState, use } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PhotoLightbox, buildLightboxPhotos } from "@/components/shared/photo-lightbox";
-import { formatDate, formatCurrency, severityConfig, estimateJobValue, stageConfig } from "@/lib/utils";
-import { Job, InspectionForm, JobStage, IssuePhoto, FixPhoto } from "@/types";
+import { formatDate, formatCurrency, severityConfig, estimateJobValue, stageConfig, DEFAULT_WEIGHTS, calculateJobRevenueValue, DEFAULT_VALUATION } from "@/lib/utils";
+import { Job, InspectionForm, JobStage, IssuePhoto, FixPhoto, DatasetValueWeights, DatasetValuationConfig } from "@/types";
 import {
   Loader2, MapPin, User, Phone, Mail, Camera, AlertTriangle,
-  ChevronRight, Package, CheckCircle, Database,
+  ChevronRight, Package, CheckCircle, Database, DollarSign,
 } from "lucide-react";
 import Link from "next/link";
 import { RebateCalculator } from "@/components/rebate/rebate-calculator";
@@ -24,6 +24,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [lightboxPhotos, setLightboxPhotos] = useState<ReturnType<typeof buildLightboxPhotos> | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [notesExpanded, setNotesExpanded] = useState(false);
+  const [weights, setWeights] = useState<DatasetValueWeights>(DEFAULT_WEIGHTS);
+  const [valuation, setValuation] = useState<DatasetValuationConfig>(DEFAULT_VALUATION);
 
   useEffect(() => {
     fetch(`/api/jobs/${id}`)
@@ -33,6 +35,12 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         setForms(data.forms || []);
         setEditStage(data.job.currentStage);
         setLoading(false);
+      });
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cfg.datasetValueWeights) setWeights(cfg.datasetValueWeights);
+        if (cfg.datasetValuation) setValuation(cfg.datasetValuation);
       });
   }, [id]);
 
@@ -76,7 +84,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const allIssues: IssuePhoto[] = forms.flatMap((f) => f.spots.flatMap((s) => s.issuePhotos));
   const allFixes: FixPhoto[] = forms.flatMap((f) => f.spots.flatMap((s) => s.fixPhotos));
   const allMaterials = forms.flatMap((f) => f.spots.flatMap((s) => s.materials));
-  const datasetValue = estimateJobValue(job, forms);
+  const datasetValue = estimateJobValue(job, forms, weights);
+  const revenueValue = calculateJobRevenueValue(job, valuation);
 
   const openLightbox = (photos: ReturnType<typeof buildLightboxPhotos>, index: number) => {
     setLightboxPhotos(photos);
@@ -130,12 +139,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           )}
         </div>
 
-        {job.rebateOutcome !== "pending" && (
+        {job.rebateStatus !== "none" && job.rebateStatus !== "calculated" && (
           <div className="absolute bottom-3 right-3">
-            <span className={`text-[11px] font-bold text-white backdrop-blur-xl bg-white/15 px-2.5 py-1 rounded-full border ${job.rebateOutcome === "approved" ? "border-emerald-400" : "border-red-400"}`}>
-              {job.rebateOutcome === "approved" && job.rebateAmount > 0
-                ? `$${Math.round(job.rebateAmount).toLocaleString()}`
-                : job.rebateOutcome === "approved" ? "Approved" : "Declined"}
+            <span className={`text-[11px] font-bold text-white backdrop-blur-xl bg-white/15 px-2.5 py-1 rounded-full border ${job.rebateStatus === "declined" ? "border-red-400" : "border-emerald-400"}`}>
+              {job.rebateStatus === "paid" && job.rebateAmount > 0
+                ? `$${Math.round(job.rebateAmount).toLocaleString()} Paid`
+                : job.rebateStatus === "accepted" && job.rebateAmount > 0
+                  ? `$${Math.round(job.rebateAmount).toLocaleString()}`
+                  : job.rebateStatus === "declined" ? "Declined"
+                    : job.rebateStatus.charAt(0).toUpperCase() + job.rebateStatus.slice(1)}
             </span>
           </div>
         )}
@@ -175,13 +187,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         ))}
 
-        {datasetValue > 0 && (
+        {(datasetValue > 0 || revenueValue > 0) && (
           <>
             <div className="w-px h-4 bg-gray-200 mx-1" />
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50">
-              <Database size={11} className="text-gray-400" />
-              <span className="text-[11px] text-gray-500">{formatCurrency(datasetValue)}</span>
-            </div>
+            {datasetValue > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50">
+                <Database size={11} className="text-gray-400" />
+                <span className="text-[11px] text-gray-500">{formatCurrency(datasetValue)}</span>
+                <span className="text-[9px] text-gray-400">pts</span>
+              </div>
+            )}
+            {revenueValue > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50">
+                <DollarSign size={11} className="text-orange-400" />
+                <span className="text-[11px] text-orange-600 font-medium">{formatCurrency(revenueValue)}</span>
+                <span className="text-[9px] text-orange-400">rev</span>
+              </div>
+            )}
           </>
         )}
 

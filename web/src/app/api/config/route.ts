@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
-import { DropdownConfig } from "@/types";
+import { DropdownConfig, DatasetValuationConfig } from "@/types";
 
 const CONFIG_DOC = "config/dropdowns";
 
@@ -81,6 +81,8 @@ export async function GET() {
       jobTypes: (data.jobTypes as string[]) || DEFAULTS.jobTypes,
       issueCategories,
       materialTypes: (data.materialTypes as string[]) || DEFAULTS.materialTypes,
+      datasetValueWeights: data.datasetValueWeights || undefined,
+      datasetValuation: (data.datasetValuation as DatasetValuationConfig) || undefined,
     });
   } catch (error) {
     console.error("Error fetching config:", error);
@@ -96,6 +98,8 @@ export async function PUT(request: Request) {
     if (body.jobTypes) update.jobTypes = body.jobTypes;
     if (body.issueCategories) update.issueCategories = body.issueCategories;
     if (body.materialTypes) update.materialTypes = body.materialTypes;
+    if (body.datasetValueWeights) update.datasetValueWeights = body.datasetValueWeights;
+    if (body.datasetValuation) update.datasetValuation = body.datasetValuation;
 
     await db.doc(CONFIG_DOC).set(update, { merge: true });
 

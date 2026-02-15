@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { StageBadge } from "@/components/shared/stage-badge";
 import { RebateBadge } from "@/components/shared/rebate-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Job, JobStage, RebateOutcome } from "@/types";
+import { Job, JobStage, RebateStatus } from "@/types";
 import Image from "next/image";
 import { Search, Loader2, Trash2, Download, ChevronLeft, ChevronRight, Plus, X, MapPin, User, Phone, Mail, FileText, Home } from "lucide-react";
 
@@ -75,7 +75,7 @@ export default function JobsPage() {
     const rows = jobs
       .filter((j) => selected.size === 0 || selected.has(j.id))
       .map((j) =>
-        `"${j.address}","${j.contactName}",${j.currentStage},${j.rebateOutcome},${j.photoCount},${j.issueCount},${j.fixCount},${new Date(j.createdAt).toISOString()}`
+        `"${j.address}","${j.contactName}",${j.currentStage},${j.rebateStatus},${j.photoCount},${j.issueCount},${j.fixCount},${new Date(j.createdAt).toISOString()}`
       )
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv" });
@@ -134,7 +134,7 @@ export default function JobsPage() {
             </Select>
             <Select value={rebateFilter} onChange={(e) => { setRebateFilter(e.target.value); setPage(1); }} className="w-40">
               <option value="">All Rebates</option>
-              {(["pending", "approved", "declined"] as RebateOutcome[]).map((r) => (
+              {(["none", "calculated", "submitted", "accepted", "declined", "paid"] as RebateStatus[]).map((r) => (
                 <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
               ))}
             </Select>
@@ -225,7 +225,7 @@ export default function JobsPage() {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
-                        <RebateBadge outcome={job.rebateOutcome} />
+                        <RebateBadge status={job.rebateStatus} />
                         {job.rebateAmount > 0 && (
                           <span className="text-xs font-semibold text-emerald-600">{formatCurrency(job.rebateAmount)}</span>
                         )}

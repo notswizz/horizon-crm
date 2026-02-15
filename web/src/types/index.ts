@@ -7,7 +7,6 @@ export type JobStage =
   | "completed"
   | "cancelled";
 
-export type RebateOutcome = "pending" | "approved" | "declined";
 
 export type JobType =
   | "Insulation"
@@ -25,7 +24,7 @@ export type IssueSeverity = "critical" | "major" | "minor";
 export type IncomeTier = "below_80" | "80_to_150" | "above_150";
 export type RebateProgram = "HER" | "HEAR" | "both";
 export type HERTier = "$2k" | "$4k" | "$10k" | "$16k";
-export type RebateStatus = "not_submitted" | "submitted" | "approved" | "declined" | "paid";
+export type RebateStatus = "none" | "calculated" | "submitted" | "accepted" | "declined" | "paid";
 
 export interface HEARItem {
   id: string;
@@ -107,7 +106,7 @@ export interface Job {
   notes: string;
   currentStage: JobStage;
   rebateAmount: number;
-  rebateOutcome: RebateOutcome;
+  rebateStatus: RebateStatus;
   houseImageURL: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -176,10 +175,26 @@ export interface IssueCategoryConfig {
   jobTypes: string[]; // empty = applies to ALL job types
 }
 
+export interface DatasetValueWeights {
+  basePoints: number;       // flat base per job (default 5)
+  photoPoints: number;      // points per photo (default 2)
+  issuePoints: number;      // points per issue (default 3)
+  rebateMultiplier: number; // multiplier when rebate has result (default 1.5)
+  pairMultiplier: number;   // multiplier when >80% issues have fixes (default 1.3)
+  pairThreshold: number;    // % threshold to trigger pair multiplier (default 80)
+  materialMultiplier: number; // multiplier when cost data exists (default 1.2)
+}
+
+export interface DatasetValuationConfig {
+  basePercent: number;      // % of rebate revenue (default 10)
+}
+
 export interface DropdownConfig {
   jobTypes: string[];
   issueCategories: IssueCategoryConfig[];
   materialTypes: string[];
+  datasetValueWeights?: DatasetValueWeights;
+  datasetValuation?: DatasetValuationConfig;
 }
 
 // ─── Derived / UI Types ────────────────────────────────────────────────
@@ -205,6 +220,9 @@ export interface AnalyticsData {
   totalIssues: number;
   totalFixes: number;
   estimatedValue: number;
+  revenueDatasetValue: number;
+  acceptedRevenue: number;
+  paidRevenue: number;
   jobsByStage: Record<JobStage, number>;
   issuesByCategory: { category: string; count: number }[];
   rebateBreakdown: { outcome: string; count: number }[];

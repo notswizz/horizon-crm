@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { DropdownConfig, IssueCategoryConfig } from "@/types";
+import { DropdownConfig, IssueCategoryConfig, DatasetValueWeights, DatasetValuationConfig } from "@/types";
+import { DEFAULT_WEIGHTS, DEFAULT_VALUATION } from "@/lib/utils";
 import {
   Loader2,
   Plus,
@@ -13,6 +14,9 @@ import {
   Package,
   Check,
   ChevronDown,
+  Database,
+  DollarSign,
+  Info,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -66,7 +70,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-7xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
@@ -96,29 +100,54 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      <SimpleList
-        title="Job Types"
-        description="Types of work that can be assigned to a job"
-        icon={<Briefcase className="h-4 w-4 text-[#FF6B35]" />}
-        items={config.jobTypes}
-        onChange={(v) => updateList("jobTypes", v)}
-        placeholder="e.g. Window Replacement"
-      />
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] gap-6">
+        {/* Left: Job Types + Material Types */}
+        <div className="space-y-6">
+          <SimpleList
+            title="Job Types"
+            description="Types of work that can be assigned to a job"
+            icon={<Briefcase className="h-4 w-4 text-[#FF6B35]" />}
+            items={config.jobTypes}
+            onChange={(v) => updateList("jobTypes", v)}
+            placeholder="e.g. Window Replacement"
+          />
 
-      <IssueCategoryList
-        categories={config.issueCategories}
-        jobTypes={config.jobTypes}
-        onChange={updateCategories}
-      />
+          <SimpleList
+            title="Material Types"
+            description="Types of materials used in fixes"
+            icon={<Package className="h-4 w-4 text-blue-500" />}
+            items={config.materialTypes}
+            onChange={(v) => updateList("materialTypes", v)}
+            placeholder="e.g. Spray Foam"
+          />
+        </div>
 
-      <SimpleList
-        title="Material Types"
-        description="Types of materials used in fixes"
-        icon={<Package className="h-4 w-4 text-blue-500" />}
-        items={config.materialTypes}
-        onChange={(v) => updateList("materialTypes", v)}
-        placeholder="e.g. Spray Foam"
-      />
+        {/* Center: Issue Categories */}
+        <IssueCategoryList
+          categories={config.issueCategories}
+          jobTypes={config.jobTypes}
+          onChange={updateCategories}
+        />
+
+        {/* Right: Dataset Value Formulas stacked */}
+        <div className="space-y-6">
+          <DatasetValueEditor
+            weights={config.datasetValueWeights || DEFAULT_WEIGHTS}
+            onChange={(w) => {
+              setConfig({ ...config, datasetValueWeights: w });
+              setDirty(true);
+            }}
+          />
+
+          <DatasetValuationEditor
+            config={config.datasetValuation || DEFAULT_VALUATION}
+            onChange={(v) => {
+              setConfig({ ...config, datasetValuation: v });
+              setDirty(true);
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -286,7 +315,7 @@ function IssueCategoryList({
           Categories inspectors choose when documenting issues. Link to job types or leave empty for all.
         </p>
 
-        <div className="space-y-0.5 max-h-[280px] overflow-y-auto pr-1">
+        <div className="space-y-0.5 max-h-[500px] overflow-y-auto pr-1">
           {categories.map((cat, i) => (
             <div key={cat.name} className="group">
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-50 transition-colors">
@@ -419,4 +448,152 @@ function IssueCategoryList({
       </CardContent>
     </Card>
   );
+}
+
+// ─── Dataset Value Weights Editor ─────────────────────────────────────
+
+function DatasetValueEditor({
+  weights,
+  onChange,
+}: {
+  weights: DatasetValueWeights;
+  onChange: (weights: DatasetValueWeights) => void;
+}) {
+  function update(key: keyof DatasetValueWeights, value: number) {
+    onChange({ ...weights, [key]: value });
+  }
+
+  const points: { key: keyof DatasetValueWeights; label: string }[] = [
+    { key: "basePoints", label: "Base" },
+    { key: "photoPoints", label: "Photo" },
+    { key: "issuePoints", label: "Issue" },
+  ];
+
+  const multipliers: { key: keyof DatasetValueWeights; label: string; step: number }[] = [
+    { key: "rebateMultiplier", label: "Rebate", step: 0.1 },
+    { key: "pairMultiplier", label: "Pair", step: 0.1 },
+    { key: "materialMultiplier", label: "Material", step: 0.1 },
+  ];
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Database className="h-4 w-4 text-emerald-500" />
+          <h3 className="text-sm font-semibold">Dataset Value Formula</h3>
+        </div>
+        <p className="text-xs text-gray-400 mb-4">
+          (base + photos &times; pts + issues &times; pts) &times; multipliers
+        </p>
+
+        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Points</label>
+        <div className="grid grid-cols-3 gap-2 mt-1.5 mb-4">
+          {points.map((f) => (
+            <div key={f.key}>
+              <label className="block text-[10px] text-gray-500 mb-0.5">{f.label}</label>
+              <input
+                type="number"
+                value={weights[f.key]}
+                onChange={(e) => update(f.key, Number(e.target.value))}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+              />
+            </div>
+          ))}
+        </div>
+
+        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Multipliers</label>
+        <div className="grid grid-cols-3 gap-2 mt-1.5 mb-4">
+          {multipliers.map((f) => (
+            <div key={f.key}>
+              <label className="block text-[10px] text-gray-500 mb-0.5">{f.label}</label>
+              <input
+                type="number"
+                value={weights[f.key]}
+                onChange={(e) => update(f.key, Number(e.target.value))}
+                step={f.step}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-[10px] text-gray-500">Pair Threshold</label>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <input
+                type="number"
+                value={weights.pairThreshold}
+                onChange={(e) => update("pairThreshold", Number(e.target.value))}
+                className="w-16 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+              />
+              <span className="text-xs text-gray-400">%</span>
+            </div>
+          </div>
+          <button
+            onClick={() => onChange({ ...DEFAULT_WEIGHTS })}
+            className="text-[11px] text-gray-400 hover:text-[#FF6B35] transition-colors"
+          >
+            Reset defaults
+          </button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Revenue-Based Dataset Valuation Editor ──────────────────────────
+
+function DatasetValuationEditor({
+  config,
+  onChange,
+}: {
+  config: DatasetValuationConfig;
+  onChange: (config: DatasetValuationConfig) => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <DollarSign className="h-4 w-4 text-purple-600" />
+          <h3 className="text-sm font-semibold">Revenue-Based Valuation</h3>
+        </div>
+        <p className="text-xs text-gray-400 mb-4">
+          Rebate Revenue &times; Base %
+        </p>
+
+        <div>
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+            % of Rebate Revenue
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={config.basePercent}
+              onChange={(e) => onChange({ basePercent: Number(e.target.value) })}
+              min={0}
+              max={100}
+              step={0.5}
+              className="w-20 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+            />
+            <span className="text-xs text-gray-400">%</span>
+            <span className="text-[10px] text-gray-400 ml-1">5-15% typical</span>
+          </div>
+        </div>
+
+        <div className="flex justify-end mt-3">
+          <button
+            onClick={() => onChange({ basePercent: 10 })}
+            className="text-[11px] text-gray-400 hover:text-[#FF6B35] transition-colors"
+          >
+            Reset default
+          </button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function fmtCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(amount);
 }

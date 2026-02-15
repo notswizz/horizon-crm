@@ -1,5 +1,5 @@
 import { db } from "./firebase-admin";
-import { Job, InspectionForm, JobStage, RebateOutcome, IssueSeverity } from "@/types";
+import { Job, InspectionForm, JobStage, RebateStatus, IssueSeverity } from "@/types";
 import { toDate } from "./utils";
 
 // ─── Normalize Firestore enum values ────────────────────────────────────
@@ -17,15 +17,21 @@ function normalizeStage(raw: unknown): JobStage {
   return STAGE_MAP[raw.toLowerCase().replace(/[\s_-]/g, "")] || "auditPending";
 }
 
-const REBATE_MAP: Record<string, RebateOutcome> = {
-  pending: "pending",
-  approved: "approved",
+const REBATE_STATUS_MAP: Record<string, RebateStatus> = {
+  none: "none",
+  pending: "none",
+  not_submitted: "none",
+  calculated: "calculated",
+  submitted: "submitted",
+  accepted: "accepted",
+  approved: "accepted",
   declined: "declined",
+  paid: "paid",
 };
 
-function normalizeRebate(raw: unknown): RebateOutcome {
-  if (typeof raw !== "string" || !raw) return "pending";
-  return REBATE_MAP[raw.toLowerCase()] || "pending";
+function normalizeRebateStatus(raw: unknown): RebateStatus {
+  if (typeof raw !== "string" || !raw) return "none";
+  return REBATE_STATUS_MAP[raw.toLowerCase()] || "none";
 }
 
 const SEVERITY_MAP: Record<string, IssueSeverity> = {
@@ -47,15 +53,12 @@ export function parseJob(doc: FirebaseFirestore.DocumentSnapshot): Job {
 
   // Derive rebateAmount from pipeline: paid > approved > claimed > estimated > legacy
   let rebateAmount = d.rebateAmount || 0;
-  let rebateOutcome: RebateOutcome = normalizeRebate(d.rebateOutcome);
+  let rebateStatus: RebateStatus = normalizeRebateStatus(d.rebateOutcome);
   if (rebateData) {
-    const status = rebateData.status as string;
+    rebateStatus = normalizeRebateStatus(rebateData.status);
     rebateAmount =
       rebateData.paidAmount || rebateData.approvedAmount ||
       rebateData.claimedAmount || rebateData.estimatedRebate || 0;
-    if (status === "paid" || status === "approved") rebateOutcome = "approved";
-    else if (status === "declined") rebateOutcome = "declined";
-    else rebateOutcome = "pending";
   }
 
   return {
@@ -73,7 +76,7 @@ export function parseJob(doc: FirebaseFirestore.DocumentSnapshot): Job {
     notes: d.notes || "",
     currentStage: normalizeStage(d.currentStage),
     rebateAmount,
-    rebateOutcome,
+    rebateStatus,
     houseImageURL: d.houseImageURL || null,
     latitude: typeof d.latitude === "number" ? d.latitude : null,
     longitude: typeof d.longitude === "number" ? d.longitude : null,

@@ -76,7 +76,7 @@ interface JobDef {
   contactEmail: string;
   notes: string;
   stage: string;
-  rebateOutcome: string;
+  rebateStatus: string;
   rebateAmount: number;
   houseIdx: number;
   spots: { title: string; jobType: string }[];
@@ -93,7 +93,7 @@ const JOBS: JobDef[] = [
     contactEmail: "marcus.j@email.com",
     notes: "Homeowner reports high energy bills. Suspects poor attic insulation.",
     stage: "Completed",
-    rebateOutcome: "Approved",
+    rebateStatus: "accepted",
     rebateAmount: 5000,
     houseIdx: 0,
     spots: [
@@ -112,7 +112,7 @@ const JOBS: JobDef[] = [
     contactEmail: "sarah.m@gmail.com",
     notes: "Large Victorian home. Multiple air sealing issues found during initial walkthrough.",
     stage: "Inspection Pending",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 1,
     spots: [
@@ -132,7 +132,7 @@ const JOBS: JobDef[] = [
     contactEmail: "dchen@outlook.com",
     notes: "New HVAC system installed. Needs final inspection before rebate approval.",
     stage: "Work In Progress",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 2,
     spots: [
@@ -150,7 +150,7 @@ const JOBS: JobDef[] = [
     contactEmail: "angela.w@yahoo.com",
     notes: "Crawlspace encapsulation project. Moisture issues in crawlspace causing mold concerns.",
     stage: "Completed",
-    rebateOutcome: "Approved",
+    rebateStatus: "accepted",
     rebateAmount: 3200,
     houseIdx: 3,
     spots: [
@@ -169,7 +169,7 @@ const JOBS: JobDef[] = [
     contactEmail: "jrivera@email.com",
     notes: "",
     stage: "Audit Pending",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 4,
     spots: [
@@ -187,7 +187,7 @@ const JOBS: JobDef[] = [
     contactEmail: "phughes@gmail.com",
     notes: "Duct sealing needed throughout. Older ductwork with visible tape repairs.",
     stage: "Inspection Pending",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 5,
     spots: [
@@ -207,7 +207,7 @@ const JOBS: JobDef[] = [
     contactEmail: "tgray@proton.me",
     notes: "1920s bungalow. Zero wall insulation confirmed by thermal camera. Full retrofit needed.",
     stage: "Work In Progress",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 6,
     spots: [
@@ -226,7 +226,7 @@ const JOBS: JobDef[] = [
     contactEmail: "nina.k@icloud.com",
     notes: "Townhome with shared walls. Ductwork in unconditioned attic losing efficiency.",
     stage: "Completed",
-    rebateOutcome: "Approved",
+    rebateStatus: "accepted",
     rebateAmount: 2800,
     houseIdx: 7,
     spots: [
@@ -244,7 +244,7 @@ const JOBS: JobDef[] = [
     contactEmail: "rokafor@gmail.com",
     notes: "Elderly homeowner, fixed income. Prioritize most impactful upgrades for rebate qualification.",
     stage: "Completed",
-    rebateOutcome: "Approved",
+    rebateStatus: "accepted",
     rebateAmount: 4500,
     houseIdx: 8,
     spots: [
@@ -264,7 +264,7 @@ const JOBS: JobDef[] = [
     contactEmail: "ltran@outlook.com",
     notes: "Condo unit. HVAC replacement — old 10 SEER unit. HOA approval obtained.",
     stage: "Inspection Pending",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 9,
     spots: [
@@ -283,7 +283,7 @@ const JOBS: JobDef[] = [
     contactEmail: "dwash@email.com",
     notes: "Craftsman bungalow. Crawlspace has standing water after rain events. Needs full encapsulation plus sump.",
     stage: "Work In Progress",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 10,
     spots: [
@@ -302,7 +302,7 @@ const JOBS: JobDef[] = [
     contactEmail: "ytanaka@gmail.com",
     notes: "Split-level home. Upper and lower attics need separate treatment. Recessed lights causing air leaks.",
     stage: "Audit Pending",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 11,
     spots: [
@@ -321,7 +321,7 @@ const JOBS: JobDef[] = [
     contactEmail: "creyes@yahoo.com",
     notes: "Duplex — left unit only. Tenant complaints about drafts and high heating bills.",
     stage: "Completed",
-    rebateOutcome: "Declined",
+    rebateStatus: "declined",
     rebateAmount: 0,
     houseIdx: 12,
     spots: [
@@ -341,7 +341,7 @@ const JOBS: JobDef[] = [
     contactEmail: "modom@proton.me",
     notes: "Ranch home. Ducts in crawlspace severely deteriorated. Full duct replacement recommended.",
     stage: "Work In Progress",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 13,
     spots: [
@@ -361,7 +361,7 @@ const JOBS: JobDef[] = [
     contactEmail: "apatel@gmail.com",
     notes: "New construction quality check. Builder cut corners on insulation and air sealing per homeowner.",
     stage: "Audit Pending",
-    rebateOutcome: "Pending",
+    rebateStatus: "none",
     rebateAmount: 0,
     houseIdx: 14,
     spots: [
@@ -381,7 +381,7 @@ const JOBS: JobDef[] = [
     contactEmail: "wduarte@email.com",
     notes: "High-rise condo. Limited scope — HVAC and window sealing only. Building engineer must be present.",
     stage: "Completed",
-    rebateOutcome: "Approved",
+    rebateStatus: "accepted",
     rebateAmount: 1800,
     houseIdx: 15,
     spots: [
@@ -544,7 +544,7 @@ function buildJobData(jobDef: JobDef, daysAgo: number) {
     notes: jobDef.notes,
     currentStage: jobDef.stage,
     rebateAmount: jobDef.rebateAmount,
-    rebateOutcome: jobDef.rebateOutcome,
+    rebateStatus: jobDef.rebateStatus,
     houseImageURL: HOUSES[jobDef.houseIdx % HOUSES.length],
     latitude: null,
     longitude: null,

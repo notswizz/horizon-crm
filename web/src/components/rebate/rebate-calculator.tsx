@@ -139,7 +139,7 @@ export function RebateCalculator({ job, onUpdate }: Props) {
         hearItems: hearCalc.items,
         hearTotal: hearCalc.total,
         estimatedRebate,
-        status: job.rebate?.status || "not_submitted",
+        status: job.rebate?.status || "calculated",
         claimedAmount: job.rebate?.claimedAmount,
         submittedDate: job.rebate?.submittedDate,
         claimNumber: job.rebate?.claimNumber,
@@ -343,6 +343,63 @@ export function RebateCalculator({ job, onUpdate }: Props) {
                 </div>
               )}
 
+              {/* Actual Costs */}
+              <div className="border-t pt-4">
+                <h4 className="text-xs font-semibold mb-3">Actual Costs (Internal)</h4>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Materials ($)</label>
+                    <Input type="number" value={materials || ""} onChange={(e) => setMaterials(Number(e.target.value))} placeholder="500" className="text-sm h-9" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Assessment Fee ($)</label>
+                    <Input type="number" value={assessmentFee || ""} onChange={(e) => setAssessmentFee(Number(e.target.value))} placeholder="500" className="text-sm h-9" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Labor Hours</label>
+                    <Input type="number" value={laborHours || ""} onChange={(e) => setLaborHours(Number(e.target.value))} placeholder="24" className="text-sm h-9" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Rate ($/hr)</label>
+                    <Input type="number" value={laborRate || ""} onChange={(e) => setLaborRate(Number(e.target.value))} placeholder="135" className="text-sm h-9" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Total Labor</label>
+                    <Input type="number" value={labor || ""} readOnly tabIndex={-1} className="text-sm h-9 bg-gray-50 text-gray-500 cursor-default" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Overhead ($)</label>
+                    <Input type="number" value={overhead || ""} onChange={(e) => setOverhead(Number(e.target.value))} placeholder="500" className="text-sm h-9" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Other ($)</label>
+                    <Input type="number" value={other || ""} onChange={(e) => setOther(Number(e.target.value))} placeholder="500" className="text-sm h-9" />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="p-2.5 bg-gray-50 rounded-lg">
+                    <p className="text-[10px] text-gray-500">Actual Costs</p>
+                    <p className="text-lg font-bold text-gray-900">${actualCosts.toLocaleString()}</p>
+                  </div>
+                  {billableAmount > 0 && (
+                    <div className="p-2.5 bg-gray-50 rounded-lg">
+                      <p className="text-[10px] text-gray-500">Markup</p>
+                      <p className={`text-lg font-bold ${markup > 0 ? "text-blue-600" : "text-red-600"}`}>
+                        {markup}%
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Billable Amount */}
               {program !== "HEAR" && (
                 <div className="border-t pt-4">
@@ -369,57 +426,6 @@ export function RebateCalculator({ job, onUpdate }: Props) {
                   </div>
                 </div>
               )}
-
-              {/* Actual Costs */}
-              <div className="border-t pt-4">
-                <h4 className="text-xs font-semibold mb-3">Actual Costs (Internal)</h4>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Materials ($)</label>
-                    <Input type="number" value={materials || ""} onChange={(e) => setMaterials(Number(e.target.value))} placeholder="500" className="text-sm h-9" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Assessment Fee ($)</label>
-                    <Input type="number" value={assessmentFee || ""} onChange={(e) => setAssessmentFee(Number(e.target.value))} placeholder="500" className="text-sm h-9" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Labor Hours</label>
-                    <Input type="number" value={laborHours || ""} onChange={(e) => setLaborHours(Number(e.target.value))} placeholder="24" className="text-sm h-9" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Labor Rate ($/hr)</label>
-                    <Input type="number" value={laborRate || ""} onChange={(e) => setLaborRate(Number(e.target.value))} placeholder="135" className="text-sm h-9" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Total Labor ($)</label>
-                    <Input type="number" value={labor || ""} onChange={(e) => setLabor(Number(e.target.value))} placeholder="Auto or manual" className="text-sm h-9" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Overhead ($)</label>
-                    <Input type="number" value={overhead || ""} onChange={(e) => setOverhead(Number(e.target.value))} placeholder="500" className="text-sm h-9" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Other ($)</label>
-                    <Input type="number" value={other || ""} onChange={(e) => setOther(Number(e.target.value))} placeholder="500" className="text-sm h-9" />
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="p-2.5 bg-gray-50 rounded-lg">
-                    <p className="text-[10px] text-gray-500">Actual Costs</p>
-                    <p className="text-lg font-bold text-gray-900">${actualCosts.toLocaleString()}</p>
-                  </div>
-                  {billableAmount > 0 && (
-                    <div className="p-2.5 bg-gray-50 rounded-lg">
-                      <p className="text-[10px] text-gray-500">Markup</p>
-                      <p className={`text-lg font-bold ${markup > 0 ? "text-blue-600" : "text-red-600"}`}>
-                        {markup}%
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
 
               {/* Rebate Summary */}
               <div className="border-t pt-4">

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { formatCurrency, estimateJobValue } from "@/lib/utils";
-import { Job, InspectionForm } from "@/types";
+import { formatCurrency, estimateJobValue, DEFAULT_WEIGHTS, calculateJobRevenueValue, DEFAULT_VALUATION } from "@/lib/utils";
+import { Job, InspectionForm, DatasetValueWeights, DatasetValuationConfig } from "@/types";
 import { Download, Loader2, FileJson, FileSpreadsheet, Shield, Briefcase, Camera, AlertTriangle, Wrench, DollarSign } from "lucide-react";
 
 export default function ExportPage() {
@@ -16,11 +16,19 @@ export default function ExportPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [formsMap, setFormsMap] = useState<Record<string, InspectionForm[]>>({});
   const [loading, setLoading] = useState(true);
+  const [weights, setWeights] = useState<DatasetValueWeights>(DEFAULT_WEIGHTS);
+  const [valuation, setValuation] = useState<DatasetValuationConfig>(DEFAULT_VALUATION);
 
   useEffect(() => {
     async function load() {
-      const jobsRes = await fetch("/api/jobs?limit=1000");
+      const [jobsRes, configRes] = await Promise.all([
+        fetch("/api/jobs?limit=1000"),
+        fetch("/api/config"),
+      ]);
       const { jobs: allJobs } = await jobsRes.json();
+      const cfg = await configRes.json();
+      if (cfg.datasetValueWeights) setWeights(cfg.datasetValueWeights);
+      if (cfg.datasetValuation) setValuation(cfg.datasetValuation);
       setJobs(allJobs || []);
 
       const fMap: Record<string, InspectionForm[]> = {};
@@ -35,14 +43,15 @@ export default function ExportPage() {
     load();
   }, []);
 
-  const filteredJobs = rebateFilter === "all" ? jobs : jobs.filter((j) => j.rebateOutcome === rebateFilter);
+  const filteredJobs = rebateFilter === "all" ? jobs : jobs.filter((j) => j.rebateStatus === rebateFilter);
 
   const stats = {
     jobs: filteredJobs.length,
     photos: filteredJobs.reduce((s, j) => s + j.photoCount, 0),
     issues: filteredJobs.reduce((s, j) => s + j.issueCount, 0),
     fixes: filteredJobs.reduce((s, j) => s + j.fixCount, 0),
-    value: filteredJobs.reduce((s, j) => s + estimateJobValue(j, formsMap[j.id] || []), 0),
+    value: filteredJobs.reduce((s, j) => s + estimateJobValue(j, formsMap[j.id] || [], weights), 0),
+    revenueValue: filteredJobs.reduce((s, j) => s + calculateJobRevenueValue(j, valuation), 0),
   };
 
   const handleExport = async () => {
@@ -118,9 +127,11 @@ export default function ExportPage() {
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Rebate Filter</label>
             <Select value={rebateFilter} onChange={(e) => setRebateFilter(e.target.value)}>
               <option value="all">All Jobs</option>
-              <option value="approved">Approved Only</option>
+              <option value="accepted">Accepted Only</option>
               <option value="declined">Declined Only</option>
-              <option value="pending">Pending Only</option>
+              <option value="paid">Paid Only</option>
+              <option value="submitted">Submitted Only</option>
+              <option value="calculated">Calculated Only</option>
             </Select>
           </div>
 
@@ -143,13 +154,14 @@ export default function ExportPage() {
       <Card>
         <CardContent className="p-6">
           <h3 className="text-sm font-semibold mb-4">Export Summary</h3>
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
             {[
               { icon: Briefcase, label: "Jobs", value: stats.jobs, color: "text-[#FF6B35]" },
               { icon: Camera, label: "Photos", value: stats.photos, color: "text-blue-500" },
               { icon: AlertTriangle, label: "Issues", value: stats.issues, color: "text-red-500" },
               { icon: Wrench, label: "Fixes", value: stats.fixes, color: "text-emerald-500" },
-              { icon: DollarSign, label: "Est. Value", value: formatCurrency(stats.value), color: "text-purple-500" },
+              { icon: DollarSign, label: "Pts Value", value: formatCurrency(stats.value), color: "text-purple-500" },
+              { icon: DollarSign, label: "Rev Value", value: formatCurrency(stats.revenueValue), color: "text-orange-500" },
             ].map((s) => (
               <div key={s.label} className="text-center">
                 <s.icon size={18} className={`${s.color} mx-auto mb-1`} />

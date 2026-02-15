@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       notes: (notes || "").trim(),
       currentStage: "Audit Pending",
       rebateAmount: 0,
-      rebateOutcome: "Pending",
+      rebateStatus: "None",
       latitude: typeof latitude === "number" ? latitude : null,
       longitude: typeof longitude === "number" ? longitude : null,
       spots: [],
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (rebate) {
-      filtered = filtered.filter((j) => j.rebateOutcome === rebate);
+      filtered = filtered.filter((j) => j.rebateStatus === rebate);
     }
 
     // Sort

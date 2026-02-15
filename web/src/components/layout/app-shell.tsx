@@ -22,6 +22,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     setAuthed(getCookie(COOKIE_NAME) === "1");
@@ -78,8 +79,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="h-screen overflow-hidden bg-gray-50">
-      <Sidebar />
-      <main className="pl-64 h-screen overflow-y-auto">
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+      <main className={`h-screen overflow-y-auto transition-all duration-200 ${collapsed ? "pl-16" : "pl-64"}`}>
         <div className="p-8">{children}</div>
       </main>
     </div>
