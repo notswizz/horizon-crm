@@ -10,7 +10,8 @@ import { StageBadge } from "@/components/shared/stage-badge";
 import { RebateBadge } from "@/components/shared/rebate-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Job, JobStage, RebateOutcome } from "@/types";
-import { Search, Loader2, Trash2, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import Image from "next/image";
+import { Search, Loader2, Trash2, Download, ChevronLeft, ChevronRight, Plus, X, MapPin, User, Phone, Mail, FileText, Home } from "lucide-react";
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -23,6 +24,7 @@ export default function JobsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showNewJob, setShowNewJob] = useState(false);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -105,6 +107,9 @@ export default function JobsPage() {
           <Button variant="outline" size="sm" onClick={exportCSV}>
             <Download size={14} className="mr-1.5" /> Export CSV
           </Button>
+          <Button size="sm" onClick={() => setShowNewJob(true)} className="bg-[#FF6B35] hover:bg-[#E85A28] text-white">
+            <Plus size={14} className="mr-1.5" /> New Job
+          </Button>
         </div>
       </div>
 
@@ -180,8 +185,25 @@ export default function JobsPage() {
                       <input type="checkbox" checked={selected.has(job.id)} onChange={() => toggleSelect(job.id)} className="rounded" />
                     </td>
                     <td className="p-3">
-                      <Link href={`/jobs/${job.id}`} className="font-medium text-gray-900 hover:text-[#FF6B35] transition-colors">
-                        {job.address || "Untitled"}
+                      <Link href={`/jobs/${job.id}`} className="flex items-center gap-3 group">
+                        {job.houseImageURL ? (
+                          <Image
+                            src={job.houseImageURL}
+                            alt="House"
+                            width={36}
+                            height={36}
+                            className="rounded-full object-cover flex-shrink-0"
+                            style={{ width: 36, height: 36 }}
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Home size={16} className="text-gray-400" />
+                          </div>
+                        )}
+                        <span className="font-medium text-gray-900 group-hover:text-[#FF6B35] transition-colors">
+                          {job.address || "Untitled"}
+                        </span>
                       </Link>
                     </td>
                     <td className="p-3 text-gray-500">{job.contactName || "—"}</td>
@@ -232,6 +254,193 @@ export default function JobsPage() {
           </div>
         )}
       </Card>
+
+      {/* New Job Modal */}
+      {showNewJob && (
+        <NewJobModal
+          onClose={() => setShowNewJob(false)}
+          onCreated={() => {
+            setShowNewJob(false);
+            fetchJobs();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── New Job Modal ──────────────────────────────────────────────────────────
+
+function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [form, setForm] = useState({
+    streetAddress: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    notes: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const canSave = form.streetAddress.trim().length > 0;
+
+  const handleChange = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create job");
+      }
+
+      onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-[#FF6B35] to-[#E85A28]">
+          <h2 className="text-lg font-bold text-white">New Job</h2>
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+          {/* Address Section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+              <MapPin size={14} className="text-[#FF6B35]" />
+              Address
+            </div>
+            <Input
+              placeholder="Street address *"
+              value={form.streetAddress}
+              onChange={(e) => handleChange("streetAddress", e.target.value)}
+              autoFocus
+            />
+            <Input
+              placeholder="City"
+              value={form.city}
+              onChange={(e) => handleChange("city", e.target.value)}
+            />
+            <div className="flex gap-3">
+              <Input
+                placeholder="State"
+                value={form.state}
+                onChange={(e) => handleChange("state", e.target.value)}
+                className="flex-1"
+              />
+              <Input
+                placeholder="Zip Code"
+                value={form.zipCode}
+                onChange={(e) => handleChange("zipCode", e.target.value)}
+                className="flex-1"
+              />
+            </div>
+          </div>
+
+          {/* Contact Section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+              <User size={14} className="text-[#FF6B35]" />
+              Contact Info
+            </div>
+            <Input
+              placeholder="Contact name"
+              value={form.contactName}
+              onChange={(e) => handleChange("contactName", e.target.value)}
+            />
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Phone number"
+                  value={form.contactPhone}
+                  onChange={(e) => handleChange("contactPhone", e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <div className="relative flex-1">
+                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Email address"
+                  value={form.contactEmail}
+                  onChange={(e) => handleChange("contactEmail", e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Notes Section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+              <FileText size={14} className="text-[#FF6B35]" />
+              Notes
+            </div>
+            <textarea
+              placeholder="Additional notes about this job"
+              value={form.notes}
+              onChange={(e) => handleChange("notes", e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35] resize-none"
+            />
+          </div>
+
+          {/* Error */}
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t bg-gray-50/50 flex items-center justify-between">
+          {!canSave && (
+            <p className="text-xs text-gray-400">Enter a street address to create the job.</p>
+          )}
+          {canSave && <div />}
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!canSave || saving}
+              onClick={handleSave}
+              className="bg-[#FF6B35] hover:bg-[#E85A28] text-white min-w-[100px]"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : "Create Job"}
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

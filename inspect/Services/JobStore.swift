@@ -379,6 +379,28 @@ final class JobStore {
         }
     }
 
+    // MARK: - House Image Upload
+
+    func uploadHouseImage(imageData: Data, jobId: UUID) async throws -> String {
+        let path = "jobs/\(jobId.uuidString)/house.jpg"
+        let ref = storage.reference().child(path)
+
+        let compressed: Data
+        if let image = UIImage(data: imageData),
+           let jpeg = image.jpegData(compressionQuality: 0.7) {
+            compressed = jpeg
+        } else {
+            compressed = imageData
+        }
+
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
+
+        _ = try await ref.putDataAsync(compressed, metadata: metadata)
+        let downloadURL = try await ref.downloadURL()
+        return downloadURL.absoluteString
+    }
+
     // MARK: - Photo Upload
 
     func uploadPhoto(imageData: Data, jobId: UUID, formId: UUID, photoId: UUID) async throws -> String {
@@ -541,6 +563,9 @@ final class JobStore {
             let export = JobExport(
                 notes: job.notes,
                 stage: job.currentStage.rawValue,
+                houseImageURL: job.houseImageURL,
+                latitude: job.latitude,
+                longitude: job.longitude,
                 rebateAmount: job.rebateAmount,
                 rebateOutcome: job.rebateOutcome.rawValue,
                 formNotes: formNotes.isEmpty ? nil : formNotes,
@@ -568,6 +593,9 @@ final class JobStore {
 
 private struct JobExport: Encodable {
     let notes, stage: String
+    let houseImageURL: String?
+    let latitude: Double?
+    let longitude: Double?
     let rebateAmount: Double
     let rebateOutcome: String
     let formNotes: [String]?

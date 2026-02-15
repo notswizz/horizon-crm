@@ -2,9 +2,10 @@ import SwiftUI
 
 struct JobsListView: View {
     var store: JobStore
+    var locationManager: LocationManager
     @State private var searchText = ""
     @State private var selectedStage: JobStage? = nil
-    @State private var sortOrder: JobSortOrder = .newest
+    @State private var sortOrder: JobSortOrder = .nearest
     @State private var showFilter = false
     @State private var showError = false
 
@@ -29,6 +30,13 @@ struct JobsListView: View {
                             .font(.body.weight(.semibold))
                             .foregroundStyle(hasActiveFilters ? DS.Colors.primary : .primary)
                     }
+                }
+                ToolbarItem(placement: .principal) {
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 36, height: 36)
+                        .clipShape(.rect(cornerRadius: 8))
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: NewJobView(store: store)) {
@@ -55,7 +63,7 @@ struct JobsListView: View {
     }
 
     private var hasActiveFilters: Bool {
-        selectedStage != nil || sortOrder != .newest
+        selectedStage != nil || sortOrder != .nearest
     }
 
     private var jobsList: some View {
@@ -68,7 +76,7 @@ struct JobsListView: View {
                 }
                 .padding(.top, 40)
             } else {
-                LazyVStack(spacing: DS.Spacing.s) {
+                LazyVStack(spacing: DS.Spacing.m) {
                     ForEach(filteredJobs) { job in
                         NavigationLink(destination: JobDetailView(job: job, store: store)) {
                             JobCard(job: job)
@@ -76,9 +84,9 @@ struct JobsListView: View {
                         .buttonStyle(DSCardPressStyle())
                     }
                 }
-                .padding(.horizontal)
-                .padding(.top, DS.Spacing.micro)
-                .padding(.bottom, DS.Spacing.l)
+                .padding(.horizontal, DS.Spacing.m)
+                .padding(.top, DS.Spacing.xs)
+                .padding(.bottom, DS.Spacing.xl)
             }
         }
         .background(DS.Colors.background)
@@ -98,6 +106,7 @@ struct JobsListView: View {
             }
         }
         switch sortOrder {
+        case .nearest: return locationManager.sortedByDistance(jobs)
         case .newest: jobs.sort { $0.createdAt > $1.createdAt }
         case .oldest: jobs.sort { $0.createdAt < $1.createdAt }
         case .address: jobs.sort { $0.address.localizedCompare($1.address) == .orderedAscending }
@@ -121,101 +130,243 @@ private struct JobCard: View {
     let job: Job
     @Environment(\.colorScheme) private var colorScheme
 
-    var body: some View {
-        HStack(spacing: 0) {
-            // Left accent border
-            RoundedRectangle(cornerRadius: 2)
-                .fill(job.currentStage.color)
-                .frame(width: DS.Components.leftAccentWidth)
+    private var progressRatio: CGFloat {
+        if job.issueCount == 0 { return job.currentStage == .completed ? 1.0 : 0.0 }
+        return min(CGFloat(job.fixCount) / CGFloat(job.issueCount), 1.0)
+    }
 
-            VStack(spacing: 0) {
-                // Top section
+    private var displayStreet: String {
+        if !job.streetAddress.isEmpty { return job.streetAddress }
+        if !job.address.isEmpty { return job.address }
+        return "Untitled Job"
+    }
+
+    private var displayLocality: String? {
+        let parts = [job.city, job.state].filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
+    private var hasMetrics: Bool {
+        job.photoCount > 0 || job.issueCount > 0 || job.fixCount > 0
+    }
+
+    private var progressColor: Color {
+        if progressRatio >= 1.0 { return DS.Colors.success }
+        if progressRatio >= 0.5 { return job.currentStage.color }
+        return DS.Colors.warning
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // ── Main content ──────────────────────────────
+            VStack(alignment: .leading, spacing: DS.Spacing.m) {
+
+                // Row 1: House thumbnail + Address + Rebate
                 HStack(alignment: .top, spacing: DS.Spacing.s) {
-                    // Stage icon circle
-                    Circle()
-                        .fill(job.currentStage.color.opacity(0.12))
-                        .frame(width: DS.Components.stageCircle, height: DS.Components.stageCircle)
-                        .overlay {
-                            Image(systemName: job.currentStage.icon)
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(job.currentStage.color)
+                    // House thumbnail
+                    AsyncImage(url: job.houseImageURL.flatMap { URL(string: $0) }) { phase in
+                        if let image = phase.image {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            Image(systemName: "house.fill")
+                                .font(.system(size: 18))
+                                .foregroundStyle(.tertiary)
                         }
+                    }
+                    .frame(width: 48, height: 48)
+                    .background(Color(.tertiarySystemFill))
+                    .clipShape(.circle)
+                    .id(job.houseImageURL)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(job.address.isEmpty ? "Untitled" : job.address)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
+                        Text(displayStreet)
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.primary)
+                            .lineLimit(2)
 
-                        if !job.contactName.isEmpty {
+                        if let locality = displayLocality {
+                            Text(locality)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+
+                    Spacer(minLength: DS.Spacing.s)
+
+                    if job.rebateAmount > 0 {
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text("$\(Int(job.rebateAmount))")
+                                .font(.system(size: 22, weight: .heavy, design: .rounded))
+                                .foregroundStyle(DS.Colors.success)
+                            Text("REBATE")
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(1)
+                                .foregroundStyle(DS.Colors.success.opacity(0.6))
+                        }
+                    }
+                }
+
+                // Row 2: Contact + Stage badge
+                HStack(spacing: 0) {
+                    if !job.contactName.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.quaternary)
                             Text(job.contactName)
-                                .font(.caption)
+                                .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
                     }
 
-                    Spacer(minLength: DS.Spacing.micro)
+                    Spacer(minLength: DS.Spacing.xs)
 
-                    StageBadge(stage: job.currentStage)
+                    // Stage pill
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(job.currentStage.color)
+                            .frame(width: 7, height: 7)
+                        Text(job.currentStage.rawValue)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(job.currentStage.color)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(job.currentStage.color.opacity(0.1), in: .capsule)
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 14)
-                .padding(.bottom, DS.Spacing.s)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 22)
+            .padding(.bottom, DS.Spacing.m)
 
-                // Divider
+            // ── Metrics footer ────────────────────────────
+            if hasMetrics {
+                // Separator
                 Rectangle()
-                    .fill(Color(.separator).opacity(0.3))
-                    .frame(height: 0.5)
-                    .padding(.horizontal, 14)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.04))
+                    .frame(height: 1)
 
-                // Bottom meta row
                 HStack(spacing: 0) {
-                    HStack(spacing: 10) {
+                    // Metric chips
+                    HStack(spacing: 6) {
                         if job.photoCount > 0 {
-                            MetaChip(icon: "photo", value: "\(job.photoCount)")
+                            CompactMetric(icon: "camera.fill", value: "\(job.photoCount)", color: DS.Colors.info)
                         }
                         if job.issueCount > 0 {
-                            MetaChip(icon: "exclamationmark.triangle.fill", value: "\(job.issueCount)", color: DS.Colors.error)
+                            CompactMetric(icon: "exclamationmark.triangle.fill", value: "\(job.issueCount)", color: DS.Colors.error)
                         }
                         if job.fixCount > 0 {
-                            MetaChip(icon: "wrench.and.screwdriver.fill", value: "\(job.fixCount)", color: DS.Colors.success)
-                        }
-                        if job.spots.count > 0 {
-                            MetaChip(icon: "mappin.and.ellipse", value: "\(job.spots.count)")
+                            CompactMetric(icon: "checkmark.circle.fill", value: "\(job.fixCount)", color: DS.Colors.success)
                         }
                     }
 
+                    Spacer(minLength: DS.Spacing.xs)
+
+                    Text(job.createdAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.quaternary)
+                }
+                .padding(.horizontal, 22)
+                .padding(.vertical, DS.Spacing.s)
+            } else {
+                // Just date when no metrics
+                HStack {
                     Spacer()
+                    Text(job.createdAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.quaternary)
+                }
+                .padding(.horizontal, 22)
+                .padding(.bottom, DS.Spacing.s)
+            }
 
-                    HStack(spacing: 10) {
-                        if job.rebateAmount > 0 {
-                            Text("$\(job.rebateAmount, specifier: "%.0f")")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(DS.Colors.success)
-                        }
+            // ── Bottom progress bar ──────────────────────
+            if job.issueCount > 0 {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(progressColor.opacity(0.08))
 
-                        Text(job.createdAt.formatted(date: .abbreviated, time: .omitted))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [progressColor, progressColor.opacity(0.7)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geo.size.width * progressRatio)
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .frame(height: 3)
             }
         }
-        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DS.Radius.card)
-                .strokeBorder(colorScheme == .dark ? DS.Colors.border : .clear, lineWidth: 1)
+        .clipShape(.rect(cornerRadius: 20))
+        .background(
+            ZStack {
+                // Base surface
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(DS.Colors.surface)
+
+                // Subtle stage glow at top-leading
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                job.currentStage.color.opacity(colorScheme == .dark ? 0.06 : 0.04),
+                                .clear
+                            ],
+                            center: .topLeading,
+                            startRadius: 0,
+                            endRadius: 180
+                        )
+                    )
+            }
         )
-        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(
+                    colorScheme == .dark
+                        ? DS.Colors.border.opacity(0.8)
+                        : Color.black.opacity(0.06),
+                    lineWidth: 1
+                )
+        )
+        // Double shadow for realistic depth
+        .shadow(color: .black.opacity(0.03), radius: 3, y: 1)
+        .shadow(color: .black.opacity(0.08), radius: 16, y: 6)
+    }
+}
+
+// MARK: - Compact Metric Chip
+
+private struct CompactMetric: View {
+    let icon: String
+    let value: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(color)
+            Text(value)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(color.opacity(0.1), in: .capsule)
     }
 }
 
 // MARK: - Sort Order
 
 enum JobSortOrder: String, CaseIterable, Identifiable {
+    case nearest = "Nearest First"
     case newest = "Newest First"
     case oldest = "Oldest First"
     case address = "Address A–Z"
@@ -225,6 +376,7 @@ enum JobSortOrder: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .nearest: "location.circle"
         case .newest: "arrow.down.circle"
         case .oldest: "arrow.up.circle"
         case .address: "textformat.abc"
@@ -309,10 +461,10 @@ private struct FilterSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if selectedStage != nil || sortOrder != .newest {
+                    if selectedStage != nil || sortOrder != .nearest {
                         Button("Reset") {
                             selectedStage = nil
-                            sortOrder = .newest
+                            sortOrder = .nearest
                         }
                         .foregroundStyle(DS.Colors.error)
                     }

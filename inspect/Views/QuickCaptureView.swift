@@ -5,6 +5,7 @@ import PhotosUI
 
 struct QuickCaptureView: View {
     var store: JobStore
+    var locationManager: LocationManager
     @AppStorage("inspectorName") private var inspectorName = ""
 
     // Photo state
@@ -77,7 +78,16 @@ struct QuickCaptureView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Quick Capture")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 36, height: 36)
+                        .clipShape(.rect(cornerRadius: 8))
+                }
+            }
             .alert("Save Error", isPresented: $showError) {
                 Button("OK") { }
             } message: {
@@ -226,7 +236,7 @@ struct QuickCaptureView: View {
             }
 
             Menu {
-                ForEach(store.jobs) { job in
+                ForEach(locationManager.sortedByDistance(store.jobs)) { job in
                     Button {
                         selectJob(job)
                     } label: {
@@ -852,7 +862,7 @@ struct QuickCaptureView: View {
                 selectedPhoto = filename
                 displayImage = store.loadTempImage(named: filename)
                 // Auto-select first job if none selected
-                if selectedJobId == nil, let first = store.jobs.first {
+                if selectedJobId == nil, let first = locationManager.sortedByDistance(store.jobs).first {
                     selectJob(first)
                 }
             }

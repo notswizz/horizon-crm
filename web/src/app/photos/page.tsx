@@ -21,6 +21,7 @@ interface PhotoItem {
   jobAddress: string;
   jobId: string;
   linkedIssueCategory?: string;
+  inspectorName: string;
 }
 
 export default function PhotosPage() {
@@ -28,6 +29,8 @@ export default function PhotosPage() {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [severityFilter, setSeverityFilter] = useState<string>("");
+  const [inspectorFilter, setInspectorFilter] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -59,6 +62,7 @@ export default function PhotosPage() {
                   spotTitle: spot.title,
                   jobAddress: job.address,
                   jobId: job.id,
+                  inspectorName: f.inspectorName || "Unknown",
                 });
               }
             });
@@ -74,6 +78,7 @@ export default function PhotosPage() {
                   jobAddress: job.address,
                   jobId: job.id,
                   linkedIssueCategory: linked?.category,
+                  inspectorName: f.inspectorName || "Unknown",
                 });
               }
             });
@@ -87,9 +92,18 @@ export default function PhotosPage() {
     load();
   }, []);
 
+  // Derive unique inspector names and categories for filter dropdowns
+  const inspectorNames = [...new Set(photos.map((p) => p.inspectorName))].sort();
+  const categories = [...new Set(photos.map((p) => p.category || p.linkedIssueCategory).filter(Boolean) as string[])].sort();
+
   const filtered = photos.filter((p) => {
     if (typeFilter && p.type !== typeFilter) return false;
     if (severityFilter && p.type === "issue" && p.severity !== severityFilter) return false;
+    if (inspectorFilter && p.inspectorName !== inspectorFilter) return false;
+    if (categoryFilter) {
+      const photoCategory = p.category || p.linkedIssueCategory;
+      if (photoCategory !== categoryFilter) return false;
+    }
     return true;
   });
 
@@ -126,6 +140,18 @@ export default function PhotosPage() {
             <option value="major">Major</option>
             <option value="minor">Minor</option>
           </Select>
+          <Select value={inspectorFilter} onChange={(e) => setInspectorFilter(e.target.value)} className="w-48">
+            <option value="">All Inspectors</option>
+            {inspectorNames.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </Select>
+          <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-48">
+            <option value="">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </Select>
           <div className="ml-auto text-sm text-gray-400 self-center">{filtered.length} photos</div>
         </CardContent>
       </Card>
@@ -157,7 +183,8 @@ export default function PhotosPage() {
                   )}
                 </div>
                 <p className="text-xs font-medium truncate">{photo.category || photo.linkedIssueCategory || "Fix photo"}</p>
-                <p className="text-[10px] text-gray-400 truncate mt-0.5">{photo.jobAddress}</p>
+                <p className="text-[10px] text-gray-400 truncate mt-0.5">{photo.inspectorName}</p>
+                <p className="text-[10px] text-gray-400 truncate">{photo.jobAddress}</p>
               </div>
             </button>
           ))}

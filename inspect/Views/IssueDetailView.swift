@@ -211,37 +211,123 @@ struct IssueDetailView: View {
                 let inspectionForm = store.forms.first {
                     $0.formType == .inspection && $0.spots.flatMap(\.fixPhotos).contains { $0.id == linkedFix.id }
                 }
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(DS.Colors.success)
-                        Text("Resolved")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(DS.Colors.success)
+
+                VStack(spacing: 0) {
+                    // ── Green header bar ──
+                    HStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(.white.opacity(0.2))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+
+                        Text("Issue Resolved")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.white)
+
+                        Spacer()
+
+                        Text(linkedFix.dateTaken.formatted(date: .abbreviated, time: .omitted))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(
+                            colors: [DS.Colors.success, DS.Colors.success.opacity(0.85)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+
+                    // ── Before / After photos ──
+                    if issue.photoURL != nil || linkedFix.photoURL != nil {
+                        HStack(spacing: 0) {
+                            // Before
+                            VStack(spacing: 6) {
+                                fixComparisonPhoto(url: issue.photoURL)
+                                Text("BEFORE")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .tracking(1)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .frame(maxWidth: .infinity)
+
+                            // Arrow
+                            ZStack {
+                                Circle()
+                                    .fill(DS.Colors.success.opacity(0.1))
+                                    .frame(width: 32, height: 32)
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(DS.Colors.success)
+                            }
+
+                            // After
+                            VStack(spacing: 6) {
+                                fixComparisonPhoto(url: linkedFix.photoURL)
+                                Text("AFTER")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .tracking(1)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.top, 16)
+                        .padding(.bottom, 12)
                     }
 
+                    // ── Resolution notes ──
                     if !linkedFix.resolutionNotes.isEmpty {
-                        Text(linkedFix.resolutionNotes)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "quote.opening")
+                                .font(.system(size: 10))
+                                .foregroundStyle(DS.Colors.success.opacity(0.4))
+                                .padding(.top, 2)
+                            Text(linkedFix.resolutionNotes)
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(DS.Colors.success.opacity(0.04))
                     }
 
+                    // ── View Inspection link ──
                     if let inspectionForm {
                         NavigationLink(destination: FormDetailView(form: inspectionForm, job: job, store: store)) {
-                            HStack(spacing: 6) {
-                                Text("View Inspection")
-                                    .font(.caption.weight(.medium))
+                            HStack(spacing: 8) {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                    .font(.system(size: 13, weight: .medium))
+                                Text("View Inspection Form")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.caption2)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
                             }
-                            .foregroundStyle(DS.Colors.info)
+                            .foregroundStyle(DS.Colors.success)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
-                .padding(14)
+                .clipShape(.rect(cornerRadius: DS.Radius.card))
                 .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
-                .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.Radius.card)
+                        .strokeBorder(DS.Colors.success.opacity(0.15), lineWidth: 1)
+                )
+                .shadow(color: DS.Colors.success.opacity(0.08), radius: 12, y: 4)
+
             } else if let issue {
                 NavigationLink(destination: SubmitFixView(job: job, issue: issue, spotId: spotId, store: store)) {
                     HStack(spacing: 8) {
@@ -261,6 +347,42 @@ struct IssueDetailView: View {
                 }
             }
         }
+    }
+
+    private func fixComparisonPhoto(url: String?) -> some View {
+        Group {
+            if let urlString = url, let imageURL = URL(string: urlString) {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 110, height: 80)
+                            .clipped()
+                            .clipShape(.rect(cornerRadius: 10))
+                    case .failure:
+                        photoPlaceholder
+                    default:
+                        ProgressView()
+                            .frame(width: 110, height: 80)
+                    }
+                }
+            } else {
+                photoPlaceholder
+            }
+        }
+    }
+
+    private var photoPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(Color(.tertiarySystemFill))
+            .frame(width: 110, height: 80)
+            .overlay {
+                Image(systemName: "photo")
+                    .font(.title3)
+                    .foregroundStyle(.quaternary)
+            }
     }
 
     // MARK: - Save Button

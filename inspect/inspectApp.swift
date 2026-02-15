@@ -15,10 +15,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct inspectApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @State private var store = JobStore()
+    @State private var locationManager = LocationManager()
 
     var body: some Scene {
         WindowGroup {
-            ContentView(store: store)
+            ContentView(store: store, locationManager: locationManager)
                 .onAppear { store.startListening() }
         }
     }

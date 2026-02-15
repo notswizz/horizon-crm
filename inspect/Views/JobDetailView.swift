@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 // MARK: - Job Detail View
 
@@ -12,6 +13,10 @@ struct JobDetailView: View {
     @State private var showNewSpotSheet = false
     @State private var newSpotTitle = ""
     @State private var newSpotJobType: JobType = .insulation
+    @State private var selectedSpotForIssue: Spot?
+    @State private var selectedHousePhoto: PhotosPickerItem?
+    @State private var isUploadingHouseImage = false
+    @State private var notesExpanded = false
 
     /// Live version from the store's listener, falls back to the passed-in snapshot
     private var liveJob: Job {
@@ -36,22 +41,22 @@ struct JobDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                heroHeader
-                    .padding(.bottom, DS.Spacing.m)
+                heroBanner
 
                 VStack(spacing: DS.Spacing.s) {
-                    stagePipeline
+                    contactRow
+                    metricsCard
                     spotsSection
                     auditSection
                     inspectionsSection
-                    if !store.allMaterials.isEmpty { materialsCard }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, DS.Spacing.m)
+                .padding(.top, DS.Spacing.m)
                 .padding(.bottom, DS.Spacing.xl)
             }
         }
         .background(DS.Colors.background)
-        .navigationTitle(liveJob.address.isEmpty ? "Job" : liveJob.address)
+        .navigationTitle(liveJob.streetAddress.isEmpty ? (liveJob.address.isEmpty ? "Job" : liveJob.address) : liveJob.streetAddress)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -63,6 +68,11 @@ struct JobDetailView: View {
         .onAppear { store.startListeningToForms(for: liveJob.id) }
         .refreshable { await store.refreshForms(for: liveJob.id) }
         .sheet(isPresented: $showNewSpotSheet) { newSpotSheet }
+        .sheet(item: $selectedSpotForIssue) { spot in
+            NavigationStack {
+                AddIssueView(job: liveJob, spot: spot, store: store)
+            }
+        }
         .alert("Rebate Amount", isPresented: $showRebateAlert) {
             TextField("Amount", text: $rebateText)
                 .keyboardType(.decimalPad)
@@ -78,503 +88,658 @@ struct JobDetailView: View {
         }
     }
 
-    // MARK: - Hero Header
+    // MARK: - Hero Helpers
 
-    private var heroHeader: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 14) {
-                // Address + badge
-                HStack(alignment: .top) {
-                    Text(liveJob.address.isEmpty ? "Untitled" : liveJob.address)
-                        .font(.title3.weight(.bold))
+    private var heroDisplayStreet: String {
+        if !liveJob.streetAddress.isEmpty { return liveJob.streetAddress }
+        if !liveJob.address.isEmpty { return liveJob.address }
+        return "Untitled Job"
+    }
+
+    private var heroDisplayLocality: String? {
+        let parts = [liveJob.city, liveJob.state].filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
+    // MARK: - Hero Banner
+
+    private var heroBanner: some View {
+        PhotosPicker(selection: $selectedHousePhoto, matching: .images) {
+            // Text content is the primary layer — always renders on top
+            VStack {
+                // Top-left: date
+                HStack {
+                    Text(liveJob.createdAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white)
-                        .lineLimit(2)
-
-                    Spacer(minLength: DS.Spacing.s)
-
-                    Text(liveJob.currentStage.rawValue)
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, DS.Spacing.xs)
-                        .padding(.vertical, 3)
-                        .background(.white.opacity(0.2), in: .capsule)
-                        .foregroundStyle(.white)
-                }
-
-                // Contact row
-                if !liveJob.contactName.isEmpty || !liveJob.contactPhone.isEmpty || !liveJob.contactEmail.isEmpty {
-                    HStack(spacing: 10) {
-                        if !liveJob.contactName.isEmpty {
-                            Label(liveJob.contactName, systemImage: "person.fill")
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.85))
-                        }
-
-                        Spacer()
-
-                        if !liveJob.contactPhone.isEmpty,
-                           let url = URL(string: "tel:\(liveJob.contactPhone.filter { $0.isNumber })") {
-                            Link(destination: url) {
-                                Image(systemName: "phone.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.white)
-                                    .frame(width: 30, height: 30)
-                                    .background(.white.opacity(0.2), in: .circle)
-                            }
-                        }
-
-                        if !liveJob.contactEmail.isEmpty,
-                           let url = URL(string: "mailto:\(liveJob.contactEmail)") {
-                            Link(destination: url) {
-                                Image(systemName: "envelope.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.white)
-                                    .frame(width: 30, height: 30)
-                                    .background(.white.opacity(0.2), in: .circle)
-                            }
-                        }
-                    }
-                }
-
-                if !liveJob.notes.isEmpty {
-                    Text(liveJob.notes)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.8))
-                        .lineLimit(3)
-                }
-
-                // Bottom bar: stats left, rebate right
-                Rectangle()
-                    .fill(.white.opacity(0.2))
-                    .frame(height: 1)
-
-                HStack(spacing: 0) {
-                    // Stats
-                    HStack(spacing: DS.Spacing.s) {
-                        if liveJob.photoCount > 0 {
-                            Label("\(liveJob.photoCount)", systemImage: "photo")
-                        }
-                        if liveJob.issueCount > 0 {
-                            Label("\(liveJob.issueCount)", systemImage: "exclamationmark.triangle.fill")
-                        }
-                        if liveJob.fixCount > 0 {
-                            Label("\(liveJob.fixCount)", systemImage: "wrench.and.screwdriver.fill")
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.8))
-
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: .capsule)
                     Spacer()
-
-                    // Rebate outcome pill — tappable menu
-                    Menu {
-                        ForEach(RebateOutcome.allCases) { outcome in
-                            Button {
-                                if outcome == .approved {
-                                    showRebateAlert = true
-                                } else {
-                                    var updated = liveJob
-                                    updated.rebateOutcome = outcome
-                                    updated.rebateAmount = 0
-                                    rebateText = ""
-                                    store.updateJob(updated)
-                                }
-                            } label: {
-                                if outcome == liveJob.rebateOutcome {
-                                    Label(outcome.rawValue, systemImage: "checkmark")
-                                } else {
-                                    Text(outcome.rawValue)
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Circle()
-                                .fill(.white)
-                                .frame(width: 6, height: 6)
-                            if liveJob.rebateOutcome == .approved && liveJob.rebateAmount > 0 {
-                                Text("$\(liveJob.rebateAmount, specifier: "%.0f")")
-                                    .font(.caption.weight(.bold))
-                            }
-                            Text(liveJob.rebateOutcome.rawValue)
-                                .font(.caption.weight(.medium))
-                        }
-                        .foregroundStyle(.white.opacity(0.9))
-                    }
                 }
 
-                Text(liveJob.createdAt.formatted(date: .long, time: .omitted))
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.6))
+                Spacer()
+
+                // Bottom-left: address + locality
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(heroDisplayStreet)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+
+                        if let locality = heroDisplayLocality {
+                            HStack(spacing: 5) {
+                                Image(systemName: "mappin")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text(locality)
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .foregroundStyle(.white.opacity(0.85))
+                            .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                        }
+                    }
+                    Spacer()
+                }
             }
-            .padding(DS.Components.cardPadding)
+            .padding(16)
+            .frame(height: 260)
+            .frame(maxWidth: .infinity)
+            .background {
+                ZStack(alignment: .bottom) {
+                    // Image or placeholder
+                    if let urlString = liveJob.houseImageURL, let url = URL(string: urlString) {
+                        AsyncImage(url: url) { phase in
+                            if let image = phase.image {
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            } else if phase.error != nil {
+                                placeholderBackground
+                            } else {
+                                ZStack {
+                                    DS.Colors.primary.opacity(0.3)
+                                    ProgressView().tint(.white)
+                                }
+                            }
+                        }
+                    } else {
+                        placeholderBackground
+                    }
+
+                    // Dark gradient scrim
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.6)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                }
+            }
+            .clipped()
         }
-        .background(
+        .buttonStyle(.plain)
+        .disabled(isUploadingHouseImage)
+        .overlay(alignment: .topTrailing) {
+            stageDropdown
+                .padding(16)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if liveJob.rebateOutcome != .pending {
+                rebateMenu
+                    .padding(16)
+            }
+        }
+        .overlay {
+            if isUploadingHouseImage {
+                ZStack {
+                    Color.black.opacity(0.4)
+                    ProgressView().tint(.white)
+                }
+            }
+        }
+        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 24, bottomTrailingRadius: 24))
+        .onChange(of: selectedHousePhoto) { _, newItem in
+            guard let newItem else { return }
+            isUploadingHouseImage = true
+            Task {
+                defer { isUploadingHouseImage = false; selectedHousePhoto = nil }
+                guard let data = try? await newItem.loadTransferable(type: Data.self) else { return }
+                guard let urlString = try? await store.uploadHouseImage(imageData: data, jobId: liveJob.id) else { return }
+                var updated = liveJob
+                updated.houseImageURL = urlString
+                store.updateJob(updated)
+            }
+        }
+    }
+
+    private var placeholderBackground: some View {
+        ZStack {
             LinearGradient(
-                colors: [DS.Colors.primary, DS.Colors.primaryDark],
+                stops: [
+                    .init(color: DS.Colors.primaryDark, location: 0),
+                    .init(color: DS.Colors.primary, location: 0.45),
+                    .init(color: DS.Colors.primaryDark.opacity(0.95), location: 1),
+                ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        )
+
+            VStack(spacing: 8) {
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 32, weight: .light))
+                Text("Tap to add photo")
+                    .font(.system(size: 14, weight: .medium))
+            }
+            .foregroundStyle(.white.opacity(0.5))
+        }
+    }
+
+    private var stageDropdown: some View {
+        Menu {
+            ForEach(JobStage.allCases) { stage in
+                Button {
+                    editedStage = stage
+                    var updated = liveJob
+                    updated.currentStage = stage
+                    store.updateJob(updated)
+                } label: {
+                    Label(stage.rawValue, systemImage: stage.icon)
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: liveJob.currentStage.icon)
+                    .font(.system(size: 9, weight: .bold))
+                Text(liveJob.currentStage.rawValue)
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.3)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 7, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial, in: .capsule)
+        }
+    }
+
+    // MARK: - Contact Row
+
+    private var contactRow: some View {
+        Group {
+            if !liveJob.contactName.isEmpty || !liveJob.contactPhone.isEmpty || !liveJob.contactEmail.isEmpty || !liveJob.notes.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Contact info
+                    if !liveJob.contactName.isEmpty || !liveJob.contactPhone.isEmpty || !liveJob.contactEmail.isEmpty {
+                        HStack(spacing: 10) {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 28, height: 28)
+                                .background(DS.Colors.primary.gradient, in: .circle)
+
+                            if !liveJob.contactName.isEmpty {
+                                Text(liveJob.contactName)
+                                    .font(.system(size: 15, weight: .semibold))
+                            }
+
+                            Spacer()
+
+                            if !liveJob.contactPhone.isEmpty,
+                               let url = URL(string: "tel:\(liveJob.contactPhone.filter { $0.isNumber })") {
+                                Link(destination: url) {
+                                    Image(systemName: "phone.fill")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(DS.Colors.info)
+                                        .frame(width: 36, height: 36)
+                                        .background(DS.Colors.info.opacity(0.1), in: .circle)
+                                }
+                            }
+
+                            if !liveJob.contactEmail.isEmpty,
+                               let url = URL(string: "mailto:\(liveJob.contactEmail)") {
+                                Link(destination: url) {
+                                    Image(systemName: "envelope.fill")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(DS.Colors.info)
+                                        .frame(width: 36, height: 36)
+                                        .background(DS.Colors.info.opacity(0.1), in: .circle)
+                                }
+                            }
+                        }
+                        .padding(DS.Spacing.m)
+                    }
+
+                    // Notes expandable
+                    if !liveJob.notes.isEmpty {
+                        if !liveJob.contactName.isEmpty || !liveJob.contactPhone.isEmpty || !liveJob.contactEmail.isEmpty {
+                            Divider().padding(.horizontal, DS.Spacing.m)
+                        }
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                notesExpanded.toggle()
+                            }
+                        } label: {
+                            HStack {
+                                Text("Notes")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
+                                    .rotationEffect(.degrees(notesExpanded ? 90 : 0))
+                            }
+                            .padding(.horizontal, DS.Spacing.m)
+                            .padding(.vertical, DS.Spacing.s)
+                        }
+                        .buttonStyle(.plain)
+
+                        if notesExpanded {
+                            Text(liveJob.notes)
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, DS.Spacing.m)
+                                .padding(.bottom, DS.Spacing.m)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                }
+                .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+                .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
+            }
+        }
+    }
+
+    // MARK: - Metrics Card
+
+    private var metricsCard: some View {
+        VStack(spacing: 0) {
+            // Rainbow gradient accent bar
+            LinearGradient(
+                colors: [DS.Colors.primary, DS.Colors.info, DS.Colors.error, DS.Colors.success],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 3)
+
+            // Metrics columns
+            HStack(spacing: 0) {
+                MetricColumn(value: liveJob.spots.count, label: "Spots", color: DS.Colors.primary)
+
+                Divider().frame(height: 40)
+
+                MetricColumn(value: liveJob.photoCount, label: "Photos", color: DS.Colors.info)
+
+                Divider().frame(height: 40)
+
+                MetricColumn(value: liveJob.issueCount, label: "Issues", color: DS.Colors.error)
+
+                Divider().frame(height: 40)
+
+                MetricColumn(value: liveJob.fixCount, label: "Fixes", color: DS.Colors.success)
+            }
+            .padding(.vertical, 16)
+        }
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .clipShape(.rect(cornerRadius: DS.Radius.card))
-        .shadow(color: DS.Colors.primary.opacity(0.3), radius: DS.Shadow.radius, y: DS.Shadow.y)
-        .padding(.horizontal)
-        .padding(.top, DS.Spacing.xs)
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
+    }
+
+    // MARK: - Rebate Menu
+
+    private var rebateMenu: some View {
+        Menu {
+            ForEach(RebateOutcome.allCases) { outcome in
+                Button {
+                    if outcome == .approved {
+                        showRebateAlert = true
+                    } else {
+                        var updated = liveJob
+                        updated.rebateOutcome = outcome
+                        updated.rebateAmount = 0
+                        rebateText = ""
+                        store.updateJob(updated)
+                    }
+                } label: {
+                    if outcome == liveJob.rebateOutcome {
+                        Label(outcome.rawValue, systemImage: "checkmark")
+                    } else {
+                        Text(outcome.rawValue)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if liveJob.rebateOutcome == .approved && liveJob.rebateAmount > 0 {
+                    Text("$\(Int(liveJob.rebateAmount))")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                } else {
+                    Text(liveJob.rebateOutcome.rawValue)
+                        .font(.system(size: 11, weight: .bold))
+                }
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: .capsule)
+            .overlay(
+                Capsule().strokeBorder(
+                    liveJob.rebateOutcome == .approved ? DS.Colors.success : DS.Colors.error,
+                    lineWidth: 1.5
+                )
+            )
+        }
     }
 
     // MARK: - Stage Pipeline
 
-    private var stagePipeline: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                DSSectionHeader(title: "Progress")
-                Spacer()
-                Menu {
-                    ForEach(JobStage.allCases) { stage in
-                        Button {
-                            editedStage = stage
-                            var updated = liveJob
-                            updated.currentStage = stage
-                            store.updateJob(updated)
-                        } label: {
-                            Label(stage.rawValue, systemImage: stage.icon)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 3) {
-                        Text("Override")
-                            .font(.caption2)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 8))
-                    }
-                    .foregroundStyle(.tertiary)
-                }
-            }
-
-            // Pipeline dots
-            HStack(spacing: 0) {
-                ForEach(Array(pipelineStages.enumerated()), id: \.element.id) { index, stage in
-                    let isActive = stageIndex(stage) <= stageIndex(liveJob.currentStage)
-                    let isCurrent = stage == liveJob.currentStage
-
-                    VStack(spacing: 5) {
-                        ZStack {
-                            Circle()
-                                .fill(isActive ? stage.color : Color(.systemGray5))
-                                .frame(width: isCurrent ? 26 : 20, height: isCurrent ? 26 : 20)
-                            Image(systemName: stage.icon)
-                                .font(.system(size: isCurrent ? 11 : 9, weight: .bold))
-                                .foregroundStyle(isActive ? .white : Color(.systemGray3))
-                        }
-
-                        Text(shortStageName(stage))
-                            .font(.system(size: 9, weight: isCurrent ? .bold : .medium))
-                            .foregroundStyle(isActive ? .primary : .tertiary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    if index < pipelineStages.count - 1 {
-                        let filled = stageIndex(pipelineStages[index + 1]) <= stageIndex(liveJob.currentStage)
-                        Rectangle()
-                            .fill(filled ? stage.color.opacity(0.4) : Color(.systemGray5))
-                            .frame(height: 2)
-                            .padding(.bottom, DS.Spacing.m)
-                    }
-                }
-            }
-        }
-        .dsCard()
-    }
-
     // MARK: - Spots Section
 
     private var spotsSection: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
             HStack {
-                Label {
-                    DSSectionHeader(title: "Spots")
-                } icon: {
+                HStack(spacing: 8) {
                     Image(systemName: "mappin.and.ellipse")
-                        .foregroundStyle(DS.Colors.primary)
-                        .font(.subheadline)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(DS.Colors.primary.gradient, in: .rect(cornerRadius: 8))
+
+                    Text("Spots")
+                        .font(.system(size: 16, weight: .bold))
                 }
+
                 Spacer()
+
                 Button {
                     showNewSpotSheet = true
                 } label: {
-                    HStack(spacing: DS.Spacing.micro) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 14))
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
                         Text("Add")
-                            .font(.caption.weight(.semibold))
+                            .font(.system(size: 13, weight: .semibold))
                     }
-                    .foregroundStyle(DS.Colors.primary)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(DS.Colors.primary.gradient, in: .capsule)
                 }
             }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
 
+            // Content
             if liveJob.spots.isEmpty {
-                HStack(spacing: DS.Spacing.xs) {
+                HStack(spacing: 10) {
                     Image(systemName: "mappin.slash")
-                        .font(.subheadline)
+                        .font(.system(size: 14))
                         .foregroundStyle(.tertiary)
                     Text("No spots yet — add one to get started")
-                        .font(.subheadline)
+                        .font(.system(size: 14))
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(DS.Spacing.s)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: DS.Spacing.xs) {
+                    HStack(spacing: 10) {
                         ForEach(liveJob.spots) { spot in
-                            VStack(spacing: DS.Spacing.xs) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: DS.Spacing.xs)
-                                        .fill(DS.Colors.primary.opacity(0.1))
-                                        .frame(width: 44, height: 44)
+                            Button {
+                                selectedSpotForIssue = spot
+                            } label: {
+                                HStack(spacing: 10) {
                                     Image(systemName: spot.jobType.icon)
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundStyle(DS.Colors.primary)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 36, height: 36)
+                                        .background(DS.Colors.primary.opacity(0.8).gradient, in: .rect(cornerRadius: 10))
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(spot.title.isEmpty ? "Untitled" : spot.title)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(1)
+                                        Text(spot.jobType.rawValue)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
                                 }
-
-                                Text(spot.title.isEmpty ? "Untitled" : spot.title)
-                                    .font(.caption.weight(.medium))
-                                    .lineLimit(1)
-
-                                Text(spot.jobType.rawValue)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
+                                .padding(10)
+                                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .strokeBorder(DS.Colors.primary.opacity(0.1), lineWidth: 1)
+                                )
                             }
-                            .frame(width: 100)
-                            .padding(.vertical, DS.Spacing.s)
-                            .padding(.horizontal, DS.Spacing.xs)
-                            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
+                            .buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal, 18)
                 }
-                .padding(.horizontal, -DS.Components.cardPadding)
-                .padding(.horizontal, DS.Components.cardPadding)
+                .padding(.bottom, 16)
             }
         }
-        .dsCard()
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.Radius.card)
+                .strokeBorder(DS.Colors.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Audit Section
 
     private var auditSection: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
             HStack {
-                Label {
-                    DSSectionHeader(title: "Audit")
-                } icon: {
+                HStack(spacing: 8) {
                     Image(systemName: "clipboard.fill")
-                        .foregroundStyle(DS.Colors.info)
-                        .font(.subheadline)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(DS.Colors.info.gradient, in: .rect(cornerRadius: 8))
+
+                    Text("Audit")
+                        .font(.system(size: 16, weight: .bold))
                 }
+
                 Spacer()
+
                 if let audit, audit.issuePhotos.count > 0 {
-                    Text("\(audit.issuePhotos.count) issue\(audit.issuePhotos.count == 1 ? "" : "s")")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(DS.Colors.error)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(DS.Colors.error.opacity(0.1), in: .capsule)
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9))
+                        Text("\(audit.issuePhotos.count) issue\(audit.issuePhotos.count == 1 ? "" : "s")")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundStyle(DS.Colors.error)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(DS.Colors.error.opacity(0.1), in: .capsule)
                 }
             }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
 
+            // Content
             if let audit {
                 NavigationLink(destination: FormDetailView(form: audit, job: liveJob, store: store)) {
-                    HStack(spacing: DS.Spacing.s) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: DS.Spacing.xs)
-                                .fill(DS.Colors.info.opacity(0.1))
-                                .frame(width: 36, height: 36)
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(DS.Colors.info)
-                        }
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(DS.Colors.info.opacity(0.8).gradient, in: .circle)
 
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(audit.inspectorName.isEmpty ? "Unknown Inspector" : audit.inspectorName)
-                                .font(.subheadline.weight(.medium))
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.primary)
 
-                            HStack(spacing: DS.Spacing.xs) {
-                                Label(audit.date.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
+                            HStack(spacing: 12) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "calendar")
+                                        .font(.system(size: 10))
+                                    Text(audit.date.formatted(date: .abbreviated, time: .omitted))
+                                }
                                 if audit.photoCount > 0 {
-                                    Label("\(audit.photoCount) photo\(audit.photoCount == 1 ? "" : "s")", systemImage: "photo")
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "camera.fill")
+                                            .font(.system(size: 10))
+                                        Text("\(audit.photoCount)")
+                                    }
                                 }
                             }
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
                         }
 
                         Spacer()
 
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.quaternary)
                     }
-                    .padding(DS.Spacing.s)
-                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 16)
                 }
                 .buttonStyle(.plain)
             } else {
-                HStack(spacing: DS.Spacing.xs) {
-                    Image(systemName: "camera.fill")
-                        .font(.subheadline)
+                HStack(spacing: 10) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 14))
                         .foregroundStyle(.tertiary)
-                    Text("Use Quick Capture to start an audit")
-                        .font(.subheadline)
+                    Text("Tap a spot to add an issue")
+                        .font(.system(size: 14))
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(DS.Spacing.s)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
             }
         }
-        .dsCard()
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.Radius.card)
+                .strokeBorder(DS.Colors.info.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Inspections Section
 
     private var inspectionsSection: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
             HStack {
-                Label {
-                    DSSectionHeader(title: "Inspections")
-                } icon: {
+                HStack(spacing: 8) {
                     Image(systemName: "checkmark.shield.fill")
-                        .foregroundStyle(DS.Colors.success)
-                        .font(.subheadline)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(DS.Colors.success.gradient, in: .rect(cornerRadius: 8))
+
+                    Text("Inspections")
+                        .font(.system(size: 16, weight: .bold))
                 }
+
                 Spacer()
+
                 if !inspections.isEmpty {
                     Text("\(inspections.count)")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(Color(.tertiarySystemFill), in: .capsule)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(DS.Colors.success)
+                        .frame(width: 24, height: 24)
+                        .background(DS.Colors.success.opacity(0.1), in: .circle)
                 }
             }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
 
+            // Content
             if inspections.isEmpty {
-                HStack(spacing: DS.Spacing.xs) {
-                    Image(systemName: "camera.fill")
-                        .font(.subheadline)
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.shield")
+                        .font(.system(size: 14))
                         .foregroundStyle(.tertiary)
-                    Text("Use Quick Capture to add inspections")
-                        .font(.subheadline)
+                    Text("No inspections yet")
+                        .font(.system(size: 14))
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(DS.Spacing.s)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
             } else {
-                VStack(spacing: 6) {
+                VStack(spacing: 8) {
                     ForEach(inspections) { inspection in
                         NavigationLink(destination: FormDetailView(form: inspection, job: liveJob, store: store)) {
-                            HStack(spacing: DS.Spacing.s) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: DS.Spacing.xs)
-                                        .fill(DS.Colors.success.opacity(0.1))
-                                        .frame(width: 36, height: 36)
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(DS.Colors.success)
-                                }
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 40, height: 40)
+                                    .background(DS.Colors.success.opacity(0.8).gradient, in: .circle)
 
-                                VStack(alignment: .leading, spacing: 3) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text(inspection.inspectorName.isEmpty ? "Unknown Inspector" : inspection.inspectorName)
-                                        .font(.subheadline.weight(.medium))
+                                        .font(.system(size: 15, weight: .semibold))
                                         .foregroundStyle(.primary)
 
-                                    HStack(spacing: DS.Spacing.xs) {
-                                        Label(inspection.date.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
+                                    HStack(spacing: 12) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "calendar")
+                                                .font(.system(size: 10))
+                                            Text(inspection.date.formatted(date: .abbreviated, time: .omitted))
+                                        }
                                         if inspection.fixPhotos.count > 0 {
-                                            Label("\(inspection.fixPhotos.count) fix\(inspection.fixPhotos.count == 1 ? "" : "es")", systemImage: "wrench.and.screwdriver")
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "wrench.and.screwdriver.fill")
+                                                    .font(.system(size: 10))
+                                                Text("\(inspection.fixPhotos.count) fix\(inspection.fixPhotos.count == 1 ? "" : "es")")
+                                            }
                                         }
                                     }
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
                                 }
 
                                 Spacer()
 
                                 Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(.quaternary)
                             }
-                            .padding(DS.Spacing.s)
-                            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: DS.Radius.inner))
                         }
                         .buttonStyle(.plain)
                     }
                 }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 16)
             }
         }
-        .dsCard()
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.Radius.card)
+                .strokeBorder(DS.Colors.success.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
-    // MARK: - Materials Card
 
-    private var materialsCard: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-            HStack {
-                DSSectionHeader(title: "Materials")
-                Spacer()
-                Text("\(store.allMaterials.count)")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Color(.tertiarySystemFill), in: .capsule)
-            }
-
-            ForEach(store.allMaterials) { material in
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(material.type.color.opacity(0.1))
-                            .frame(width: 28, height: 28)
-                        Image(systemName: material.type.icon)
-                            .font(.system(size: 11))
-                            .foregroundStyle(material.type.color)
-                    }
-
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(material.name.isEmpty ? "Unnamed" : material.name)
-                            .font(.subheadline.weight(.medium))
-                        HStack(spacing: DS.Spacing.xs) {
-                            if !material.quantity.isEmpty {
-                                Text(material.quantity)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if let cost = material.cost {
-                                Text("$\(cost, specifier: "%.2f")")
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(DS.Colors.success)
-                            }
-                        }
-                    }
-
-                    Spacer()
-
-                    Text(material.type.rawValue)
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(material.type.color.opacity(0.08), in: .capsule)
-                        .foregroundStyle(material.type.color)
-                }
-            }
-        }
-        .dsCard()
-    }
 
     // MARK: - New Spot Sheet
 
@@ -659,29 +824,6 @@ struct JobDetailView: View {
         }
     }
 
-    private var pipelineStages: [JobStage] {
-        [.auditPending, .workInProgress, .inspectionPending, .completed]
-    }
-
-    private func stageIndex(_ stage: JobStage) -> Int {
-        switch stage {
-        case .auditPending: 0
-        case .workInProgress: 1
-        case .inspectionPending: 2
-        case .completed: 3
-        case .cancelled: -1
-        }
-    }
-
-    private func shortStageName(_ stage: JobStage) -> String {
-        switch stage {
-        case .auditPending: "Audit"
-        case .workInProgress: "Work"
-        case .inspectionPending: "Inspect"
-        case .completed: "Done"
-        case .cancelled: "Cancel"
-        }
-    }
 
     // MARK: - Share
 
@@ -772,5 +914,25 @@ struct JobDetailView: View {
         }
 
         return text
+    }
+}
+
+// MARK: - Metric Column
+
+private struct MetricColumn: View {
+    let value: Int
+    let label: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("\(value)")
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(value > 0 ? color : Color(.quaternaryLabel))
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }

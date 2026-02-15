@@ -6,14 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { StageBadge } from "@/components/shared/stage-badge";
-import { RebateBadge } from "@/components/shared/rebate-badge";
 import { PhotoLightbox, buildLightboxPhotos } from "@/components/shared/photo-lightbox";
 import { formatDate, formatDateTime, formatCurrency, severityConfig, estimateJobValue, stageConfig } from "@/lib/utils";
 import { Job, InspectionForm, JobStage, RebateOutcome, IssuePhoto } from "@/types";
 import {
-  Loader2, MapPin, User, Phone, Mail, Calendar, Camera, AlertTriangle,
-  Wrench, Save, ChevronRight, Package, DollarSign, CheckCircle,
+  Loader2, MapPin, User, Phone, Mail, Camera, AlertTriangle,
+  Wrench, Save, ChevronRight, Package, CheckCircle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -93,36 +91,111 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <span className="text-gray-700 font-medium">{job.address || "Untitled"}</span>
       </div>
 
-      {/* Hero card */}
-      <div className="rounded-xl bg-gradient-to-br from-[#FF6B35] to-[#E85A28] p-6 text-white shadow-lg">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-bold">{job.address || "Untitled"}</h1>
-            <p className="text-white/70 text-sm mt-1">{formatDate(job.createdAt)}</p>
+      {/* Hero Banner */}
+      <div className="relative h-64 w-full rounded-b-2xl overflow-hidden shadow-lg">
+        {job.houseImageURL ? (
+          <img src={job.houseImageURL} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-[#E85A28] via-[#FF6B35] to-[#E85A28]">
+            <div className="flex flex-col items-center justify-center h-full text-white/50">
+              <Camera size={36} strokeWidth={1.5} />
+              <span className="text-sm font-medium mt-2">No photo</span>
+            </div>
           </div>
-          <StageBadge stage={job.currentStage} />
+        )}
+        {/* Gradient scrim */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
+
+        {/* Top-left: date */}
+        <div className="absolute top-4 left-4">
+          <span className="text-xs font-semibold text-white backdrop-blur-xl bg-white/15 px-3 py-1.5 rounded-full border border-white/20">
+            {formatDate(job.createdAt)}
+          </span>
         </div>
 
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/80">
-          {job.contactName && (
-            <span className="flex items-center gap-1.5"><User size={14} /> {job.contactName}</span>
-          )}
-          {job.contactPhone && (
-            <a href={`tel:${job.contactPhone}`} className="flex items-center gap-1.5 hover:text-white"><Phone size={14} /> {job.contactPhone}</a>
-          )}
-          {job.contactEmail && (
-            <a href={`mailto:${job.contactEmail}`} className="flex items-center gap-1.5 hover:text-white"><Mail size={14} /> {job.contactEmail}</a>
+        {/* Top-right: stage */}
+        <div className="absolute top-4 right-4">
+          <span className="text-xs font-semibold text-white backdrop-blur-xl bg-white/15 px-3 py-1.5 rounded-full border border-white/20">
+            {stageConfig[job.currentStage]?.label || job.currentStage}
+          </span>
+        </div>
+
+        {/* Bottom-left: address */}
+        <div className="absolute bottom-4 left-4 right-24">
+          <h1 className="text-2xl font-bold text-white drop-shadow-lg leading-tight">{job.address || "Untitled"}</h1>
+          {(job.city || job.state) && (
+            <div className="flex items-center gap-1 mt-1 text-white/85">
+              <MapPin size={12} />
+              <span className="text-sm font-medium">{[job.city, job.state].filter(Boolean).join(", ")}</span>
+            </div>
           )}
         </div>
 
-        {job.notes && <p className="text-sm text-white/70 mt-3">{job.notes}</p>}
-
-        <div className="flex gap-4 mt-4 pt-4 border-t border-white/20 text-sm">
-          <span className="flex items-center gap-1"><Camera size={14} /> {job.photoCount} photos</span>
-          <span className="flex items-center gap-1"><AlertTriangle size={14} /> {job.issueCount} issues</span>
-          <span className="flex items-center gap-1"><Wrench size={14} /> {job.fixCount} fixes</span>
-        </div>
+        {/* Bottom-right: rebate chip */}
+        {job.rebateOutcome !== "pending" && (
+          <div className="absolute bottom-4 right-4">
+            <span className={`text-xs font-bold text-white backdrop-blur-xl bg-white/15 px-3 py-1.5 rounded-full border ${job.rebateOutcome === "approved" ? "border-emerald-400" : "border-red-400"}`}>
+              {job.rebateOutcome === "approved" && job.rebateAmount > 0
+                ? `$${Math.round(job.rebateAmount).toLocaleString()}`
+                : job.rebateOutcome === "approved" ? "Approved" : "Declined"}
+            </span>
+          </div>
+        )}
       </div>
+
+      {/* Contact Row */}
+      {(job.contactName || job.contactPhone || job.contactEmail || job.notes) && (
+        <Card>
+          <CardContent className="p-4">
+            {(job.contactName || job.contactPhone || job.contactEmail) && (
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E85A28] flex items-center justify-center">
+                  <User size={13} className="text-white" />
+                </div>
+                {job.contactName && <span className="text-sm font-semibold">{job.contactName}</span>}
+                <div className="ml-auto flex items-center gap-2">
+                  {job.contactPhone && (
+                    <a href={`tel:${job.contactPhone}`} className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 transition-colors">
+                      <Phone size={14} className="text-blue-500" />
+                    </a>
+                  )}
+                  {job.contactEmail && (
+                    <a href={`mailto:${job.contactEmail}`} className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 transition-colors">
+                      <Mail size={14} className="text-blue-500" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+            {job.notes && (
+              <>
+                {(job.contactName || job.contactPhone || job.contactEmail) && <hr className="my-3" />}
+                <p className="text-sm text-gray-500">{job.notes}</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Metrics Card */}
+      <Card className="overflow-hidden">
+        <div className="h-[3px] bg-gradient-to-r from-[#FF6B35] via-[#3B82F6] via-50% via-[#EF4444] to-[#10B981]" />
+        <CardContent className="p-0">
+          <div className="grid grid-cols-4 divide-x py-4">
+            {[
+              { value: job.spots.length, label: "Spots", color: "text-[#FF6B35]" },
+              { value: job.photoCount, label: "Photos", color: "text-blue-500" },
+              { value: job.issueCount, label: "Issues", color: "text-red-500" },
+              { value: job.fixCount, label: "Fixes", color: "text-emerald-500" },
+            ].map((m) => (
+              <div key={m.label} className="text-center">
+                <p className={`text-2xl font-bold ${m.value > 0 ? m.color : "text-gray-200"}`} style={{ fontVariantNumeric: "tabular-nums" }}>{m.value}</p>
+                <p className="text-[11px] text-gray-400 font-medium mt-0.5">{m.label}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column */}

@@ -35,7 +35,11 @@ export interface Spot {
 
 export interface Job {
   id: string;
-  address: string;
+  streetAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  address: string; // computed display: "street, city, state, zip"
   contactName: string;
   contactPhone: string;
   contactEmail: string;
@@ -43,6 +47,9 @@ export interface Job {
   currentStage: JobStage;
   rebateAmount: number;
   rebateOutcome: RebateOutcome;
+  houseImageURL: string | null;
+  latitude: number | null;
+  longitude: number | null;
   spots: Spot[];
   formCount: number;
   photoCount: number;

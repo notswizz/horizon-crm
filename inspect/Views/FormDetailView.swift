@@ -42,36 +42,149 @@ struct FormDetailView: View {
 
     // MARK: - Form Info Card
 
+    private var formAccent: Color {
+        liveForm.formType == .audit ? DS.Colors.info : DS.Colors.success
+    }
+
     private var formInfoCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let isAudit = liveForm.formType == .audit
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // ── Type badge row ──────────────────────
             HStack {
-                Text(job.address.isEmpty ? "Untitled" : job.address)
-                    .font(.title3.weight(.semibold))
+                Text(liveForm.date.formatted(date: .abbreviated, time: .omitted))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+
                 Spacer()
-                FormTypeBadge(formType: liveForm.formType)
+
+                HStack(spacing: 5) {
+                    Image(systemName: isAudit ? "clipboard.fill" : "checkmark.shield.fill")
+                        .font(.system(size: 9, weight: .bold))
+                    Text(liveForm.formType.rawValue)
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(0.3)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.white.opacity(0.15), in: .capsule)
+                .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 1))
+            }
+            .padding(.bottom, 16)
+
+            // ── Address ─────────────────────────────
+            Text(job.streetAddress.isEmpty ? (job.address.isEmpty ? "Untitled" : job.address) : job.streetAddress)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+
+            if !job.city.isEmpty || !job.state.isEmpty {
+                Text([job.city, job.state, job.zipCode].filter { !$0.isEmpty }.joined(separator: ", "))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.top, 3)
             }
 
-            Divider()
+            // ── Inspector bar ───────────────────────
+            HStack(spacing: 14) {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 11))
+                    Text(liveForm.inspectorName.isEmpty ? "Unknown" : liveForm.inspectorName)
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .foregroundStyle(.white.opacity(0.8))
 
-            Label(liveForm.inspectorName.isEmpty ? "Unknown" : liveForm.inspectorName, systemImage: "person.fill")
-                .font(.subheadline)
-            Label(liveForm.date.formatted(date: .long, time: .shortened), systemImage: "calendar")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Text("\(liveForm.photoCount) photo\(liveForm.photoCount == 1 ? "" : "s")")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                Spacer()
 
+                HStack(spacing: 6) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 10))
+                    Text(liveForm.date.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(.white.opacity(0.5))
+            }
+            .padding(.top, 16)
+
+            // ── Stats row ───────────────────────────
+            HStack(spacing: 8) {
+                FormHeroStat(
+                    value: "\(liveForm.photoCount)",
+                    label: "Photos",
+                    icon: "camera.fill"
+                )
+                if isAudit {
+                    FormHeroStat(
+                        value: "\(liveForm.issuePhotos.count)",
+                        label: "Issues",
+                        icon: "exclamationmark.triangle.fill"
+                    )
+                } else {
+                    FormHeroStat(
+                        value: "\(liveForm.fixPhotos.count)",
+                        label: "Fixes",
+                        icon: "wrench.and.screwdriver.fill"
+                    )
+                }
+                FormHeroStat(
+                    value: "\(liveForm.spots.count)",
+                    label: "Spots",
+                    icon: "mappin"
+                )
+            }
+            .padding(.top, 16)
+
+            // ── Notes ───────────────────────────────
             if !liveForm.notes.isEmpty {
                 Text(liveForm.notes)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 2)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(3)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.white.opacity(0.08), in: .rect(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(.white.opacity(0.06), lineWidth: 1)
+                    )
+                    .padding(.top, 14)
             }
         }
-        .padding()
-        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
-        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
+        .padding(22)
+        .background(
+            ZStack {
+                LinearGradient(
+                    stops: isAudit ? [
+                        .init(color: Color(red: 0.2, green: 0.35, blue: 0.65), location: 0),
+                        .init(color: DS.Colors.info, location: 0.45),
+                        .init(color: Color(red: 0.12, green: 0.2, blue: 0.4), location: 1),
+                    ] : [
+                        .init(color: Color(red: 0.14, green: 0.52, blue: 0.42), location: 0),
+                        .init(color: DS.Colors.success, location: 0.45),
+                        .init(color: Color(red: 0.08, green: 0.28, blue: 0.22), location: 1),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Circle()
+                    .fill((isAudit ? Color.blue : Color.mint).opacity(0.2))
+                    .frame(width: 160, height: 160)
+                    .blur(radius: 50)
+                    .offset(x: 100, y: -50)
+
+                Circle()
+                    .fill((isAudit ? Color.indigo : Color.teal).opacity(0.2))
+                    .frame(width: 120, height: 120)
+                    .blur(radius: 40)
+                    .offset(x: -80, y: 70)
+            }
+        )
+        .clipShape(.rect(cornerRadius: 20))
+        .shadow(color: formAccent.opacity(0.2), radius: 4, y: 2)
+        .shadow(color: formAccent.opacity(0.2), radius: 16, y: 6)
     }
 
     // MARK: - Materials Card
@@ -471,5 +584,34 @@ struct FormDetailView: View {
         }
 
         return text
+    }
+}
+
+// MARK: - Form Hero Stat Block
+
+private struct FormHeroStat: View {
+    let value: String
+    let label: String
+    let icon: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.6))
+            Text(value)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.white.opacity(0.5))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(.white.opacity(0.08), in: .rect(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+        )
     }
 }

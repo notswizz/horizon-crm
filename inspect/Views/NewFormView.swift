@@ -46,10 +46,13 @@ struct NewFormView: View {
     @State private var localMaterials: [Material] = []
     @FocusState private var focusedField: FormField?
 
-    init(job: Job, formType: FormType, store: JobStore) {
+    let initialSpotId: UUID?
+
+    init(job: Job, formType: FormType, store: JobStore, initialSpotId: UUID? = nil) {
         self.job = job
         self.formType = formType
         self.store = store
+        self.initialSpotId = initialSpotId
         self._form = State(initialValue: InspectionForm(formType: formType))
         self._localSpots = State(initialValue: job.spots)
     }
@@ -67,8 +70,10 @@ struct NewFormView: View {
                     addFixPhotoButton
                 }
 
-                materialsSection
-                addMaterialButton
+                if formType == .inspection {
+                    materialsSection
+                    addMaterialButton
+                }
                 actionButtons
             }
             .padding()
@@ -88,6 +93,14 @@ struct NewFormView: View {
         .onAppear {
             if form.inspectorName.isEmpty && !savedInspectorName.isEmpty {
                 form.inspectorName = savedInspectorName
+            }
+            // Pre-add an issue photo for the selected spot
+            if let spotId = initialSpotId, formType == .audit,
+               let spot = localSpots.first(where: { $0.id == spotId }) {
+                let newPhoto = IssuePhoto()
+                var formSpot = FormSpot(from: spot)
+                formSpot.issuePhotos.append(newPhoto)
+                form.spots.append(formSpot)
             }
         }
     }
@@ -181,11 +194,12 @@ struct NewFormView: View {
         Button {
             withAnimation(DS.Animation.defaultSpring) {
                 let newPhoto = IssuePhoto()
-                if let firstSpot = localSpots.first {
-                    if let si = form.spots.firstIndex(where: { $0.id == firstSpot.id }) {
+                let preferredSpot = initialSpotId.flatMap { id in localSpots.first { $0.id == id } } ?? localSpots.first
+                if let spot = preferredSpot {
+                    if let si = form.spots.firstIndex(where: { $0.id == spot.id }) {
                         form.spots[si].issuePhotos.append(newPhoto)
                     } else {
-                        var formSpot = FormSpot(from: firstSpot)
+                        var formSpot = FormSpot(from: spot)
                         formSpot.issuePhotos.append(newPhoto)
                         form.spots.append(formSpot)
                     }
@@ -359,17 +373,73 @@ struct NewFormView: View {
                 }
             }
 
-            ForEach($localMaterials) { $material in
-                MaterialEntryCard(
-                    material: $material,
-                    focusedField: $focusedField,
-                    onDelete: {
-                        withAnimation(DS.Animation.defaultSpring) {
-                            localMaterials.removeAll { $0.id == material.id }
+            ForEach(localMaterials.indices, id: \.self) { i in
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        TextField("Material name (required)", text: $localMaterials[i].name)
+                            .font(.subheadline)
+                        Button {
+                            withAnimation(DS.Animation.defaultSpring) {
+                                let _ = localMaterials.remove(at: i)
+                            }
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundStyle(DS.Colors.error.opacity(0.7))
                         }
                     }
-                )
-                .transition(.cardTransition)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(MaterialType.allCases) { type in
+                                Button {
+                                    localMaterials[i].type = type
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: type.icon)
+                                            .font(.caption2)
+                                        Text(type.rawValue)
+                                            .font(.caption.weight(.medium))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 30)
+                                    .foregroundStyle(localMaterials[i].type == type ? .white : .primary)
+                                    .background(
+                                        localMaterials[i].type == type
+                                            ? AnyShapeStyle(type.color)
+                                            : AnyShapeStyle(.clear),
+                                        in: .capsule
+                                    )
+                                    .overlay(
+                                        Capsule().strokeBorder(
+                                            localMaterials[i].type == type ? .clear : Color(.systemGray3),
+                                            lineWidth: 1
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("Quantity (e.g. 200 sq ft)", text: $localMaterials[i].quantity)
+                            .font(.caption)
+                            .padding(8)
+                            .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
+
+                        TextField("Cost ($)", text: Binding(
+                            get: { localMaterials[i].cost.map { String($0) } ?? "" },
+                            set: { localMaterials[i].cost = Double($0) }
+                        ))
+                            .font(.caption)
+                            .keyboardType(.decimalPad)
+                            .padding(8)
+                            .frame(width: 100)
+                            .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
+                    }
+                }
+                .padding(12)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
             }
         }
         .dsCard()
@@ -593,9 +663,14 @@ struct NewFormView: View {
         do {
             var updatedForm = form
 
-            // Distribute materials to first spot that has content (or first spot overall)
+            // Distribute materials to first spot that has content (or create one)
             let validMaterials = localMaterials.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
-            if !validMaterials.isEmpty, !updatedForm.spots.isEmpty {
+            if !validMaterials.isEmpty {
+                if updatedForm.spots.isEmpty {
+                    // No spots yet — create one from the first job spot (or a default)
+                    let fallbackSpot = localSpots.first ?? Spot(title: "General", jobType: .insulation)
+                    updatedForm.spots.append(FormSpot(from: fallbackSpot))
+                }
                 let targetIdx = updatedForm.spots.firstIndex { !$0.issuePhotos.isEmpty || !$0.fixPhotos.isEmpty } ?? 0
                 updatedForm.spots[targetIdx].materials.append(contentsOf: validMaterials)
             }
@@ -1105,7 +1180,10 @@ private struct MaterialEntryCard: View {
                     .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
                     .focused(focusedField, equals: .materialQuantity(material.id))
 
-                TextField("Cost ($)", value: $material.cost, format: .number)
+                TextField("Cost ($)", text: Binding(
+                    get: { material.cost.map { String($0) } ?? "" },
+                    set: { material.cost = Double($0) }
+                ))
                     .font(.caption)
                     .keyboardType(.decimalPad)
                     .padding(8)

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -10,7 +11,6 @@ import {
   BarChart3,
   Download,
   Settings,
-  Flame,
 } from "lucide-react";
 
 const navItems = [
@@ -29,9 +29,7 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r bg-white">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FF6B35]">
-          <Flame className="h-5 w-5 text-white" />
-        </div>
+        <Image src="/logo.png" alt="Inspect logo" width={36} height={36} className="rounded-lg" />
         <div>
           <h1 className="text-sm font-bold tracking-tight">Horizon Energy</h1>
           <p className="text-[10px] text-gray-400 font-medium">Admin Dashboard</p>

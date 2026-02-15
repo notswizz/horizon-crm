@@ -45,7 +45,13 @@ export function parseJob(doc: FirebaseFirestore.DocumentSnapshot): Job {
   const d = doc.data()!;
   return {
     id: d.id || doc.id,
-    address: d.address || "",
+    streetAddress: d.streetAddress || d.address || "",
+    city: d.city || "",
+    state: d.state || "",
+    zipCode: d.zipCode || "",
+    address: [d.streetAddress || d.address || "", d.city || "", d.state || "", d.zipCode || ""]
+      .filter((s: string) => s.length > 0)
+      .join(", "),
     contactName: d.contactName || "",
     contactPhone: d.contactPhone || "",
     contactEmail: d.contactEmail || "",
@@ -53,6 +59,9 @@ export function parseJob(doc: FirebaseFirestore.DocumentSnapshot): Job {
     currentStage: normalizeStage(d.currentStage),
     rebateAmount: d.rebateAmount || 0,
     rebateOutcome: normalizeRebate(d.rebateOutcome),
+    houseImageURL: d.houseImageURL || null,
+    latitude: typeof d.latitude === "number" ? d.latitude : null,
+    longitude: typeof d.longitude === "number" ? d.longitude : null,
     spots: d.spots || [],
     formCount: d.formCount || 0,
     photoCount: d.photoCount || 0,

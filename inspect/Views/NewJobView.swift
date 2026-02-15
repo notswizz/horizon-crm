@@ -1,9 +1,14 @@
 import SwiftUI
+import CoreLocation
+import MapKit
 
 // MARK: - Focus Fields
 
 private enum Field: Hashable {
-    case address
+    case streetAddress
+    case city
+    case state
+    case zipCode
     case contactName
     case contactPhone
     case contactEmail
@@ -18,6 +23,8 @@ struct NewJobView: View {
     @State private var job = Job()
     @State private var showSuccess = false
     @State private var showError = false
+    @State private var addressCompleter = AddressCompleter()
+    @State private var suppressCompleter = false
     @FocusState private var focusedField: Field?
 
     var body: some View {
@@ -81,12 +88,89 @@ struct NewJobView: View {
 
             StyledTextField(
                 icon: "mappin",
-                label: "ADDRESS",
-                placeholder: "Enter address",
-                text: $job.address,
-                contentType: .fullStreetAddress
+                label: "STREET ADDRESS",
+                placeholder: "123 Main St",
+                text: $job.streetAddress,
+                contentType: .streetAddressLine1
             )
-            .focused($focusedField, equals: .address)
+            .focused($focusedField, equals: .streetAddress)
+            .onChange(of: job.streetAddress) { _, newValue in
+                guard !suppressCompleter else { return }
+                addressCompleter.searchText = newValue
+            }
+
+            // Address suggestions
+            if focusedField == .streetAddress && !addressCompleter.suggestions.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(addressCompleter.suggestions, id: \.self) { suggestion in
+                        Button {
+                            selectSuggestion(suggestion)
+                        } label: {
+                            HStack(spacing: DS.Spacing.s) {
+                                Image(systemName: "mappin.circle.fill")
+                                    .font(.subheadline)
+                                    .foregroundStyle(DS.Colors.primary.opacity(0.7))
+                                    .frame(width: 24)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(suggestion.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    if !suggestion.subtitle.isEmpty {
+                                        Text(suggestion.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, DS.Spacing.xs)
+                            .padding(.horizontal, DS.Spacing.s)
+                            .contentShape(.rect)
+                        }
+                        if suggestion != addressCompleter.suggestions.last {
+                            Divider().padding(.leading, 36)
+                        }
+                    }
+                }
+                .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 10))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            Divider().padding(.leading, 36)
+
+            StyledTextField(
+                icon: "building.2",
+                label: "CITY",
+                placeholder: "City",
+                text: $job.city,
+                contentType: .addressCity
+            )
+            .focused($focusedField, equals: .city)
+
+            Divider().padding(.leading, 36)
+
+            HStack(spacing: DS.Spacing.s) {
+                StyledTextField(
+                    icon: "map",
+                    label: "STATE",
+                    placeholder: "NC",
+                    text: $job.state,
+                    contentType: .addressState
+                )
+                .focused($focusedField, equals: .state)
+
+                StyledTextField(
+                    icon: "number",
+                    label: "ZIP CODE",
+                    placeholder: "28401",
+                    text: $job.zipCode,
+                    contentType: .postalCode,
+                    keyboardType: .numberPad
+                )
+                .focused($focusedField, equals: .zipCode)
+            }
         }
         .dsCard()
     }
@@ -195,8 +279,8 @@ struct NewJobView: View {
             .disabled(!canSave || showSuccess)
             .sensoryFeedback(.impact(weight: .medium), trigger: showSuccess)
 
-            if job.address.isEmpty {
-                Text("Enter an address to create the job.")
+            if job.streetAddress.isEmpty {
+                Text("Enter a street address to create the job.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -208,15 +292,68 @@ struct NewJobView: View {
     // MARK: - Computed Properties
 
     private var canSave: Bool {
-        !job.address.isEmpty
+        !job.streetAddress.isEmpty
+    }
+
+    // MARK: - Address Selection
+
+    private func selectSuggestion(_ suggestion: MKLocalSearchCompletion) {
+        suppressCompleter = true
+        addressCompleter.clear()
+        focusedField = nil
+
+        Task {
+            guard let mapItem = await addressCompleter.resolve(suggestion) else {
+                suppressCompleter = false
+                return
+            }
+            let placemark = mapItem.placemark
+            job.streetAddress = [placemark.subThoroughfare, placemark.thoroughfare]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            job.city = placemark.locality ?? ""
+            job.state = placemark.administrativeArea ?? ""
+            job.zipCode = placemark.postalCode ?? ""
+            if let location = placemark.location {
+                job.latitude = location.coordinate.latitude
+                job.longitude = location.coordinate.longitude
+            }
+            suppressCompleter = false
+        }
     }
 
     // MARK: - Save Action
 
     private func saveJob() {
         focusedField = nil
-        store.addJob(job)
+        addressCompleter.clear()
 
+        // If coords already set (from autocomplete), save directly
+        if job.latitude != nil {
+            store.addJob(job)
+            finishSave()
+            return
+        }
+
+        // Otherwise geocode the manually-typed address
+        let addressString = job.address
+        guard !addressString.isEmpty else {
+            store.addJob(job)
+            finishSave()
+            return
+        }
+
+        CLGeocoder().geocodeAddressString(addressString) { placemarks, _ in
+            if let location = placemarks?.first?.location {
+                job.latitude = location.coordinate.latitude
+                job.longitude = location.coordinate.longitude
+            }
+            store.addJob(job)
+            finishSave()
+        }
+    }
+
+    private func finishSave() {
         // Check if store caught an encoding error
         if let error = store.errorMessage {
             showError = true

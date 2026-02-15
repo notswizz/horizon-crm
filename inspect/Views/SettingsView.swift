@@ -23,7 +23,16 @@ struct SettingsView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 36, height: 36)
+                        .clipShape(.rect(cornerRadius: 8))
+                }
+            }
             .alert("Delete All Jobs?", isPresented: $showDeleteConfirm) {
                 Button("Delete Everything", role: .destructive) {
                     store.deleteAllJobs()

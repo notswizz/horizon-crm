@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
+import { Timestamp } from "firebase-admin/firestore";
 import { fetchJob, fetchForms } from "@/lib/firestore-helpers";
+
+// Map web camelCase values → iOS enum rawValues
+const STAGE_TO_IOS: Record<string, string> = {
+  auditPending: "Audit Pending",
+  workInProgress: "Work In Progress",
+  inspectionPending: "Inspection Pending",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const REBATE_TO_IOS: Record<string, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  declined: "Declined",
+};
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,18 +37,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { id } = await params;
     const body = await req.json();
 
-    // Only allow updating specific fields
-    const allowedFields = ["currentStage", "rebateOutcome", "rebateAmount"];
     const updates: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (field in body) updates[field] = body[field];
+
+    if ("currentStage" in body) {
+      updates.currentStage = STAGE_TO_IOS[body.currentStage] || body.currentStage;
+    }
+    if ("rebateOutcome" in body) {
+      updates.rebateOutcome = REBATE_TO_IOS[body.rebateOutcome] || body.rebateOutcome;
+    }
+    if ("rebateAmount" in body) {
+      updates.rebateAmount = body.rebateAmount;
     }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
-    updates.updatedAt = new Date().toISOString();
+    updates.updatedAt = Timestamp.now();
     await db.collection("jobs").doc(id).update(updates);
 
     return NextResponse.json({ success: true });

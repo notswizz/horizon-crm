@@ -343,6 +343,11 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
     var notes: String
     var spots: [FormSpot]
 
+    // Exclude computed properties from Codable encoding
+    private enum CodingKeys: String, CodingKey {
+        case id, formType, inspectorName, date, notes, spots
+    }
+
     /// Flattened issue photos across all spots
     var issuePhotos: [IssuePhoto] { spots.flatMap { $0.issuePhotos } }
     /// Flattened fix photos across all spots
@@ -407,7 +412,10 @@ struct InspectionForm: Identifiable, Codable, Equatable, Sendable {
 
 struct Job: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
-    var address: String
+    var streetAddress: String
+    var city: String
+    var state: String
+    var zipCode: String
     var contactName: String
     var contactPhone: String
     var contactEmail: String
@@ -420,12 +428,25 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
     var photoCount: Int
     var issueCount: Int
     var fixCount: Int
+    var houseImageURL: String?
+    var latitude: Double?
+    var longitude: Double?
     var createdAt: Date
     var updatedAt: Date
 
+    /// Combined display address
+    var address: String {
+        [streetAddress, city, state, zipCode]
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+    }
+
     init(
         id: UUID = UUID(),
-        address: String = "",
+        streetAddress: String = "",
+        city: String = "",
+        state: String = "",
+        zipCode: String = "",
         contactName: String = "",
         contactPhone: String = "",
         contactEmail: String = "",
@@ -438,11 +459,17 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
         photoCount: Int = 0,
         issueCount: Int = 0,
         fixCount: Int = 0,
+        houseImageURL: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
         self.id = id
-        self.address = address
+        self.streetAddress = streetAddress
+        self.city = city
+        self.state = state
+        self.zipCode = zipCode
         self.contactName = contactName
         self.contactPhone = contactPhone
         self.contactEmail = contactEmail
@@ -455,14 +482,62 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
         self.photoCount = photoCount
         self.issueCount = issueCount
         self.fixCount = fixCount
+        self.houseImageURL = houseImageURL
+        self.latitude = latitude
+        self.longitude = longitude
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    // Exclude computed `address` from Codable
+    private enum CodingKeys: String, CodingKey {
+        case id, streetAddress, city, state, zipCode, address
+        case contactName, contactPhone, contactEmail, notes
+        case currentStage, rebateAmount, rebateOutcome, spots
+        case formCount, photoCount, issueCount, fixCount
+        case houseImageURL
+        case latitude, longitude
+        case createdAt, updatedAt
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(streetAddress, forKey: .streetAddress)
+        try c.encode(city, forKey: .city)
+        try c.encode(state, forKey: .state)
+        try c.encode(zipCode, forKey: .zipCode)
+        try c.encode(contactName, forKey: .contactName)
+        try c.encode(contactPhone, forKey: .contactPhone)
+        try c.encode(contactEmail, forKey: .contactEmail)
+        try c.encode(notes, forKey: .notes)
+        try c.encode(currentStage, forKey: .currentStage)
+        try c.encode(rebateAmount, forKey: .rebateAmount)
+        try c.encode(rebateOutcome, forKey: .rebateOutcome)
+        try c.encode(spots, forKey: .spots)
+        try c.encode(formCount, forKey: .formCount)
+        try c.encode(photoCount, forKey: .photoCount)
+        try c.encode(issueCount, forKey: .issueCount)
+        try c.encode(fixCount, forKey: .fixCount)
+        try c.encodeIfPresent(houseImageURL, forKey: .houseImageURL)
+        try c.encodeIfPresent(latitude, forKey: .latitude)
+        try c.encodeIfPresent(longitude, forKey: .longitude)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(updatedAt, forKey: .updatedAt)
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
-        address = try c.decode(String.self, forKey: .address)
+        // Migrate old single `address` field → streetAddress
+        if let sa = try c.decodeIfPresent(String.self, forKey: .streetAddress), !sa.isEmpty {
+            streetAddress = sa
+        } else {
+            streetAddress = try c.decodeIfPresent(String.self, forKey: .address) ?? ""
+        }
+        city = try c.decodeIfPresent(String.self, forKey: .city) ?? ""
+        state = try c.decodeIfPresent(String.self, forKey: .state) ?? ""
+        zipCode = try c.decodeIfPresent(String.self, forKey: .zipCode) ?? ""
         contactName = try c.decode(String.self, forKey: .contactName)
         contactPhone = try c.decode(String.self, forKey: .contactPhone)
         contactEmail = try c.decode(String.self, forKey: .contactEmail)
@@ -475,6 +550,9 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
         photoCount = try c.decodeIfPresent(Int.self, forKey: .photoCount) ?? 0
         issueCount = try c.decodeIfPresent(Int.self, forKey: .issueCount) ?? 0
         fixCount = try c.decodeIfPresent(Int.self, forKey: .fixCount) ?? 0
+        houseImageURL = try c.decodeIfPresent(String.self, forKey: .houseImageURL)
+        latitude = try c.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         updatedAt = try c.decode(Date.self, forKey: .updatedAt)
     }
@@ -485,7 +563,10 @@ struct Job: Identifiable, Codable, Equatable, Sendable {
 extension Job {
     static let samples: [Job] = [
         Job(
-            address: "742 Evergreen Terrace",
+            streetAddress: "742 Evergreen Terrace",
+            city: "Springfield",
+            state: "IL",
+            zipCode: "62704",
             contactName: "Homer Simpson",
             contactPhone: "(555) 123-4567",
             contactEmail: "homer@example.com",
@@ -501,7 +582,10 @@ extension Job {
             issueCount: 0
         ),
         Job(
-            address: "221B Baker Street",
+            streetAddress: "221B Baker Street",
+            city: "London",
+            state: "UK",
+            zipCode: "NW1 6XE",
             contactName: "John Watson",
             contactPhone: "(555) 987-6543",
             contactEmail: "watson@example.com",
