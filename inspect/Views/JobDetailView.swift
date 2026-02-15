@@ -402,6 +402,10 @@ struct JobDetailView: View {
                         updated.rebateOutcome = outcome
                         updated.rebateAmount = 0
                         rebateText = ""
+                        if outcome == .declined {
+                            updated.currentStage = .cancelled
+                            editedStage = .cancelled
+                        }
                         store.updateJob(updated)
                     }
                 } label: {

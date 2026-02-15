@@ -1,23 +1,17 @@
 import SwiftUI
-import UIKit
 
 struct SettingsView: View {
     var store: JobStore
     @AppStorage("inspectorName") private var inspectorName = ""
-    @State private var showDeleteConfirm = false
-    @State private var isExporting = false
-    @State private var exportFileURL: URL?
-    @State private var showShareSheet = false
-    @State private var estimatedValue: String = "—"
-    @State private var isEstimating = false
+    @State private var showTutorial = false
+    @AppStorage("hasSeenTutorial") private var hasSeenTutorial = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     inspectorCard
-                    exportCard
-                    dangerZoneCard
+                    tutorialCard
                 }
                 .padding()
             }
@@ -33,18 +27,12 @@ struct SettingsView: View {
                         .clipShape(.rect(cornerRadius: 8))
                 }
             }
-            .alert("Delete All Jobs?", isPresented: $showDeleteConfirm) {
-                Button("Delete Everything", role: .destructive) {
-                    store.deleteAllJobs()
-                }
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text("This will permanently delete all \(store.jobs.count) job\(store.jobs.count == 1 ? "" : "s"), forms, and photos. This cannot be undone.")
+            .sheet(isPresented: $showTutorial) {
+                TutorialView()
+                    .onDisappear { hasSeenTutorial = true }
             }
-            .sheet(isPresented: $showShareSheet) {
-                if let url = exportFileURL {
-                    ShareSheetView(items: [url])
-                }
+            .onAppear {
+                if !hasSeenTutorial { showTutorial = true }
             }
         }
     }
@@ -52,209 +40,54 @@ struct SettingsView: View {
     // MARK: - Inspector Card
 
     private var inspectorCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(DS.Colors.primary.gradient, in: .circle)
+
+            if inspectorName.trimmingCharacters(in: .whitespaces).isEmpty {
+                TextField("Your name", text: $inspectorName)
+                    .font(.system(size: 16, weight: .medium))
+                    .textContentType(.name)
+                    .submitLabel(.done)
+            } else {
+                Text(inspectorName)
+                    .font(.system(size: 16, weight: .semibold))
+                Spacer()
+            }
+        }
+        .dsCard()
+    }
+
+    // MARK: - Tutorial Card
+
+    private var tutorialCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label {
-                Text("Inspector / Auditor")
+                Text("App Tutorial")
                     .font(.headline)
             } icon: {
-                Image(systemName: "person.crop.circle.fill")
+                Image(systemName: "book.fill")
                     .foregroundStyle(DS.Colors.primary)
             }
 
-            Text("This name is automatically attached to every form you submit.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            StyledTextField(
-                icon: "person.fill",
-                label: "NAME",
-                placeholder: "Your name",
-                text: $inspectorName,
-                contentType: .name
-            )
-        }
-        .dsCard()
-    }
-
-    // MARK: - Export Card
-
-    private var exportCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label {
-                Text("Export Training Data")
-                    .font(.headline)
-            } icon: {
-                Image(systemName: "square.and.arrow.up")
-                    .foregroundStyle(DS.Colors.info)
-            }
-
-            Text("Export all jobs and forms as a JSONL file for AI training.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
             Button {
-                Task {
-                    isExporting = true
-                    let jsonl = await store.exportAllAsJSONL()
-                    let datestamp = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date()) }()
-                    let tempURL = FileManager.default.temporaryDirectory
-                        .appendingPathComponent("horizon_training_data_\(datestamp).jsonl")
-                    try? jsonl.data(using: .utf8)?.write(to: tempURL)
-                    exportFileURL = tempURL
-                    isExporting = false
-                    showShareSheet = true
-                }
+                showTutorial = true
             } label: {
                 HStack(spacing: 8) {
                     Spacer()
-                    if isExporting {
-                        ProgressView()
-                            .tint(DS.Colors.info)
-                    } else {
-                        Image(systemName: "arrow.down.doc.fill")
-                    }
-                    Text(isExporting ? "Exporting..." : "Export Data")
+                    Image(systemName: "play.fill")
+                    Text("Start Tutorial")
                     Spacer()
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(DS.Colors.info)
+                .foregroundStyle(.white)
                 .frame(height: 44)
-                .background(DS.Colors.info.opacity(0.1), in: .rect(cornerRadius: 10))
-            }
-            .disabled(isExporting || store.jobs.isEmpty)
-
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(store.jobs.count) job\(store.jobs.count == 1 ? "" : "s")")
-                        .font(.caption.weight(.medium))
-                    Text("\(totalPhotos) photo\(totalPhotos == 1 ? "" : "s") \u{2022} \(totalIssues) issue\(totalIssues == 1 ? "" : "s")")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("est. value")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    if isEstimating {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        HStack(spacing: 4) {
-                            Image(systemName: "sparkles")
-                                .font(.caption)
-                                .foregroundStyle(DS.Colors.success)
-                            Text(estimatedValue)
-                                .font(.title3.weight(.bold).monospacedDigit())
-                                .foregroundStyle(DS.Colors.success)
-                        }
-                    }
-                }
+                .background(DS.Colors.primary.gradient, in: .rect(cornerRadius: 10))
             }
         }
         .dsCard()
-        .task(id: store.jobs.count) {
-            await computeEstimate()
-        }
     }
-
-    /// Computes estimated dollar value by fetching actual form data per job.
-    ///
-    /// Base per job = $5/job + $2/photo + $3/issue
-    /// Multipliers:
-    ///   ×1.5 if rebate outcome known (approved or declined)
-    ///   ×1.3 if >80% of issues have linked fix photos (actual before+after pairs)
-    ///   ×1.2 if any materials have cost data
-    private func computeEstimate() async {
-        guard !store.jobs.isEmpty else {
-            estimatedValue = "$0"
-            return
-        }
-        isEstimating = true
-        defer { isEstimating = false }
-
-        var total: Double = 0
-
-        for job in store.jobs {
-            let base = 5.0 + Double(job.photoCount) * 2 + Double(job.issueCount) * 3
-
-            // Rebate multiplier
-            let hasRebateOutcome = job.rebateOutcome == .approved || job.rebateOutcome == .declined
-            let rebateMult: Double = hasRebateOutcome ? 1.5 : 1.0
-
-            // Fetch real form data for pair ratio + material cost check
-            let forms = await store.fetchForms(for: job.id)
-
-            // Count actual linked fixes
-            let allFixPhotos = forms
-                .filter { $0.formType == .inspection }
-                .flatMap { $0.fixPhotos }
-            let linkedFixCount = allFixPhotos.filter { $0.linkedAuditIssueId != nil }.count
-            let pairRatio = job.issueCount > 0 ? Double(linkedFixCount) / Double(job.issueCount) : 0
-            let pairMult: Double = pairRatio > 0.8 ? 1.3 : 1.0
-
-            // Check if any materials have actual cost data
-            let allMaterials = forms.flatMap { $0.allMaterials }
-            let hasCostData = allMaterials.contains { $0.cost != nil && $0.cost! > 0 }
-            let materialMult: Double = hasCostData ? 1.2 : 1.0
-
-            total += base * rebateMult * pairMult * materialMult
-        }
-
-        estimatedValue = total < 1 ? "$0" : "$\(Int(total))"
-    }
-
-    private var totalPhotos: Int {
-        store.jobs.reduce(0) { $0 + $1.photoCount }
-    }
-
-    private var totalIssues: Int {
-        store.jobs.reduce(0) { $0 + $1.issueCount }
-    }
-
-    // MARK: - Danger Zone
-
-    private var dangerZoneCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label {
-                Text("Danger Zone")
-                    .font(.headline)
-            } icon: {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(DS.Colors.error)
-            }
-
-            Button(role: .destructive) {
-                showDeleteConfirm = true
-            } label: {
-                HStack(spacing: 8) {
-                    Spacer()
-                    Image(systemName: "trash.fill")
-                    Text("Delete All Jobs")
-                    Spacer()
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(DS.Colors.error)
-                .frame(height: 44)
-                .background(DS.Colors.error.opacity(0.1), in: .rect(cornerRadius: 10))
-            }
-
-            Text("Permanently removes all jobs, forms, and uploaded photos from the database.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .dsCard()
-    }
-}
-
-// MARK: - Share Sheet
-
-struct ShareSheetView: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
