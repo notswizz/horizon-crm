@@ -12,11 +12,6 @@ const STAGE_TO_IOS: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
-const REBATE_TO_IOS: Record<string, string> = {
-  pending: "Pending",
-  approved: "Approved",
-  declined: "Declined",
-};
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -42,11 +37,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if ("currentStage" in body) {
       updates.currentStage = STAGE_TO_IOS[body.currentStage] || body.currentStage;
     }
-    if ("rebateOutcome" in body) {
-      updates.rebateOutcome = REBATE_TO_IOS[body.rebateOutcome] || body.rebateOutcome;
+    // Rebate calculator fields
+    if ("energyAssessment" in body) {
+      updates.energyAssessment = body.energyAssessment;
     }
-    if ("rebateAmount" in body) {
-      updates.rebateAmount = body.rebateAmount;
+    if ("projectCosts" in body) {
+      updates.projectCosts = body.projectCosts;
+    }
+    if ("rebate" in body) {
+      updates.rebateData = body.rebate; // stored as rebateData to avoid conflict with rebateAmount/rebateOutcome
+    }
+    if ("profitMargin" in body) {
+      updates.profitMargin = body.profitMargin;
+    }
+    if ("netProfit" in body) {
+      updates.netProfit = body.netProfit;
     }
 
     if (Object.keys(updates).length === 0) {

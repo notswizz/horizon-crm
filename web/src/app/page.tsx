@@ -16,6 +16,10 @@ import {
   Camera,
   Users,
   Package,
+  TrendingUp,
+  FileText,
+  CheckCircle,
+  Banknote,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -57,6 +61,7 @@ const tooltipStyle = {
 
 export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [photoDays, setPhotoDays] = useState<7 | 30 | 90>(30);
@@ -65,9 +70,11 @@ export default function DashboardPage() {
     Promise.all([
       fetch("/api/analytics").then((r) => r.json()),
       fetch("/api/jobs?limit=5&sort=newest").then((r) => r.json()),
-    ]).then(([a, j]) => {
+      fetch("/api/jobs?limit=500").then((r) => r.json()),
+    ]).then(([a, j, all]) => {
       setAnalytics(a);
       setRecentJobs(j.jobs || []);
+      setAllJobs(all.jobs || []);
       setLoading(false);
     });
   }, []);
@@ -92,6 +99,26 @@ export default function DashboardPage() {
   const totalRebates = analytics.rebateBreakdown.reduce((s, r) => s + r.count, 0);
   const approvedRebates = analytics.rebateBreakdown.find((r) => r.outcome === "approved");
   const approvalRate = totalRebates > 0 && approvedRebates ? Math.round((approvedRebates.count / totalRebates) * 100) : 0;
+
+  // Pipeline metrics from rebate data
+  const totalPipeline = allJobs
+    .filter((j) => j.rebate?.status === "submitted")
+    .reduce((sum, j) => sum + (j.rebate?.claimedAmount || j.rebate?.estimatedRebate || 0), 0);
+
+  const approvedPending = allJobs
+    .filter((j) => j.rebate?.status === "approved")
+    .reduce((sum, j) => sum + (j.rebate?.approvedAmount || 0), 0);
+
+  const totalPaid = allJobs
+    .filter((j) => j.rebate?.status === "paid")
+    .reduce((sum, j) => sum + (j.rebate?.paidAmount || 0), 0);
+
+  const jobsWithMargin = allJobs.filter((j) => j.profitMargin != null && j.profitMargin !== 0);
+  const avgMargin = jobsWithMargin.length > 0
+    ? Math.round(jobsWithMargin.reduce((sum, j) => sum + j.profitMargin!, 0) / jobsWithMargin.length * 10) / 10
+    : 0;
+
+  const hasPipelineData = totalPipeline > 0 || approvedPending > 0 || totalPaid > 0 || avgMargin > 0;
 
   // Weekly aggregation for jobs over time
   const weeklyJobs = analytics.jobsOverTime.reduce<{ date: string; count: number }[]>((acc, item) => {
@@ -177,6 +204,65 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Rebate Pipeline Row */}
+      {hasPipelineData && (
+        <div className="grid grid-cols-4 gap-4">
+          <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Pipeline</span>
+                <div className="p-1.5 rounded-lg bg-blue-50">
+                  <FileText className="h-3.5 w-3.5 text-blue-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalPipeline)}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Submitted claims</p>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Approved</span>
+                <div className="p-1.5 rounded-lg bg-green-50">
+                  <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(approvedPending)}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Pending payment</p>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Paid</span>
+                <div className="p-1.5 rounded-lg bg-emerald-50">
+                  <Banknote className="h-3.5 w-3.5 text-emerald-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totalPaid)}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Total collected</p>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Avg Margin</span>
+                <div className="p-1.5 rounded-lg bg-orange-50">
+                  <TrendingUp className="h-3.5 w-3.5 text-[#FF6B35]" />
+                </div>
+              </div>
+              <p className={`text-2xl font-bold ${avgMargin > 20 ? "text-green-600" : avgMargin > 10 ? "text-orange-600" : "text-red-600"}`}>
+                {avgMargin}%
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{jobsWithMargin.length} jobs with data</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Row 2: Jobs Over Time + Stage Donut — 8+4 */}
       <div className="grid grid-cols-12 gap-6">

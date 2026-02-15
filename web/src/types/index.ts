@@ -20,6 +20,67 @@ export type JobType =
 
 export type IssueSeverity = "critical" | "major" | "minor";
 
+// ─── Rebate Types ─────────────────────────────────────────────────────
+
+export type IncomeTier = "below_80" | "80_to_150" | "above_150";
+export type RebateProgram = "HER" | "HEAR" | "both";
+export type HERTier = "$2k" | "$4k" | "$10k" | "$16k";
+export type RebateStatus = "not_submitted" | "submitted" | "approved" | "declined" | "paid";
+
+export interface HEARItem {
+  id: string;
+  name: string;
+  cost: number;
+  maxRebate: number;
+  rebateAmount: number;
+}
+
+export interface EnergyAssessment {
+  baselineKWh: number;
+  projectedKWh: number;
+  savingsPercent: number;
+  assessmentDate: string;
+  assessor: string;
+  modelingNotes?: string;
+}
+
+export interface ProjectCosts {
+  materials: number;
+  labor: number;
+  laborHours?: number;
+  laborRate?: number;
+  assessmentFee: number;
+  overhead: number;
+  other: number;
+  otherDescription?: string;
+  total: number;
+  billableAmount?: number; // What you charge/claim (costs + markup)
+}
+
+export interface RebateInfo {
+  program: RebateProgram;
+  incomeTier: IncomeTier;
+  incomeVerified: boolean;
+  incomeDocType?: "tax_return" | "pay_stub" | "self_cert" | "none";
+  herTier?: string;
+  herAmount?: number;
+  hearItems?: HEARItem[];
+  hearTotal?: number;
+  estimatedRebate: number;
+  claimedAmount?: number;
+  submittedDate?: string;
+  submittedTo?: "GEFA" | "Georgia Power";
+  claimNumber?: string;
+  status: RebateStatus;
+  approvedAmount?: number;
+  approvedDate?: string;
+  declineReason?: string;
+  paidAmount?: number;
+  paidDate?: string;
+  paymentMethod?: string;
+  variance?: number;
+}
+
 export type MaterialType =
   | "insulation"
   | "sealant"
@@ -57,6 +118,12 @@ export interface Job {
   fixCount: number;
   createdAt: Date;
   updatedAt: Date;
+  // Rebate fields
+  energyAssessment?: EnergyAssessment;
+  projectCosts?: ProjectCosts;
+  rebate?: RebateInfo;
+  profitMargin?: number;
+  netProfit?: number;
 }
 
 export interface IssuePhoto {

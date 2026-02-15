@@ -43,6 +43,21 @@ function normalizeSeverity(raw: unknown): IssueSeverity {
 
 export function parseJob(doc: FirebaseFirestore.DocumentSnapshot): Job {
   const d = doc.data()!;
+  const rebateData = d.rebateData || undefined;
+
+  // Derive rebateAmount from pipeline: paid > approved > claimed > estimated > legacy
+  let rebateAmount = d.rebateAmount || 0;
+  let rebateOutcome: RebateOutcome = normalizeRebate(d.rebateOutcome);
+  if (rebateData) {
+    const status = rebateData.status as string;
+    rebateAmount =
+      rebateData.paidAmount || rebateData.approvedAmount ||
+      rebateData.claimedAmount || rebateData.estimatedRebate || 0;
+    if (status === "paid" || status === "approved") rebateOutcome = "approved";
+    else if (status === "declined") rebateOutcome = "declined";
+    else rebateOutcome = "pending";
+  }
+
   return {
     id: d.id || doc.id,
     streetAddress: d.streetAddress || d.address || "",
@@ -57,8 +72,8 @@ export function parseJob(doc: FirebaseFirestore.DocumentSnapshot): Job {
     contactEmail: d.contactEmail || "",
     notes: d.notes || "",
     currentStage: normalizeStage(d.currentStage),
-    rebateAmount: d.rebateAmount || 0,
-    rebateOutcome: normalizeRebate(d.rebateOutcome),
+    rebateAmount,
+    rebateOutcome,
     houseImageURL: d.houseImageURL || null,
     latitude: typeof d.latitude === "number" ? d.latitude : null,
     longitude: typeof d.longitude === "number" ? d.longitude : null,
@@ -69,6 +84,12 @@ export function parseJob(doc: FirebaseFirestore.DocumentSnapshot): Job {
     fixCount: d.fixCount || 0,
     createdAt: toDate(d.createdAt),
     updatedAt: toDate(d.updatedAt),
+    // Rebate calculator fields
+    energyAssessment: d.energyAssessment || undefined,
+    projectCosts: d.projectCosts || undefined,
+    rebate: rebateData,
+    profitMargin: typeof d.profitMargin === "number" ? d.profitMargin : undefined,
+    netProfit: typeof d.netProfit === "number" ? d.netProfit : undefined,
   };
 }
 
