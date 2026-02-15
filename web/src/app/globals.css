@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #FF6B35;
+  --primary-dark: #E85A28;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --info: #3B82F6;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

@@ -1,0 +1,172 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { PhotoLightbox } from "@/components/shared/photo-lightbox";
+import { severityConfig, formatDate } from "@/lib/utils";
+import { Job, InspectionForm, IssuePhoto, IssueSeverity } from "@/types";
+import { Loader2, Camera } from "lucide-react";
+
+interface PhotoItem {
+  url: string;
+  type: "issue" | "fix";
+  category?: string;
+  severity?: IssueSeverity;
+  notes?: string;
+  resolutionNotes?: string;
+  dateTaken?: Date;
+  spotTitle: string;
+  jobAddress: string;
+  jobId: string;
+  linkedIssueCategory?: string;
+}
+
+export default function PhotosPage() {
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState<string>("");
+  const [severityFilter, setSeverityFilter] = useState<string>("");
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      const jobsRes = await fetch("/api/jobs?limit=500");
+      const { jobs } = await jobsRes.json();
+      const items: PhotoItem[] = [];
+
+      for (const job of jobs as Job[]) {
+        const formsRes = await fetch(`/api/forms/${job.id}`);
+        const { forms } = await formsRes.json();
+
+        const allIssues: IssuePhoto[] = [];
+        (forms as InspectionForm[]).forEach((f) => {
+          f.spots.forEach((s) => allIssues.push(...s.issuePhotos));
+        });
+
+        (forms as InspectionForm[]).forEach((f) => {
+          f.spots.forEach((spot) => {
+            spot.issuePhotos.forEach((p) => {
+              if (p.photoURL) {
+                items.push({
+                  url: p.photoURL,
+                  type: "issue",
+                  category: p.category,
+                  severity: p.severity,
+                  notes: p.notes,
+                  dateTaken: p.dateTaken,
+                  spotTitle: spot.title,
+                  jobAddress: job.address,
+                  jobId: job.id,
+                });
+              }
+            });
+            spot.fixPhotos.forEach((p) => {
+              if (p.photoURL) {
+                const linked = allIssues.find((i) => i.id === p.linkedAuditIssueId);
+                items.push({
+                  url: p.photoURL,
+                  type: "fix",
+                  resolutionNotes: p.resolutionNotes,
+                  dateTaken: p.dateTaken,
+                  spotTitle: spot.title,
+                  jobAddress: job.address,
+                  jobId: job.id,
+                  linkedIssueCategory: linked?.category,
+                });
+              }
+            });
+          });
+        });
+      }
+
+      setPhotos(items);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const filtered = photos.filter((p) => {
+    if (typeFilter && p.type !== typeFilter) return false;
+    if (severityFilter && p.type === "issue" && p.severity !== severityFilter) return false;
+    return true;
+  });
+
+  const lightboxPhotos = filtered.map((p) => ({
+    url: p.url,
+    type: p.type,
+    category: p.category,
+    severity: p.severity,
+    notes: p.notes,
+    resolutionNotes: p.resolutionNotes,
+    dateTaken: p.dateTaken,
+    spotTitle: p.spotTitle,
+    linkedIssueCategory: p.linkedIssueCategory,
+  }));
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Photos</h1>
+        <p className="text-sm text-gray-500 mt-1">{photos.length} total photos across all jobs</p>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4 flex flex-wrap gap-3">
+          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-40">
+            <option value="">All Types</option>
+            <option value="issue">Issues</option>
+            <option value="fix">Fixes</option>
+          </Select>
+          <Select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="w-40">
+            <option value="">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="major">Major</option>
+            <option value="minor">Minor</option>
+          </Select>
+          <div className="ml-auto text-sm text-gray-400 self-center">{filtered.length} photos</div>
+        </CardContent>
+      </Card>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-[#FF6B35]" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filtered.map((photo, i) => (
+            <button
+              key={`${photo.url}-${i}`}
+              onClick={() => setLightboxIndex(i)}
+              className="group relative rounded-xl overflow-hidden border bg-white shadow-sm hover:shadow-md transition-shadow text-left"
+            >
+              <img src={photo.url} alt="" className="w-full h-40 object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+              <div className="p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  {photo.type === "issue" ? (
+                    <Badge className="bg-red-50 text-red-600 text-[10px]">Issue</Badge>
+                  ) : (
+                    <Badge className="bg-emerald-50 text-emerald-600 text-[10px]">Fix</Badge>
+                  )}
+                  {photo.severity && severityConfig[photo.severity] && (
+                    <Badge className={`${severityConfig[photo.severity].bg} ${severityConfig[photo.severity].color} text-[10px]`}>
+                      {photo.severity}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs font-medium truncate">{photo.category || photo.linkedIssueCategory || "Fix photo"}</p>
+                <p className="text-[10px] text-gray-400 truncate mt-0.5">{photo.jobAddress}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {lightboxIndex !== null && (
+        <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+      )}
+    </div>
+  );
+}

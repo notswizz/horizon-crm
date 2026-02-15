@@ -359,13 +359,13 @@ struct NewFormView: View {
                 }
             }
 
-            ForEach(Array(localMaterials.enumerated()), id: \.element.id) { index, _ in
+            ForEach($localMaterials) { $material in
                 MaterialEntryCard(
-                    material: $localMaterials[index],
+                    material: $material,
                     focusedField: $focusedField,
                     onDelete: {
                         withAnimation(DS.Animation.defaultSpring) {
-                            _ = localMaterials.remove(at: index)
+                            localMaterials.removeAll { $0.id == material.id }
                         }
                     }
                 )
