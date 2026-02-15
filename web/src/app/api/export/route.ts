@@ -11,6 +11,14 @@ export async function POST(req: NextRequest) {
       format = "jsonl",
       anonymize = false,
       rebateFilter = "all",
+      rebateFilters = [],
+      stageFilter = "all",
+      stageFilters = [],
+      dateFrom = "",
+      dateTo = "",
+      minPhotos = 0,
+      minIssues = 0,
+      hasFormsOnly = false,
     } = body;
 
     // Fetch config for dataset value calculations
@@ -21,18 +29,43 @@ export async function POST(req: NextRequest) {
 
     let jobs = await fetchAllJobs();
 
-    // Rebate filter
-    if (rebateFilter !== "all") {
+    // Filters (support both legacy single and new multi-select)
+    if (rebateFilters.length > 0) {
+      jobs = jobs.filter((j) => rebateFilters.includes(j.rebateStatus));
+    } else if (rebateFilter !== "all") {
       jobs = jobs.filter((j) => j.rebateStatus === rebateFilter);
+    }
+    if (stageFilters.length > 0) {
+      jobs = jobs.filter((j) => stageFilters.includes(j.currentStage));
+    } else if (stageFilter !== "all") {
+      jobs = jobs.filter((j) => j.currentStage === stageFilter);
+    }
+    if (dateFrom) {
+      const from = new Date(dateFrom).getTime();
+      jobs = jobs.filter((j) => new Date(j.createdAt).getTime() >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo).getTime() + 86400000; // end of day
+      jobs = jobs.filter((j) => new Date(j.createdAt).getTime() < to);
+    }
+    if (minPhotos > 0) {
+      jobs = jobs.filter((j) => j.photoCount >= minPhotos);
+    }
+    if (minIssues > 0) {
+      jobs = jobs.filter((j) => j.issueCount >= minIssues);
     }
 
     // Fetch forms for each job
-    const jobsWithForms = await Promise.all(
+    let jobsWithForms = await Promise.all(
       jobs.map(async (job) => {
         const forms = await fetchForms(job.id);
         return { job, forms };
       })
     );
+
+    if (hasFormsOnly) {
+      jobsWithForms = jobsWithForms.filter(({ forms }) => forms.length > 0);
+    }
 
     if (format === "csv") {
       // Flattened CSV

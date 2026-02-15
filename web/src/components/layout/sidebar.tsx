@@ -42,8 +42,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <Image src="/logo.png" alt="Inspect logo" width={36} height={36} className="rounded-lg flex-shrink-0" />
         {!collapsed && (
           <div className="min-w-0">
-            <h1 className="text-sm font-bold tracking-tight">Horizon Energy</h1>
-            <p className="text-[10px] text-gray-400 font-medium">Admin Dashboard</p>
+            <h1 className="text-sm font-bold tracking-tight">Horizon</h1>
+            <p className="text-[10px] text-gray-400 font-medium">Energy South</p>
           </div>
         )}
       </div>

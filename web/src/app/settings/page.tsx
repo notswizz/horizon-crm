@@ -17,6 +17,8 @@ import {
   Database,
   DollarSign,
   Info,
+  Users,
+  Pencil,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -27,12 +29,18 @@ export default function SettingsPage() {
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    fetch("/api/config")
-      .then((r) => r.json())
-      .then((d) => {
-        setConfig(d);
-        setLoading(false);
-      });
+    Promise.all([
+      fetch("/api/config").then((r) => r.json()),
+      fetch("/api/analytics").then((r) => r.json()),
+    ]).then(([cfg, analytics]) => {
+      // Merge discovered inspector names into config list
+      const saved: string[] = cfg.inspectorNames || [];
+      const discovered: string[] = (analytics.topInspectors || []).map((i: { name: string }) => i.name);
+      const merged = Array.from(new Set([...saved, ...discovered]));
+      cfg.inspectorNames = merged;
+      setConfig(cfg);
+      setLoading(false);
+    });
   }, []);
 
   async function handleSave() {
@@ -49,7 +57,7 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  function updateList(key: "jobTypes" | "materialTypes", values: string[]) {
+  function updateList(key: "jobTypes" | "materialTypes" | "inspectorNames", values: string[]) {
     if (!config) return;
     setConfig({ ...config, [key]: values });
     setDirty(true);
@@ -131,22 +139,24 @@ export default function SettingsPage() {
         />
       </div>
 
-      {/* Bottom row: Value Formulas */}
+      {/* Bottom row: Combined Value Formulas + Inspector Names */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DatasetValueEditor
+        <CombinedValueEditor
           weights={config.datasetValueWeights || DEFAULT_WEIGHTS}
-          onChange={(w) => {
+          valuation={config.datasetValuation || DEFAULT_VALUATION}
+          onWeightsChange={(w) => {
             setConfig({ ...config, datasetValueWeights: w });
+            setDirty(true);
+          }}
+          onValuationChange={(v) => {
+            setConfig({ ...config, datasetValuation: v });
             setDirty(true);
           }}
         />
 
-        <DatasetValuationEditor
-          config={config.datasetValuation || DEFAULT_VALUATION}
-          onChange={(v) => {
-            setConfig({ ...config, datasetValuation: v });
-            setDirty(true);
-          }}
+        <InspectorNameList
+          names={config.inspectorNames || []}
+          onChange={(v) => updateList("inspectorNames", v)}
         />
       </div>
     </div>
@@ -456,17 +466,21 @@ function IssueCategoryList({
   );
 }
 
-// ─── Dataset Value Weights Editor ─────────────────────────────────────
+// ─── Combined Value Editor ────────────────────────────────────────────
 
-function DatasetValueEditor({
+function CombinedValueEditor({
   weights,
-  onChange,
+  valuation,
+  onWeightsChange,
+  onValuationChange,
 }: {
   weights: DatasetValueWeights;
-  onChange: (weights: DatasetValueWeights) => void;
+  valuation: DatasetValuationConfig;
+  onWeightsChange: (weights: DatasetValueWeights) => void;
+  onValuationChange: (config: DatasetValuationConfig) => void;
 }) {
   function update(key: keyof DatasetValueWeights, value: number) {
-    onChange({ ...weights, [key]: value });
+    onWeightsChange({ ...weights, [key]: value });
   }
 
   const points: { key: keyof DatasetValueWeights; label: string }[] = [
@@ -483,117 +497,268 @@ function DatasetValueEditor({
 
   return (
     <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Database className="h-4 w-4 text-emerald-500" />
-          <h3 className="text-sm font-semibold">Dataset Value Formula</h3>
-        </div>
-        <p className="text-xs text-gray-400 mb-4">
-          (base + photos &times; pts + issues &times; pts) &times; multipliers
-        </p>
-
-        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Points</label>
-        <div className="grid grid-cols-3 gap-2 mt-1.5 mb-4">
-          {points.map((f) => (
-            <div key={f.key}>
-              <label className="block text-[10px] text-gray-500 mb-0.5">{f.label}</label>
-              <input
-                type="number"
-                value={weights[f.key]}
-                onChange={(e) => update(f.key, Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
-              />
-            </div>
-          ))}
-        </div>
-
-        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Multipliers</label>
-        <div className="grid grid-cols-3 gap-2 mt-1.5 mb-4">
-          {multipliers.map((f) => (
-            <div key={f.key}>
-              <label className="block text-[10px] text-gray-500 mb-0.5">{f.label}</label>
-              <input
-                type="number"
-                value={weights[f.key]}
-                onChange={(e) => update(f.key, Number(e.target.value))}
-                step={f.step}
-                className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <label className="text-[10px] text-gray-500">Pair Threshold</label>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <input
-                type="number"
-                value={weights.pairThreshold}
-                onChange={(e) => update("pairThreshold", Number(e.target.value))}
-                className="w-16 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
-              />
-              <span className="text-xs text-gray-400">%</span>
-            </div>
+      <CardContent className="p-6 space-y-5">
+        {/* Point-based section */}
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Database className="h-4 w-4 text-[#FF6B35]" />
+            <h3 className="text-sm font-semibold">Point-Based Value</h3>
           </div>
-          <button
-            onClick={() => onChange({ ...DEFAULT_WEIGHTS })}
-            className="text-[11px] text-gray-400 hover:text-[#FF6B35] transition-colors"
-          >
-            Reset defaults
-          </button>
+          <p className="text-xs text-gray-400 mb-3">
+            (base + photos &times; pts + issues &times; pts) &times; multipliers
+          </p>
+
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Points</label>
+          <div className="grid grid-cols-3 gap-2 mt-1.5 mb-3">
+            {points.map((f) => (
+              <div key={f.key}>
+                <label className="block text-[10px] text-gray-500 mb-0.5">{f.label}</label>
+                <input
+                  type="number"
+                  value={weights[f.key]}
+                  onChange={(e) => update(f.key, Number(e.target.value))}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                />
+              </div>
+            ))}
+          </div>
+
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Multipliers</label>
+          <div className="grid grid-cols-3 gap-2 mt-1.5 mb-3">
+            {multipliers.map((f) => (
+              <div key={f.key}>
+                <label className="block text-[10px] text-gray-500 mb-0.5">{f.label}</label>
+                <input
+                  type="number"
+                  value={weights[f.key]}
+                  onChange={(e) => update(f.key, Number(e.target.value))}
+                  step={f.step}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-[10px] text-gray-500">Pair Threshold</label>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <input
+                  type="number"
+                  value={weights.pairThreshold}
+                  onChange={(e) => update("pairThreshold", Number(e.target.value))}
+                  className="w-16 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                />
+                <span className="text-xs text-gray-400">%</span>
+              </div>
+            </div>
+            <button
+              onClick={() => onWeightsChange({ ...DEFAULT_WEIGHTS })}
+              className="text-[11px] text-gray-400 hover:text-[#FF6B35] transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <hr className="border-gray-100" />
+
+        {/* Revenue-based section */}
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <DollarSign className="h-4 w-4 text-purple-600" />
+            <h3 className="text-sm font-semibold">Revenue-Based Value</h3>
+          </div>
+          <p className="text-xs text-gray-400 mb-3">
+            Rebate Revenue &times; Base %
+          </p>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                % of Rebate Revenue
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  value={valuation.basePercent}
+                  onChange={(e) => onValuationChange({ basePercent: Number(e.target.value) })}
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  className="w-20 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                />
+                <span className="text-xs text-gray-400">%</span>
+                <span className="text-[10px] text-gray-400 ml-1">5-15% typical</span>
+              </div>
+            </div>
+            <button
+              onClick={() => onValuationChange({ basePercent: 10 })}
+              className="text-[11px] text-gray-400 hover:text-[#FF6B35] transition-colors"
+            >
+              Reset
+            </button>
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-// ─── Revenue-Based Dataset Valuation Editor ──────────────────────────
+// ─── Inspector Name List with Rename ─────────────────────────────────
 
-function DatasetValuationEditor({
-  config,
+function InspectorNameList({
+  names,
   onChange,
 }: {
-  config: DatasetValuationConfig;
-  onChange: (config: DatasetValuationConfig) => void;
+  names: string[];
+  onChange: (names: string[]) => void;
 }) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const addRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingIndex !== null) inputRef.current?.focus();
+  }, [editingIndex]);
+
+  useEffect(() => {
+    if (adding) addRef.current?.focus();
+  }, [adding]);
+
+  function startEdit(i: number) {
+    setEditingIndex(i);
+    setEditValue(names[i]);
+  }
+
+  async function commitRename(i: number) {
+    const trimmed = editValue.trim();
+    if (!trimmed || trimmed === names[i]) {
+      setEditingIndex(null);
+      return;
+    }
+
+    setRenaming(true);
+    try {
+      const res = await fetch("/api/inspectors", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldName: names[i], newName: trimmed }),
+      });
+      if (res.ok) {
+        const updated = [...names];
+        updated[i] = trimmed;
+        onChange(updated);
+      }
+    } finally {
+      setRenaming(false);
+      setEditingIndex(null);
+    }
+  }
+
+  function handleAdd() {
+    const trimmed = newName.trim();
+    if (!trimmed || names.includes(trimmed)) return;
+    onChange([...names, trimmed]);
+    setNewName("");
+    setAdding(false);
+  }
+
   return (
     <Card>
       <CardContent className="p-6">
-        <div className="flex items-center gap-2 mb-1">
-          <DollarSign className="h-4 w-4 text-purple-600" />
-          <h3 className="text-sm font-semibold">Revenue-Based Valuation</h3>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-indigo-500" />
+            <h3 className="text-sm font-semibold">Inspector Names</h3>
+          </div>
+          <span className="text-xs text-gray-400">{names.length} inspectors</span>
         </div>
         <p className="text-xs text-gray-400 mb-4">
-          Rebate Revenue &times; Base %
+          Click the pencil to rename — updates all existing forms in Firestore and iOS.
         </p>
 
-        <div>
-          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-            % of Rebate Revenue
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              value={config.basePercent}
-              onChange={(e) => onChange({ basePercent: Number(e.target.value) })}
-              min={0}
-              max={100}
-              step={0.5}
-              className="w-20 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
-            />
-            <span className="text-xs text-gray-400">%</span>
-            <span className="text-[10px] text-gray-400 ml-1">5-15% typical</span>
-          </div>
+        <div className="space-y-1">
+          {names.map((name, i) => (
+            <div key={`${name}-${i}`} className="group flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 transition-colors">
+              {editingIndex === i ? (
+                <div className="flex-1 flex items-center gap-1.5">
+                  <input
+                    ref={inputRef}
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename(i);
+                      if (e.key === "Escape") setEditingIndex(null);
+                    }}
+                    disabled={renaming}
+                    className="flex-1 text-sm px-2 py-1 rounded border border-[#FF6B35] bg-white outline-none"
+                  />
+                  <button
+                    onClick={() => commitRename(i)}
+                    disabled={renaming}
+                    className="p-1 rounded bg-[#FF6B35] text-white hover:bg-[#E5532D] disabled:opacity-50"
+                  >
+                    {renaming ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm text-gray-700">{name}</span>
+                  <button
+                    onClick={() => startEdit(i)}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-300 hover:text-indigo-500 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => onChange(names.filter((_, j) => j !== i))}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
         </div>
 
-        <div className="flex justify-end mt-3">
-          <button
-            onClick={() => onChange({ basePercent: 10 })}
-            className="text-[11px] text-gray-400 hover:text-[#FF6B35] transition-colors"
-          >
-            Reset default
-          </button>
+        <div className="mt-3">
+          {adding ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                ref={addRef}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); handleAdd(); }
+                  if (e.key === "Escape") { setAdding(false); setNewName(""); }
+                }}
+                onBlur={() => { if (!newName.trim()) { setAdding(false); setNewName(""); } }}
+                placeholder="e.g. Mike Rivera"
+                className="text-sm px-3 py-1.5 rounded-lg border border-[#FF6B35] bg-white outline-none flex-1"
+              />
+              <button
+                onClick={handleAdd}
+                disabled={!newName.trim()}
+                className="p-1.5 rounded-lg bg-[#FF6B35] text-white hover:bg-[#E5532D] disabled:opacity-30 transition-colors"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAdding(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-gray-300 text-sm text-gray-400 hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors w-full justify-center"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Inspector
+            </button>
+          )}
         </div>
       </CardContent>
     </Card>

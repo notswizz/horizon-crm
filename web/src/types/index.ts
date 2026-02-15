@@ -193,6 +193,7 @@ export interface DropdownConfig {
   jobTypes: string[];
   issueCategories: IssueCategoryConfig[];
   materialTypes: string[];
+  inspectorNames?: string[];
   datasetValueWeights?: DatasetValueWeights;
   datasetValuation?: DatasetValuationConfig;
 }
