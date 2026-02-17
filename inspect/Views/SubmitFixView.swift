@@ -28,19 +28,27 @@ struct SubmitFixView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    issueCard
-                    photoSection
-                    notesSection
-                    materialsSection
-                    saveButton
+                VStack(spacing: 0) {
+                    // Hero issue context
+                    issueHero
+
+                    // Form content
+                    VStack(spacing: 14) {
+                        photoSection
+                        notesSection
+                        materialsSection
+                        saveButton
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 32)
                 }
-                .padding()
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Fix Issue")
             .navigationBarTitleDisplayMode(.inline)
+            .ignoresSafeArea(.container, edges: .top)
             .alert("Save Error", isPresented: $showError) {
                 Button("OK") { }
             } message: {
@@ -48,104 +56,144 @@ struct SubmitFixView: View {
             }
 
             if showSuccess {
-                VStack(spacing: 16) {
-                    ZStack {
-                        Circle()
-                            .fill(DS.Colors.success.opacity(0.15))
-                            .frame(width: 80, height: 80)
-                        Image(systemName: "wrench.and.screwdriver.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(DS.Colors.success)
-                    }
-                    Text("Fix Submitted")
-                        .font(.title3.weight(.bold))
-                    Text(issue.category)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(32)
-                .background(.ultraThinMaterial, in: .rect(cornerRadius: 24))
-                .shadow(color: .black.opacity(0.12), radius: 24, y: 8)
-                .transition(.scale.combined(with: .opacity))
+                successOverlay
             }
         }
     }
 
-    // MARK: - Issue Context Card
+    // MARK: - Issue Hero
 
-    private var issueCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 5) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(DS.Colors.error)
-                Text("Fixing Issue")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-
-            // Issue summary
-            HStack(spacing: 8) {
-                Image(systemName: issue.severity.icon)
-                    .foregroundStyle(issue.severity.color)
-                    .font(.subheadline)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(issue.category)
-                        .font(.subheadline.weight(.semibold))
-
-                    HStack(spacing: 8) {
-                        Text(issue.severity.rawValue)
-                            .font(.caption2.weight(.medium))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(issue.severity.color.opacity(0.12), in: .capsule)
-                            .foregroundStyle(issue.severity.color)
-
-                        if let spot {
-                            Text(spot.title)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+    private var issueHero: some View {
+        ZStack(alignment: .bottom) {
+            // Issue photo or gradient background
+            Color.clear
+                .frame(height: 260)
+                .overlay {
+                    Group {
+                        if let urlString = issue.photoURL, let url = URL(string: urlString) {
+                            AsyncImage(url: url) { phase in
+                                if let img = phase.image {
+                                    img.resizable().scaledToFill()
+                                } else if phase.error != nil {
+                                    heroPlaceholder
+                                } else {
+                                    ZStack {
+                                        Color(.systemGray5)
+                                        ProgressView()
+                                    }
+                                }
+                            }
+                        } else {
+                            heroPlaceholder
                         }
                     }
                 }
+                .clipped()
+
+            // Gradient scrim
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0.2),
+                    .init(color: .black.opacity(0.7), location: 1.0),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            // Bottom overlay info
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Severity badge
+                    HStack(spacing: 5) {
+                        Image(systemName: issue.severity.icon)
+                            .font(.system(size: 10, weight: .bold))
+                        Text(issue.severity.rawValue)
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(issue.severity.color.opacity(0.5), in: .capsule)
+                    .overlay(Capsule().strokeBorder(issue.severity.color.opacity(0.6), lineWidth: 1))
+
+                    // Category
+                    Text(issue.category)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+
+                    // Address
+                    HStack(spacing: 5) {
+                        Image(systemName: "mappin")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text(job.address)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(.white.opacity(0.8))
+                }
 
                 Spacer()
-            }
 
-            if !issue.notes.isEmpty {
-                Text(issue.notes)
-                    .font(.caption)
+                // Spot badge
+                if let spot {
+                    HStack(spacing: 5) {
+                        Image(systemName: JobType.icon(for: spot.jobType))
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(spot.title)
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial, in: .capsule)
+                }
+            }
+            .padding(18)
+        }
+    }
+
+    private var heroPlaceholder: some View {
+        ZStack {
+            LinearGradient(
+                colors: [issue.severity.color.opacity(0.3), issue.severity.color.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            VStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 36, weight: .light))
+                    .foregroundStyle(issue.severity.color.opacity(0.4))
+                Text("Issue Photo")
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.tertiary)
-                    .lineLimit(2)
-            }
-
-            // Job context
-            HStack(spacing: 6) {
-                Image(systemName: "mappin")
-                    .font(.caption2)
-                    .foregroundStyle(DS.Colors.primary)
-                Text(job.address)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
-        .padding(14)
-        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
-        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Photo Section
 
     private var photoSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
                 Image(systemName: "camera.fill")
-                    .font(.caption)
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(DS.Colors.success)
-                Text("Fix Photo")
-                    .font(.caption.weight(.semibold))
+                Text("FIX PHOTO")
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
+                    .tracking(0.5)
+
+                Spacer()
+
+                if displayImage != nil {
+                    HStack(spacing: 3) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 10))
+                        Text("Captured")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(DS.Colors.success)
+                }
             }
 
             if let displayImage {
@@ -154,36 +202,51 @@ struct SubmitFixView: View {
                         .resizable()
                         .scaledToFill()
                         .frame(maxWidth: .infinity)
-                        .frame(height: 200)
+                        .frame(height: 220)
                         .clipped()
-                        .clipShape(.rect(cornerRadius: 10))
+                        .clipShape(.rect(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(DS.Colors.success.opacity(0.3), lineWidth: 2)
+                        )
 
                     Button {
-                        photoRef = nil
-                        self.displayImage = nil
-                        selectedItem = nil
+                        withAnimation(DS.Animation.defaultSpring) {
+                            photoRef = nil
+                            self.displayImage = nil
+                            selectedItem = nil
+                        }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
+                            .font(.system(size: 24))
                             .foregroundStyle(.white, .black.opacity(0.5))
-                            .padding(8)
+                            .padding(10)
                     }
                 }
             } else {
                 PhotosPicker(selection: $selectedItem, matching: .images) {
-                    VStack(spacing: 8) {
-                        Image(systemName: "camera.fill")
-                            .font(.title2)
+                    VStack(spacing: 10) {
+                        ZStack {
+                            Circle()
+                                .fill(DS.Colors.success.opacity(0.1))
+                                .frame(width: 52, height: 52)
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(DS.Colors.success)
+                        }
                         Text("Take / Choose Photo")
-                            .font(.subheadline.weight(.medium))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(DS.Colors.success)
+                        Text("Required to submit fix")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
                     }
-                    .foregroundStyle(DS.Colors.success)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 140)
-                    .background(DS.Colors.success.opacity(0.06), in: .rect(cornerRadius: 10))
+                    .frame(height: 160)
+                    .background(DS.Colors.success.opacity(0.04), in: .rect(cornerRadius: 12))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 5]))
                             .foregroundStyle(DS.Colors.success.opacity(0.25))
                     )
                 }
@@ -192,7 +255,7 @@ struct SubmitFixView: View {
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
@@ -200,23 +263,28 @@ struct SubmitFixView: View {
     // MARK: - Notes Section
 
     private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
                 Image(systemName: "text.alignleft")
-                    .font(.caption)
-                    .foregroundStyle(DS.Colors.success)
-                Text("Resolution Notes")
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DS.Colors.info)
+                Text("RESOLUTION NOTES")
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
+                    .tracking(0.5)
             }
 
             TextField("How was this fixed?", text: $resolutionNotes, axis: .vertical)
-                .lineLimit(3...6)
-                .font(.subheadline)
+                .lineLimit(3...8)
+                .font(.system(size: 15))
                 .padding(12)
-                .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                )
         }
-        .padding(14)
+        .padding(16)
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
@@ -224,91 +292,32 @@ struct SubmitFixView: View {
     // MARK: - Materials Section
 
     private var materialsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
                 Image(systemName: "shippingbox.fill")
-                    .font(.caption)
-                    .foregroundStyle(.purple)
-                Text("Materials Used")
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(.purple.gradient, in: .rect(cornerRadius: 6))
+                Text("MATERIALS USED")
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
+                    .tracking(0.5)
+
                 Spacer()
+
                 if !materials.isEmpty {
-                    Text("\(materials.count)")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color(.tertiarySystemFill), in: .capsule)
+                    Text("\(materials.count) item\(materials.count == 1 ? "" : "s")")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.purple)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.purple.opacity(0.1), in: .capsule)
                 }
             }
 
             ForEach(Array(materials.enumerated()), id: \.element.id) { index, _ in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        TextField("Material name", text: $materials[index].name)
-                            .font(.subheadline)
-
-                        Button {
-                            withAnimation(DS.Animation.defaultSpring) {
-                                _ = materials.remove(at: index)
-                            }
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.caption)
-                                .foregroundStyle(DS.Colors.error.opacity(0.7))
-                        }
-                    }
-
-                    HStack(spacing: 8) {
-                        TextField("Quantity", text: $materials[index].quantity)
-                            .font(.caption)
-                            .padding(8)
-                            .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
-
-                        TextField("Cost ($)", value: $materials[index].cost, format: .number)
-                            .font(.caption)
-                            .keyboardType(.decimalPad)
-                            .padding(8)
-                            .frame(width: 100)
-                            .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
-                    }
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(configStore.materialTypes, id: \.self) { type in
-                                Button {
-                                    materials[index].type = type
-                                } label: {
-                                    HStack(spacing: 3) {
-                                        Image(systemName: MaterialType.icon(for: type))
-                                            .font(.caption2)
-                                        Text(type)
-                                            .font(.caption.weight(.medium))
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .frame(height: 28)
-                                    .foregroundStyle(materials[index].type == type ? .white : .primary)
-                                    .background(
-                                        materials[index].type == type
-                                            ? AnyShapeStyle(MaterialType.color(for: type))
-                                            : AnyShapeStyle(.clear),
-                                        in: .capsule
-                                    )
-                                    .overlay(
-                                        Capsule()
-                                            .strokeBorder(
-                                                materials[index].type == type ? .clear : Color(.systemGray3),
-                                                lineWidth: 1
-                                            )
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(10)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
+                materialRow(index: index)
             }
 
             Button {
@@ -318,24 +327,139 @@ struct SubmitFixView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "plus.circle.fill")
-                        .font(.caption)
+                        .font(.system(size: 14))
                     Text("Add Material")
-                        .font(.subheadline.weight(.medium))
+                        .font(.system(size: 14, weight: .semibold))
                 }
                 .foregroundStyle(.purple)
                 .frame(maxWidth: .infinity)
-                .frame(height: 40)
-                .background(.purple.opacity(0.06), in: .rect(cornerRadius: 8))
+                .frame(height: 44)
+                .background(.purple.opacity(0.04), in: .rect(cornerRadius: 12))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                        .foregroundStyle(.purple.opacity(0.25))
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 5]))
+                        .foregroundStyle(.purple.opacity(0.18))
                 )
             }
         }
-        .padding(14)
+        .padding(16)
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
+    }
+
+    private func materialRow(index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header: number + delete
+            HStack {
+                HStack(spacing: 6) {
+                    Text("\(index + 1)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 18, height: 18)
+                        .background(.purple.gradient, in: .circle)
+                    Text("Material")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button {
+                    withAnimation(DS.Animation.defaultSpring) {
+                        _ = materials.remove(at: index)
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(Color(.tertiarySystemFill), in: .circle)
+                }
+            }
+
+            // Name field
+            TextField("Material name", text: $materials[index].name)
+                .font(.system(size: 15))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                )
+
+            // Quantity + cost side by side
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Quantity")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                    TextField("0", text: $materials[index].quantity)
+                        .font(.system(size: 14))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Unit Cost")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                    HStack(spacing: 4) {
+                        Text("$")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                        TextField("0.00", value: $materials[index].cost, format: .number)
+                            .font(.system(size: 14))
+                            .keyboardType(.decimalPad)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                    )
+                }
+            }
+
+            // Type chips
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(configStore.materialTypes, id: \.self) { type in
+                        Button {
+                            materials[index].type = type
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: MaterialType.icon(for: type))
+                                    .font(.system(size: 9))
+                                Text(type)
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 30)
+                            .foregroundStyle(materials[index].type == type ? .white : .primary)
+                            .background(
+                                materials[index].type == type
+                                    ? AnyShapeStyle(MaterialType.color(for: type).gradient)
+                                    : AnyShapeStyle(Color(.tertiarySystemFill)),
+                                in: .capsule
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(.purple.opacity(0.08), lineWidth: 1)
+        )
     }
 
     // MARK: - Save Button
@@ -345,38 +469,62 @@ struct SubmitFixView: View {
             Task { await save() }
         } label: {
             HStack(spacing: 8) {
-                Spacer()
                 if isSaving {
                     ProgressView()
                         .tint(.white)
                 } else {
                     Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
                     Text("Submit Fix")
+                        .font(.system(size: 16, weight: .bold))
                 }
-                Spacer()
             }
-            .font(.headline)
             .foregroundStyle(.white)
-            .frame(height: 50)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
             .background(
                 LinearGradient(
                     colors: photoRef != nil
                         ? [DS.Colors.success, DS.Colors.success.opacity(0.85)]
-                        : [.gray, .gray.opacity(0.85)],
+                        : [Color(.systemGray3), Color(.systemGray3).opacity(0.85)],
                     startPoint: .leading,
                     endPoint: .trailing
                 ),
-                in: .capsule
+                in: .rect(cornerRadius: 14)
             )
             .shadow(
                 color: photoRef != nil ? DS.Colors.success.opacity(0.3) : .clear,
-                radius: 12,
+                radius: 10,
                 y: 4
             )
         }
         .disabled(photoRef == nil || isSaving)
         .sensoryFeedback(.impact(weight: .medium), trigger: isSaving)
         .padding(.top, 4)
+    }
+
+    // MARK: - Success Overlay
+
+    private var successOverlay: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(DS.Colors.success.opacity(0.15))
+                    .frame(width: 80, height: 80)
+                Image(systemName: "wrench.and.screwdriver.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(DS.Colors.success)
+            }
+            Text("Fix Submitted")
+                .font(.system(size: 20, weight: .bold))
+            Text(issue.category)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+        }
+        .padding(32)
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.12), radius: 24, y: 8)
+        .transition(.scale.combined(with: .opacity))
     }
 
     // MARK: - Photo Import

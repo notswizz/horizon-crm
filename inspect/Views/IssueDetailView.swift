@@ -31,47 +31,156 @@ struct IssueDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                photoSection
-                detailsCard
-                notesCard
-                fixStatusCard
-                saveButton
+            VStack(spacing: 0) {
+                // Hero photo with overlays
+                photoHero
+
+                // Content
+                VStack(spacing: 14) {
+                    detailsCard
+                    notesCard
+                    fixStatusCard
+                    saveButton
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 32)
             }
-            .padding()
         }
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Issue Detail")
         .navigationBarTitleDisplayMode(.inline)
+        .ignoresSafeArea(.container, edges: .top)
         .onAppear { loadFields() }
         .refreshable { await store.refreshForms(for: job.id) }
     }
 
-    // MARK: - Photo
+    // MARK: - Photo Hero
 
-    private var photoSection: some View {
-        Group {
-            if let urlString = issue?.photoURL, let url = URL(string: urlString) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(maxHeight: 300)
-                            .clipped()
-                            .clipShape(.rect(cornerRadius: 14))
-                    case .failure:
-                        placeholderBox("Failed to load photo")
-                    default:
-                        ProgressView()
-                            .frame(height: 220)
+    private var photoHero: some View {
+        ZStack(alignment: .bottom) {
+            // Photo
+            Color.clear
+                .frame(height: 320)
+                .overlay {
+                    Group {
+                        if let urlString = issue?.photoURL {
+                            if urlString.hasPrefix("pending://") {
+                                let photoId = String(urlString.dropFirst("pending://".count))
+                                if let localImage = syncQueue.loadPendingImage(photoId: photoId) {
+                                    Image(uiImage: localImage)
+                                        .resizable()
+                                        .scaledToFill()
+                                } else {
+                                    photoPlaceholder
+                                }
+                            } else if let url = URL(string: urlString) {
+                                AsyncImage(url: url) { phase in
+                                    if let img = phase.image {
+                                        img.resizable().scaledToFill()
+                                    } else if phase.error != nil {
+                                        photoPlaceholder
+                                    } else {
+                                        ZStack {
+                                            Color(.systemGray5)
+                                            ProgressView()
+                                        }
+                                    }
+                                }
+                            } else {
+                                photoPlaceholder
+                            }
+                        } else {
+                            photoPlaceholder
+                        }
                     }
                 }
-            } else {
-                placeholderBox("No photo")
+                .clipped()
+
+            // Bottom gradient scrim
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0.4),
+                    .init(color: .black.opacity(0.6), location: 1.0),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            // Bottom overlay: severity + category + spot
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 6) {
+                    // Severity pill
+                    if let issue {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(issue.severity.color)
+                                .frame(width: 8, height: 8)
+                            Text(issue.severity.rawValue)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(issue.severity.color.opacity(0.3), in: .capsule)
+                        .overlay(Capsule().strokeBorder(issue.severity.color.opacity(0.4), lineWidth: 1))
+                    }
+
+                    // Category
+                    Text(category)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                }
+
+                Spacer()
+
+                // Spot badge
+                if let spot {
+                    HStack(spacing: 5) {
+                        Image(systemName: JobType.icon(for: spot.jobType))
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(spot.title)
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial, in: .capsule)
+                }
             }
+            .padding(18)
+        }
+        .overlay(alignment: .topTrailing) {
+            // Resolution badge
+            if linkedFix != nil {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12, weight: .bold))
+                    Text("Resolved")
+                        .font(.system(size: 12, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(DS.Colors.success.gradient, in: .capsule)
+                .shadow(color: DS.Colors.success.opacity(0.3), radius: 6, y: 3)
+                .padding(.top, 56)
+                .padding(.trailing, 16)
+            }
+        }
+    }
+
+    private var photoPlaceholder: some View {
+        ZStack {
+            Color(.systemGray5)
+            VStack(spacing: 6) {
+                Image(systemName: "camera")
+                    .font(.system(size: 28, weight: .light))
+                Text("No photo")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .foregroundStyle(.tertiary)
         }
     }
 
@@ -79,40 +188,12 @@ struct IssueDetailView: View {
 
     private var detailsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 5) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(DS.Colors.error)
-                Text("Issue Details")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-
-            // Spot info
-            if let spot {
-                HStack(spacing: 8) {
-                    Image(systemName: JobType.icon(for: spot.jobType))
-                        .font(.caption)
-                        .foregroundStyle(DS.Colors.primary)
-                    Text(spot.title)
-                        .font(.subheadline.weight(.medium))
-                    Spacer()
-                    Text(spot.jobType)
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(DS.Colors.primary.opacity(0.1), in: .capsule)
-                        .foregroundStyle(DS.Colors.primary)
-                }
-            }
-
-            Divider()
-
             // Category picker
             VStack(alignment: .leading, spacing: 6) {
                 Text("CATEGORY")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
 
                 Menu {
                     ForEach(configStore.categories(for: spot?.jobType ?? ""), id: \.self) { cat in
@@ -121,57 +202,79 @@ struct IssueDetailView: View {
                 } label: {
                     HStack {
                         Text(category)
-                            .font(.subheadline)
+                            .font(.system(size: 15, weight: .medium))
                         Spacer()
                         Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption2)
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.tertiary)
                     }
-                    .padding(10)
-                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                    )
                 }
                 .foregroundStyle(.primary)
             }
 
             // Severity picker
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("SEVERITY")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
 
                 HStack(spacing: 8) {
                     ForEach(IssueSeverity.allCases) { sev in
                         Button {
-                            severity = sev
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                severity = sev
+                            }
                         } label: {
-                            Text(sev.rawValue)
-                                .font(.caption.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 34)
-                                .foregroundStyle(severity == sev ? .white : sev.color)
-                                .background(
-                                    severity == sev
-                                        ? AnyShapeStyle(sev.color)
-                                        : AnyShapeStyle(sev.color.opacity(0.1)),
-                                    in: .capsule
-                                )
+                            VStack(spacing: 4) {
+                                Circle()
+                                    .fill(severity == sev ? sev.color : sev.color.opacity(0.2))
+                                    .frame(width: 10, height: 10)
+                                Text(sev.rawValue)
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .foregroundStyle(severity == sev ? .white : sev.color)
+                            .background(
+                                severity == sev
+                                    ? AnyShapeStyle(sev.color.gradient)
+                                    : AnyShapeStyle(sev.color.opacity(0.08)),
+                                in: .rect(cornerRadius: 12)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(
+                                        severity == sev ? .clear : sev.color.opacity(0.15),
+                                        lineWidth: 1
+                                    )
+                            )
                         }
+                        .sensoryFeedback(.selection, trigger: severity == sev)
                     }
                 }
             }
 
+            // Date
             if let issue {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 10, weight: .semibold))
                     Text(issue.dateTaken.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 12, weight: .medium))
                 }
+                .foregroundStyle(.tertiary)
+                .padding(.top, 2)
             }
         }
-        .padding(14)
+        .padding(16)
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
@@ -180,22 +283,22 @@ struct IssueDetailView: View {
 
     private var notesCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: "text.alignleft")
-                    .font(.caption)
-                    .foregroundStyle(DS.Colors.primary)
-                Text("Notes")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
+            Text("NOTES")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.secondary)
+                .tracking(0.5)
 
             TextField("Add notes about this issue...", text: $notes, axis: .vertical)
                 .lineLimit(3...8)
-                .font(.subheadline)
+                .font(.system(size: 15))
                 .padding(12)
-                .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                )
         }
-        .padding(14)
+        .padding(16)
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
@@ -228,147 +331,116 @@ struct IssueDetailView: View {
 
     private func resolvedCard(issue: IssuePhoto, fix: FixPhoto) -> some View {
         VStack(spacing: 0) {
-            resolvedHeader(fix: fix)
-            resolvedComparison(issue: issue, fix: fix)
-            resolvedNotes(fix: fix)
-            resolvedInspectionLink
+            // Header
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16, weight: .bold))
+                Text("Resolved")
+                    .font(.system(size: 15, weight: .bold))
+                Spacer()
+                Text(fix.dateTaken.formatted(date: .abbreviated, time: .omitted))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(DS.Colors.success.gradient)
+
+            // Before/after comparison
+            if issue.photoURL != nil || fix.photoURL != nil {
+                HStack(spacing: 0) {
+                    VStack(spacing: 5) {
+                        fixComparisonPhoto(url: issue.photoURL)
+                        Text("BEFORE")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.8)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    ZStack {
+                        Circle()
+                            .fill(DS.Colors.success.opacity(0.1))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(DS.Colors.success)
+                    }
+
+                    VStack(spacing: 5) {
+                        fixComparisonPhoto(url: fix.photoURL)
+                        Text("AFTER")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.8)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(16)
+            }
+
+            // Resolution notes
+            if !fix.resolutionNotes.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "quote.opening")
+                        .font(.system(size: 9))
+                        .foregroundStyle(DS.Colors.success.opacity(0.4))
+                        .padding(.top, 2)
+                    Text(fix.resolutionNotes)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DS.Colors.success.opacity(0.04))
+            }
+
+            // Link to inspection
+            if let inspectionForm = inspectionFormForFix {
+                Divider()
+                NavigationLink(destination: FormDetailView(form: inspectionForm, job: job, store: store, configStore: configStore, syncQueue: syncQueue)) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.system(size: 12, weight: .medium))
+                        Text("View Inspection")
+                            .font(.system(size: 13, weight: .semibold))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(DS.Colors.success)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .clipShape(.rect(cornerRadius: DS.Radius.card))
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .overlay(
             RoundedRectangle(cornerRadius: DS.Radius.card)
-                .strokeBorder(DS.Colors.success.opacity(0.15), lineWidth: 1)
+                .strokeBorder(DS.Colors.success.opacity(0.12), lineWidth: 1)
         )
-        .shadow(color: DS.Colors.success.opacity(0.08), radius: 12, y: 4)
-    }
-
-    private func resolvedHeader(fix: FixPhoto) -> some View {
-        HStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(.white.opacity(0.2))
-                    .frame(width: 28, height: 28)
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-
-            Text("Issue Resolved")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
-
-            Spacer()
-
-            Text(fix.dateTaken.formatted(date: .abbreviated, time: .omitted))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(
-            LinearGradient(
-                colors: [DS.Colors.success, DS.Colors.success.opacity(0.85)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
-    }
-
-    @ViewBuilder
-    private func resolvedComparison(issue: IssuePhoto, fix: FixPhoto) -> some View {
-        if issue.photoURL != nil || fix.photoURL != nil {
-            HStack(spacing: 0) {
-                VStack(spacing: 6) {
-                    fixComparisonPhoto(url: issue.photoURL)
-                    Text("BEFORE")
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity)
-
-                ZStack {
-                    Circle()
-                        .fill(DS.Colors.success.opacity(0.1))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(DS.Colors.success)
-                }
-
-                VStack(spacing: 6) {
-                    fixComparisonPhoto(url: fix.photoURL)
-                    Text("AFTER")
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
-        }
-    }
-
-    @ViewBuilder
-    private func resolvedNotes(fix: FixPhoto) -> some View {
-        if !fix.resolutionNotes.isEmpty {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "quote.opening")
-                    .font(.system(size: 10))
-                    .foregroundStyle(DS.Colors.success.opacity(0.4))
-                    .padding(.top, 2)
-                Text(fix.resolutionNotes)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DS.Colors.success.opacity(0.04))
-        }
-    }
-
-    @ViewBuilder
-    private var resolvedInspectionLink: some View {
-        if let inspectionForm = inspectionFormForFix {
-            NavigationLink(destination: FormDetailView(form: inspectionForm, job: job, store: store, configStore: configStore, syncQueue: syncQueue)) {
-                HStack(spacing: 8) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 13, weight: .medium))
-                    Text("View Inspection Form")
-                        .font(.system(size: 14, weight: .semibold))
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-                .foregroundStyle(DS.Colors.success)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 14)
-            }
-            .buttonStyle(.plain)
-        }
+        .clipShape(.rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Colors.success.opacity(0.1), radius: 10, y: 4)
     }
 
     private func fixIssueButton(issue: IssuePhoto) -> some View {
         NavigationLink(destination: SubmitFixView(job: job, issue: issue, spotId: spotId, store: store, configStore: configStore)) {
             HStack(spacing: 8) {
-                Spacer()
                 Image(systemName: "wrench.and.screwdriver.fill")
+                    .font(.system(size: 14, weight: .semibold))
                 Text("Fix This Issue")
-                Spacer()
+                    .font(.system(size: 15, weight: .bold))
             }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(DS.Colors.success)
-            .frame(height: 44)
-            .background(DS.Colors.success.opacity(0.1), in: .rect(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(DS.Colors.success.opacity(0.2), lineWidth: 1)
-            )
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(DS.Colors.success.gradient, in: .rect(cornerRadius: 14))
+            .shadow(color: DS.Colors.success.opacity(0.25), radius: 8, y: 4)
         }
     }
 
@@ -385,25 +457,25 @@ struct IssueDetailView: View {
                             .clipped()
                             .clipShape(.rect(cornerRadius: 10))
                     case .failure:
-                        photoPlaceholder
+                        comparisonPlaceholder
                     default:
                         ProgressView()
                             .frame(width: 110, height: 80)
                     }
                 }
             } else {
-                photoPlaceholder
+                comparisonPlaceholder
             }
         }
     }
 
-    private var photoPlaceholder: some View {
+    private var comparisonPlaceholder: some View {
         RoundedRectangle(cornerRadius: 10)
             .fill(Color(.tertiarySystemFill))
             .frame(width: 110, height: 80)
             .overlay {
                 Image(systemName: "photo")
-                    .font(.title3)
+                    .font(.system(size: 16))
                     .foregroundStyle(.quaternary)
             }
     }
@@ -415,23 +487,28 @@ struct IssueDetailView: View {
             saveChanges()
         } label: {
             HStack(spacing: 8) {
-                Spacer()
                 if showSaved {
                     Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
                     Text("Saved")
+                        .font(.system(size: 16, weight: .bold))
                 } else {
                     Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 16, weight: .semibold))
                     Text("Save Changes")
+                        .font(.system(size: 16, weight: .bold))
                 }
-                Spacer()
             }
-            .font(.headline)
             .foregroundStyle(.white)
-            .frame(height: 50)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
             .background(
-                showSaved ? DS.Colors.success : DS.Colors.primary,
-                in: .capsule
+                showSaved
+                    ? AnyShapeStyle(DS.Colors.success.gradient)
+                    : AnyShapeStyle(DS.Colors.primary.gradient),
+                in: .rect(cornerRadius: 14)
             )
+            .shadow(color: (showSaved ? DS.Colors.success : DS.Colors.primary).opacity(0.25), radius: 8, y: 4)
         }
         .disabled(showSaved)
         .padding(.top, 4)
@@ -475,16 +552,5 @@ struct IssueDetailView: View {
             }
         }
         return nil
-    }
-
-    private func placeholderBox(_ text: String) -> some View {
-        RoundedRectangle(cornerRadius: 14)
-            .fill(Color(.tertiarySystemFill))
-            .frame(height: 220)
-            .overlay {
-                Text(text)
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-            }
     }
 }

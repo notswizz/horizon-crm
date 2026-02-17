@@ -94,6 +94,8 @@ export function parseJob(doc: FirebaseFirestore.DocumentSnapshot): Job {
     profitMargin: typeof d.profitMargin === "number" ? d.profitMargin : undefined,
     netProfit: typeof d.netProfit === "number" ? d.netProfit : undefined,
     companyId: d.companyId || undefined,
+    stageHistory: d.stageHistory || undefined,
+    activityLog: d.activityLog || undefined,
   };
 }
 

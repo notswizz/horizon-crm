@@ -36,17 +36,18 @@ struct NewJobView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: DS.Spacing.l) {
+                VStack(spacing: 14) {
                     propertyPhotoCard
                     jobDetailsCard
                     contactCard
                     notesCard
                     actionButtons
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(DS.Colors.background)
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("New Job")
             .navigationBarTitleDisplayMode(.inline)
             .alert("Error", isPresented: $showError) {
@@ -82,31 +83,52 @@ struct NewJobView: View {
     // MARK: - Success Overlay
 
     private var successOverlay: some View {
-        VStack(spacing: DS.Spacing.s) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(DS.Colors.success)
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(DS.Colors.success.opacity(0.15))
+                    .frame(width: 80, height: 80)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(DS.Colors.success)
+            }
             Text("Job Created")
-                .font(.title3.weight(.semibold))
+                .font(.system(size: 20, weight: .bold))
             Text("Switch to the Jobs tab to view it.")
-                .font(.subheadline)
+                .font(.system(size: 14))
                 .foregroundStyle(.secondary)
         }
-        .padding(DS.Spacing.xxl)
-        .background(.ultraThinMaterial, in: .rect(cornerRadius: DS.Spacing.l))
-        .shadow(color: .black.opacity(0.1), radius: DS.Spacing.l, y: DS.Spacing.xs)
+        .padding(32)
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.12), radius: 24, y: 8)
     }
 
     // MARK: - Property Photo Card
 
     private var propertyPhotoCard: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.m) {
-            Label {
-                Text("Property Photo")
-                    .font(.headline)
-            } icon: {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
                 Image(systemName: "photo.fill")
-                    .foregroundStyle(DS.Colors.primary)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(DS.Colors.primary.gradient, in: .rect(cornerRadius: 6))
+                Text("PROPERTY PHOTO")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
+
+                Spacer()
+
+                if propertyImage != nil {
+                    HStack(spacing: 3) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 10))
+                        Text("Added")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(DS.Colors.success)
+                }
             }
 
             if let propertyImage {
@@ -115,90 +137,127 @@ struct NewJobView: View {
                         .resizable()
                         .scaledToFill()
                         .frame(maxWidth: .infinity)
-                        .frame(height: 180)
+                        .frame(height: 200)
                         .clipped()
                         .clipShape(.rect(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+                        )
 
                     Button {
-                        self.propertyImage = nil
+                        withAnimation(DS.Animation.defaultSpring) {
+                            self.propertyImage = nil
+                        }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                            .shadow(radius: 2)
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white, .black.opacity(0.5))
+                            .padding(10)
                     }
-                    .padding(8)
                 }
             } else {
-                HStack(spacing: 12) {
-                    // Camera
+                HStack(spacing: 10) {
+                    // Camera button
                     Button {
                         if UIImagePickerController.isSourceTypeAvailable(.camera) {
                             showCamera = true
                         }
                     } label: {
-                        VStack(spacing: 6) {
-                            Image(systemName: "camera.fill")
-                                .font(.title3)
+                        VStack(spacing: 8) {
+                            ZStack {
+                                Circle()
+                                    .fill(DS.Colors.primary.opacity(0.1))
+                                    .frame(width: 44, height: 44)
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(DS.Colors.primary)
+                            }
                             Text("Camera")
-                                .font(.caption.weight(.medium))
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
                         }
-                        .foregroundStyle(DS.Colors.primary)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 80)
-                        .background(DS.Colors.primary.opacity(0.08), in: .rect(cornerRadius: 12))
+                        .frame(height: 100)
+                        .background(DS.Colors.primary.opacity(0.04), in: .rect(cornerRadius: 12))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(DS.Colors.primary.opacity(0.2), lineWidth: 1)
+                                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 5]))
+                                .foregroundStyle(DS.Colors.primary.opacity(0.2))
                         )
                     }
 
-                    // Library
+                    // Library button
                     PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        VStack(spacing: 6) {
-                            Image(systemName: "photo.on.rectangle")
-                                .font(.title3)
+                        VStack(spacing: 8) {
+                            ZStack {
+                                Circle()
+                                    .fill(DS.Colors.info.opacity(0.1))
+                                    .frame(width: 44, height: 44)
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(DS.Colors.info)
+                            }
                             Text("Library")
-                                .font(.caption.weight(.medium))
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
                         }
-                        .foregroundStyle(DS.Colors.primary)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 80)
-                        .background(DS.Colors.primary.opacity(0.08), in: .rect(cornerRadius: 12))
+                        .frame(height: 100)
+                        .background(DS.Colors.info.opacity(0.04), in: .rect(cornerRadius: 12))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(DS.Colors.primary.opacity(0.2), lineWidth: 1)
+                                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 5]))
+                                .foregroundStyle(DS.Colors.info.opacity(0.2))
                         )
                     }
                 }
             }
         }
-        .dsCard()
+        .padding(16)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Job Details Card
 
     private var jobDetailsCard: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.m) {
-            Label {
-                Text("Address")
-                    .font(.headline)
-            } icon: {
-                Image(systemName: "mappin.circle.fill")
-                    .foregroundStyle(DS.Colors.primary)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 6) {
+                Image(systemName: "mappin")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(DS.Colors.error.gradient, in: .rect(cornerRadius: 6))
+                Text("ADDRESS")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
             }
 
-            StyledTextField(
-                icon: "mappin",
-                label: "STREET ADDRESS",
-                placeholder: "123 Main St",
-                text: $job.streetAddress,
-                contentType: .streetAddressLine1
-            )
-            .focused($focusedField, equals: .streetAddress)
-            .onChange(of: job.streetAddress) { _, newValue in
-                guard !suppressCompleter else { return }
-                addressCompleter.searchText = newValue
+            // Street address
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Street Address")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                TextField("123 Main St", text: $job.streetAddress)
+                    .font(.system(size: 15))
+                    .textContentType(.streetAddressLine1)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(
+                                focusedField == .streetAddress ? DS.Colors.primary.opacity(0.5) : Color(.systemGray4),
+                                lineWidth: 1
+                            )
+                    )
+                    .focused($focusedField, equals: .streetAddress)
+                    .onChange(of: job.streetAddress) { _, newValue in
+                        guard !suppressCompleter else { return }
+                        addressCompleter.searchText = newValue
+                    }
             }
 
             // Address suggestions
@@ -208,27 +267,29 @@ struct NewJobView: View {
                         Button {
                             selectSuggestion(suggestion)
                         } label: {
-                            HStack(spacing: DS.Spacing.s) {
+                            HStack(spacing: 10) {
                                 Image(systemName: "mappin.circle.fill")
-                                    .font(.subheadline)
+                                    .font(.system(size: 14))
                                     .foregroundStyle(DS.Colors.primary.opacity(0.7))
-                                    .frame(width: 24)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(suggestion.title)
-                                        .font(.subheadline.weight(.medium))
+                                        .font(.system(size: 13, weight: .medium))
                                         .foregroundStyle(.primary)
                                         .lineLimit(1)
                                     if !suggestion.subtitle.isEmpty {
                                         Text(suggestion.subtitle)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.tertiary)
                                             .lineLimit(1)
                                     }
                                 }
                                 Spacer()
+                                Image(systemName: "arrow.up.left")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.quaternary)
                             }
-                            .padding(.vertical, DS.Spacing.xs)
-                            .padding(.horizontal, DS.Spacing.s)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 12)
                             .contentShape(.rect)
                         }
                         if suggestion != addressCompleter.suggestions.last {
@@ -236,146 +297,225 @@ struct NewJobView: View {
                         }
                     }
                 }
-                .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 10))
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(DS.Colors.primary.opacity(0.15), lineWidth: 1)
+                )
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            Divider().padding(.leading, 36)
+            // City
+            VStack(alignment: .leading, spacing: 4) {
+                Text("City")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                TextField("City", text: $job.city)
+                    .font(.system(size: 15))
+                    .textContentType(.addressCity)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                    )
+                    .focused($focusedField, equals: .city)
+            }
 
-            StyledTextField(
-                icon: "building.2",
-                label: "CITY",
-                placeholder: "City",
-                text: $job.city,
-                contentType: .addressCity
-            )
-            .focused($focusedField, equals: .city)
+            // State + Zip
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("State")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                    TextField("NC", text: $job.state)
+                        .font(.system(size: 15))
+                        .textContentType(.addressState)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                        )
+                        .focused($focusedField, equals: .state)
+                }
 
-            Divider().padding(.leading, 36)
-
-            HStack(spacing: DS.Spacing.s) {
-                StyledTextField(
-                    icon: "map",
-                    label: "STATE",
-                    placeholder: "NC",
-                    text: $job.state,
-                    contentType: .addressState
-                )
-                .focused($focusedField, equals: .state)
-
-                StyledTextField(
-                    icon: "number",
-                    label: "ZIP CODE",
-                    placeholder: "28401",
-                    text: $job.zipCode,
-                    contentType: .postalCode,
-                    keyboardType: .numberPad
-                )
-                .focused($focusedField, equals: .zipCode)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Zip Code")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                    TextField("28401", text: $job.zipCode)
+                        .font(.system(size: 15))
+                        .textContentType(.postalCode)
+                        .keyboardType(.numberPad)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                        )
+                        .focused($focusedField, equals: .zipCode)
+                }
             }
         }
-        .dsCard()
+        .padding(16)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Contact Card
 
     private var contactCard: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.m) {
-            Label {
-                Text("Contact Info")
-                    .font(.headline)
-            } icon: {
-                Image(systemName: "person.crop.circle.fill")
-                    .foregroundStyle(DS.Colors.primary)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 6) {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(DS.Colors.info.gradient, in: .rect(cornerRadius: 6))
+                Text("CONTACT INFO")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
             }
 
-            StyledTextField(
-                icon: "person.fill",
-                label: "CONTACT NAME",
-                placeholder: "Contact name",
-                text: $job.contactName,
-                contentType: .name
-            )
-            .focused($focusedField, equals: .contactName)
+            // Contact Name
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Name")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                HStack(spacing: 10) {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                    TextField("Contact name", text: $job.contactName)
+                        .font(.system(size: 15))
+                        .textContentType(.name)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                )
+                .focused($focusedField, equals: .contactName)
+            }
 
-            Divider().padding(.leading, 36)
+            // Phone
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Phone")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                HStack(spacing: 10) {
+                    Image(systemName: "phone.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                    TextField("Phone number", text: $job.contactPhone)
+                        .font(.system(size: 15))
+                        .textContentType(.telephoneNumber)
+                        .keyboardType(.phonePad)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                )
+                .focused($focusedField, equals: .contactPhone)
+            }
 
-            StyledTextField(
-                icon: "phone.fill",
-                label: "PHONE",
-                placeholder: "Phone number",
-                text: $job.contactPhone,
-                contentType: .telephoneNumber,
-                keyboardType: .phonePad
-            )
-            .focused($focusedField, equals: .contactPhone)
-
-            Divider().padding(.leading, 36)
-
-            StyledTextField(
-                icon: "envelope.fill",
-                label: "EMAIL",
-                placeholder: "Email address",
-                text: $job.contactEmail,
-                contentType: .emailAddress,
-                keyboardType: .emailAddress
-            )
-            .focused($focusedField, equals: .contactEmail)
+            // Email
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Email")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                HStack(spacing: 10) {
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                    TextField("Email address", text: $job.contactEmail)
+                        .font(.system(size: 15))
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                )
+                .focused($focusedField, equals: .contactEmail)
+            }
         }
-        .dsCard()
+        .padding(16)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Notes Card
 
     private var notesCard: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.m) {
-            Label {
-                Text("Notes")
-                    .font(.headline)
-            } icon: {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
                 Image(systemName: "note.text")
-                    .foregroundStyle(DS.Colors.primary)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(DS.Colors.warning.gradient, in: .rect(cornerRadius: 6))
+                Text("NOTES")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
             }
 
-            StyledTextField(
-                icon: "note.text",
-                label: "NOTES",
-                placeholder: "Additional notes about this job",
-                text: $job.notes,
-                axis: .vertical,
-                lineLimit: 2...5
-            )
-            .focused($focusedField, equals: .notes)
+            TextField("Additional notes about this job...", text: $job.notes, axis: .vertical)
+                .lineLimit(3...8)
+                .font(.system(size: 15))
+                .padding(12)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                )
+                .focused($focusedField, equals: .notes)
         }
-        .dsCard()
+        .padding(16)
+        .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
-        VStack(spacing: DS.Spacing.s) {
+        VStack(spacing: 10) {
             Button {
                 saveJob()
             } label: {
-                HStack(spacing: DS.Spacing.xs) {
-                    Spacer()
+                HStack(spacing: 8) {
                     Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
                     Text("Create Job")
-                    Spacer()
+                        .font(.system(size: 16, weight: .bold))
                 }
-                .font(.headline)
                 .foregroundStyle(.white)
-                .frame(height: 54)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
                 .background(
                     canSave
-                        ? DS.Gradients.primaryButton
-                        : LinearGradient(colors: [.gray, .gray.opacity(0.85)], startPoint: .leading, endPoint: .trailing),
-                    in: .capsule
+                        ? AnyShapeStyle(DS.Colors.primary.gradient)
+                        : AnyShapeStyle(Color(.systemGray3).gradient),
+                    in: .rect(cornerRadius: 14)
                 )
                 .shadow(
                     color: canSave ? DS.Colors.primary.opacity(0.3) : .clear,
-                    radius: DS.Shadow.radius,
-                    y: DS.Shadow.y
+                    radius: 10,
+                    y: 4
                 )
             }
             .disabled(!canSave || showSuccess)
@@ -383,12 +523,12 @@ struct NewJobView: View {
 
             if job.streetAddress.isEmpty {
                 Text("Enter a street address to create the job.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
             }
         }
-        .padding(.top, DS.Spacing.micro)
+        .padding(.top, 4)
     }
 
     // MARK: - Computed Properties

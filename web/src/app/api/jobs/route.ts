@@ -44,6 +44,16 @@ export async function POST(req: NextRequest) {
       companyId: session.companyId,
       createdAt: now,
       updatedAt: now,
+      stageHistory: [{ stage: "Audit Pending", date: now.toDate().toISOString() }],
+      activityLog: [{
+        id: `job-created-${jobId}`,
+        type: "job_created",
+        title: "New job created",
+        subtitle: streetAddress.trim(),
+        date: now.toDate().toISOString(),
+        icon: "briefcase",
+        color: "#FF6B35",
+      }],
     });
 
     return NextResponse.json({ id: jobId }, { status: 201 });

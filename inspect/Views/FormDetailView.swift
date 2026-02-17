@@ -14,7 +14,7 @@ struct FormDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 formInfoCard
 
                 if !liveForm.allMaterials.isEmpty {
@@ -28,8 +28,11 @@ struct FormDetailView: View {
                     inspectionSpotSections
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 32)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle(form.formType.rawValue)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -50,9 +53,11 @@ struct FormDetailView: View {
 
     private var formInfoCard: some View {
         let isAudit = liveForm.formType == .audit
+        let resolved = isAudit ? resolvedCount : 0
+        let total = isAudit ? liveForm.issuePhotos.count : 0
 
         return VStack(alignment: .leading, spacing: 0) {
-            // ── Type badge row ──────────────────────
+            // Top row: date + type badge
             HStack {
                 Text(liveForm.date.formatted(date: .abbreviated, time: .omitted))
                     .font(.system(size: 12, weight: .medium))
@@ -73,181 +78,188 @@ struct FormDetailView: View {
                 .background(.white.opacity(0.15), in: .capsule)
                 .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 1))
             }
-            .padding(.bottom, 16)
+            .padding(.bottom, 14)
 
-            // ── Address ─────────────────────────────
+            // Address
             Text(job.streetAddress.isEmpty ? (job.address.isEmpty ? "Untitled" : job.address) : job.streetAddress)
-                .font(.system(size: 24, weight: .bold))
+                .font(.system(size: 22, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(2)
 
             if !job.city.isEmpty || !job.state.isEmpty {
                 Text([job.city, job.state, job.zipCode].filter { !$0.isEmpty }.joined(separator: ", "))
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
-                    .padding(.top, 3)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .padding(.top, 2)
             }
 
-            // ── Inspector bar ───────────────────────
-            HStack(spacing: 14) {
-                HStack(spacing: 6) {
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 11))
-                    Text(liveForm.inspectorName.isEmpty ? "Unknown" : liveForm.inspectorName)
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .foregroundStyle(.white.opacity(0.8))
+            // Inspector + time
+            HStack(spacing: 0) {
+                // Initials avatar
+                Text(String(liveForm.inspectorName.prefix(1)).uppercased())
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(formAccent)
+                    .frame(width: 26, height: 26)
+                    .background(.white.opacity(0.2), in: .circle)
+
+                Text(liveForm.inspectorName.isEmpty ? "Unknown" : liveForm.inspectorName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.leading, 8)
 
                 Spacer()
 
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Image(systemName: "clock")
-                        .font(.system(size: 10))
+                        .font(.system(size: 9, weight: .semibold))
                     Text(liveForm.date.formatted(date: .omitted, time: .shortened))
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.45))
             }
-            .padding(.top, 16)
+            .padding(.top, 14)
 
-            // ── Stats row ───────────────────────────
+            // Stats row
             HStack(spacing: 8) {
-                FormHeroStat(
-                    value: "\(liveForm.photoCount)",
-                    label: "Photos",
-                    icon: "camera.fill"
-                )
+                FormHeroStat(value: "\(liveForm.photoCount)", label: "Photos", icon: "camera.fill")
                 if isAudit {
-                    FormHeroStat(
-                        value: "\(liveForm.issuePhotos.count)",
-                        label: "Issues",
-                        icon: "exclamationmark.triangle.fill"
-                    )
+                    FormHeroStat(value: "\(liveForm.issuePhotos.count)", label: "Issues", icon: "exclamationmark.triangle.fill")
                 } else {
-                    FormHeroStat(
-                        value: "\(liveForm.fixPhotos.count)",
-                        label: "Fixes",
-                        icon: "wrench.and.screwdriver.fill"
-                    )
+                    FormHeroStat(value: "\(liveForm.fixPhotos.count)", label: "Fixes", icon: "wrench.and.screwdriver.fill")
                 }
-                FormHeroStat(
-                    value: "\(liveForm.spots.count)",
-                    label: "Spots",
-                    icon: "mappin"
-                )
+                FormHeroStat(value: "\(liveForm.spots.count)", label: "Spots", icon: "mappin")
             }
-            .padding(.top, 16)
+            .padding(.top, 14)
 
-            // ── Notes ───────────────────────────────
+            // Resolution progress bar (audit only)
+            if isAudit && total > 0 {
+                VStack(spacing: 6) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(.white.opacity(0.12))
+                                .frame(height: 4)
+
+                            Capsule()
+                                .fill(resolved == total ? DS.Colors.success : DS.Colors.warning)
+                                .frame(width: geo.size.width * CGFloat(resolved) / CGFloat(total), height: 4)
+                        }
+                    }
+                    .frame(height: 4)
+
+                    HStack {
+                        Text("\(resolved) of \(total) resolved")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.5))
+                        Spacer()
+                        Text("\(Int(Double(resolved) / Double(total) * 100))%")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(resolved == total ? DS.Colors.success : .white.opacity(0.7))
+                    }
+                }
+                .padding(.top, 12)
+            }
+
+            // Notes
             if !liveForm.notes.isEmpty {
                 Text(liveForm.notes)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.65))
                     .lineLimit(3)
-                    .padding(12)
+                    .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.white.opacity(0.08), in: .rect(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(.white.opacity(0.06), lineWidth: 1)
-                    )
-                    .padding(.top, 14)
+                    .padding(.top, 12)
             }
         }
-        .padding(22)
+        .padding(20)
         .background(
             ZStack {
                 LinearGradient(
                     stops: isAudit ? [
-                        .init(color: Color(red: 0.2, green: 0.35, blue: 0.65), location: 0),
-                        .init(color: DS.Colors.info, location: 0.45),
-                        .init(color: Color(red: 0.12, green: 0.2, blue: 0.4), location: 1),
+                        .init(color: Color(red: 0.15, green: 0.28, blue: 0.55), location: 0),
+                        .init(color: DS.Colors.info, location: 0.5),
+                        .init(color: Color(red: 0.1, green: 0.18, blue: 0.38), location: 1),
                     ] : [
-                        .init(color: Color(red: 0.14, green: 0.52, blue: 0.42), location: 0),
-                        .init(color: DS.Colors.success, location: 0.45),
-                        .init(color: Color(red: 0.08, green: 0.28, blue: 0.22), location: 1),
+                        .init(color: Color(red: 0.1, green: 0.45, blue: 0.35), location: 0),
+                        .init(color: DS.Colors.success, location: 0.5),
+                        .init(color: Color(red: 0.06, green: 0.25, blue: 0.2), location: 1),
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
 
+                // Subtle bokeh circles
                 Circle()
-                    .fill((isAudit ? Color.blue : Color.mint).opacity(0.2))
-                    .frame(width: 160, height: 160)
-                    .blur(radius: 50)
-                    .offset(x: 100, y: -50)
+                    .fill((isAudit ? Color.blue : Color.mint).opacity(0.15))
+                    .frame(width: 180, height: 180)
+                    .blur(radius: 60)
+                    .offset(x: 110, y: -40)
 
                 Circle()
-                    .fill((isAudit ? Color.indigo : Color.teal).opacity(0.2))
-                    .frame(width: 120, height: 120)
-                    .blur(radius: 40)
-                    .offset(x: -80, y: 70)
+                    .fill((isAudit ? Color.indigo : Color.teal).opacity(0.15))
+                    .frame(width: 140, height: 140)
+                    .blur(radius: 45)
+                    .offset(x: -90, y: 60)
             }
         )
-        .clipShape(.rect(cornerRadius: 20))
-        .shadow(color: formAccent.opacity(0.2), radius: 4, y: 2)
-        .shadow(color: formAccent.opacity(0.2), radius: 16, y: 6)
+        .clipShape(.rect(cornerRadius: 22))
+        .shadow(color: formAccent.opacity(0.18), radius: 3, y: 2)
+        .shadow(color: formAccent.opacity(0.12), radius: 16, y: 8)
     }
 
     // MARK: - Materials Card
 
     private var materialsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label {
-                    Text("Materials")
-                        .font(.headline)
-                } icon: {
+                HStack(spacing: 6) {
                     Image(systemName: "shippingbox.fill")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.purple)
+                    Text("Materials")
+                        .font(.system(size: 14, weight: .bold))
                 }
+
                 Spacer()
-                Text("\(liveForm.allMaterials.count)")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(Color(.tertiarySystemFill), in: .capsule)
+
+                let totalCost = liveForm.allMaterials.compactMap(\.cost).reduce(0, +)
+                if totalCost > 0 {
+                    Text("$\(totalCost, specifier: "%.0f")")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(DS.Colors.success)
+                }
             }
 
             ForEach(liveForm.allMaterials) { material in
                 HStack(spacing: 10) {
                     Image(systemName: MaterialType.icon(for: material.type))
-                        .font(.caption)
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(MaterialType.color(for: material.type))
-                        .frame(width: 24)
+                        .frame(width: 28, height: 28)
+                        .background(MaterialType.color(for: material.type).opacity(0.1), in: .rect(cornerRadius: 8))
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) {
                         Text(material.name.isEmpty ? "Unnamed" : material.name)
-                            .font(.subheadline.weight(.medium))
-                        HStack(spacing: 8) {
-                            if !material.quantity.isEmpty {
-                                Text(material.quantity)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if let cost = material.cost {
-                                Text("$\(cost, specifier: "%.2f")")
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(DS.Colors.success)
-                            }
+                            .font(.system(size: 13, weight: .semibold))
+                        if !material.quantity.isEmpty {
+                            Text(material.quantity)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
                         }
                     }
 
                     Spacer()
 
-                    Text(material.type)
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(MaterialType.color(for: material.type).opacity(0.15), in: .capsule)
-                        .foregroundStyle(MaterialType.color(for: material.type))
+                    if let cost = material.cost {
+                        Text("$\(cost, specifier: "%.2f")")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(DS.Colors.success)
+                    }
                 }
-                .padding(10)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
             }
         }
-        .padding()
+        .padding(16)
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
@@ -261,143 +273,104 @@ struct FormDetailView: View {
     }
 
     private func spotIssueCard(spot: FormSpot) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             // Spot header
-            HStack {
-                Label {
-                    Text(spot.title.isEmpty ? "Unknown Spot" : spot.title)
-                        .font(.headline)
-                } icon: {
-                    Image(systemName: JobType.icon(for: spot.jobType))
-                        .foregroundStyle(DS.Colors.primary)
-                }
+            HStack(spacing: 10) {
+                Image(systemName: JobType.icon(for: spot.jobType))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(DS.Colors.primary.gradient, in: .rect(cornerRadius: 8))
+
+                Text(spot.title.isEmpty ? "Unknown Spot" : spot.title)
+                    .font(.system(size: 16, weight: .bold))
 
                 Spacer()
 
                 Text(spot.jobType)
-                    .font(.caption.weight(.medium))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(DS.Colors.primary.opacity(0.1), in: .capsule)
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(DS.Colors.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(DS.Colors.primary.opacity(0.1), in: .capsule)
             }
-
-            Divider()
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
 
             // Issue photos
-            if spot.issuePhotos.count > 1 {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(spot.issuePhotos) { photo in
-                            issuePhotoCard(photo, spotId: spot.id)
-                                .frame(width: 260)
-                        }
+            VStack(spacing: 2) {
+                ForEach(Array(spot.issuePhotos.enumerated()), id: \.element.id) { index, photo in
+                    issuePhotoRow(photo, spotId: spot.id)
+
+                    if index < spot.issuePhotos.count - 1 {
+                        Divider().padding(.leading, 16)
                     }
-                }
-            } else {
-                ForEach(spot.issuePhotos) { photo in
-                    issuePhotoCard(photo, spotId: spot.id)
                 }
             }
         }
-        .padding()
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
-    private func issuePhotoCard(_ photo: IssuePhoto, spotId: UUID) -> some View {
-        NavigationLink(destination: IssueDetailView(issueId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store, configStore: configStore, syncQueue: syncQueue)) {
-            VStack(alignment: .leading, spacing: 8) {
-                // Category + severity
-                HStack(spacing: 6) {
-                    Image(systemName: photo.severity.icon)
-                        .foregroundStyle(photo.severity.color)
-                        .font(.caption)
+    private func issuePhotoRow(_ photo: IssuePhoto, spotId: UUID) -> some View {
+        let isResolved = linkedFixPhoto(for: photo.id) != nil
 
+        return NavigationLink(destination: IssueDetailView(issueId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store, configStore: configStore, syncQueue: syncQueue)) {
+            HStack(spacing: 12) {
+                // Photo thumbnail
+                ZStack(alignment: .bottomTrailing) {
+                    photoThumbnail(url: photo.photoURL, size: 72)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(photo.severity.color.opacity(0.4), lineWidth: 2)
+                        )
+
+                    // Resolution badge on thumbnail
+                    if isResolved {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(DS.Colors.success)
+                            .background(.white, in: .circle)
+                            .offset(x: 4, y: 4)
+                    }
+                }
+
+                // Info
+                VStack(alignment: .leading, spacing: 4) {
                     Text(photo.category)
-                        .font(.subheadline.weight(.medium))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    Text(photo.severity.rawValue)
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(photo.severity.color.opacity(0.15), in: .capsule)
-                        .foregroundStyle(photo.severity.color)
+                    // Severity badge
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(photo.severity.color)
+                            .frame(width: 6, height: 6)
+                        Text(photo.severity.rawValue)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(photo.severity.color)
+                    }
+
+                    // Status
+                    HStack(spacing: 4) {
+                        Image(systemName: isResolved ? "checkmark.circle.fill" : "exclamationmark.circle")
+                            .font(.system(size: 10))
+                        Text(isResolved ? "Resolved" : "Open")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(isResolved ? DS.Colors.success : DS.Colors.warning)
                 }
 
-                // Photo
-                if let urlString = photo.photoURL {
-                    if urlString.hasPrefix("pending://") {
-                        // Pending upload — show local image with sync badge
-                        let photoId = String(urlString.dropFirst("pending://".count))
-                        ZStack(alignment: .topTrailing) {
-                            if let localImage = syncQueue.loadPendingImage(photoId: photoId) {
-                                Image(uiImage: localImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 160)
-                                    .clipped()
-                                    .clipShape(.rect(cornerRadius: 8))
-                            } else {
-                                photoPlaceholder("Pending upload")
-                            }
-                            Image(systemName: "arrow.triangle.2.circlepath.icloud.fill")
-                                .font(.caption)
-                                .foregroundStyle(.white)
-                                .padding(5)
-                                .background(.ultraThinMaterial, in: .circle)
-                                .padding(6)
-                        }
-                    } else if let url = URL(string: urlString) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 160)
-                                    .clipped()
-                                    .clipShape(.rect(cornerRadius: 8))
-                            case .failure:
-                                photoPlaceholder("Failed to load")
-                            default:
-                                ProgressView()
-                                    .frame(height: 160)
-                            }
-                        }
-                    }
-                }
+                Spacer()
 
-                // Bottom: status badge — always same height
-                HStack(spacing: 6) {
-                    if linkedFixPhoto(for: photo.id) != nil {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(DS.Colors.success)
-                        Text("Resolved")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(DS.Colors.success)
-                    } else {
-                        Image(systemName: "exclamationmark.circle")
-                            .font(.caption)
-                            .foregroundStyle(DS.Colors.primary)
-                        Text("Open")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(DS.Colors.primary)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(height: 20)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.quaternary)
             }
-            .padding(10)
-            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
         .buttonStyle(.plain)
     }
@@ -411,161 +384,169 @@ struct FormDetailView: View {
     }
 
     private func spotFixCard(spot: FormSpot) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             // Spot header
-            HStack {
-                Label {
-                    Text(spot.title.isEmpty ? "Unknown Spot" : spot.title)
-                        .font(.headline)
-                } icon: {
-                    Image(systemName: JobType.icon(for: spot.jobType))
-                        .foregroundStyle(DS.Colors.success)
-                }
+            HStack(spacing: 10) {
+                Image(systemName: JobType.icon(for: spot.jobType))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(DS.Colors.success.gradient, in: .rect(cornerRadius: 8))
+
+                Text(spot.title.isEmpty ? "Unknown Spot" : spot.title)
+                    .font(.system(size: 16, weight: .bold))
 
                 Spacer()
 
                 Text(spot.jobType)
-                    .font(.caption.weight(.medium))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(DS.Colors.success.opacity(0.1), in: .capsule)
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(DS.Colors.success)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(DS.Colors.success.opacity(0.1), in: .capsule)
             }
-
-            Divider()
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
 
             // Fix photos
-            if spot.fixPhotos.count > 1 {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(spot.fixPhotos) { photo in
-                            fixPhotoCard(photo, spotId: spot.id)
-                                .frame(width: 260)
-                        }
+            VStack(spacing: 2) {
+                ForEach(Array(spot.fixPhotos.enumerated()), id: \.element.id) { index, photo in
+                    fixPhotoRow(photo, spotId: spot.id)
+
+                    if index < spot.fixPhotos.count - 1 {
+                        Divider().padding(.leading, 16)
                     }
-                }
-            } else {
-                ForEach(spot.fixPhotos) { photo in
-                    fixPhotoCard(photo, spotId: spot.id)
                 }
             }
         }
-        .padding()
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
     }
 
-    private func fixPhotoCard(_ photo: FixPhoto, spotId: UUID) -> some View {
-        NavigationLink(destination: FixDetailView(fixId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store)) {
-            VStack(alignment: .leading, spacing: 8) {
-                // Linked issue info
-                if let linkedId = photo.linkedAuditIssueId {
-                    let linkedIssue = store.auditIssuePhotos.first { $0.id == linkedId }
+    private func fixPhotoRow(_ photo: FixPhoto, spotId: UUID) -> some View {
+        let linkedIssue = photo.linkedAuditIssueId.flatMap { id in
+            store.auditIssuePhotos.first { $0.id == id }
+        }
+
+        return NavigationLink(destination: FixDetailView(fixId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store)) {
+            HStack(spacing: 12) {
+                // Before/after thumbnails
+                ZStack(alignment: .bottomTrailing) {
+                    photoThumbnail(url: photo.photoURL, size: 72)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(DS.Colors.success.opacity(0.4), lineWidth: 2)
+                        )
+
+                    // Mini "before" thumbnail if linked
+                    if let issue = linkedIssue, issue.photoURL != nil {
+                        photoThumbnail(url: issue.photoURL, size: 28)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .strokeBorder(.white, lineWidth: 2)
+                            )
+                            .offset(x: 6, y: 6)
+                    }
+                }
+
+                // Info
+                VStack(alignment: .leading, spacing: 4) {
                     if let issue = linkedIssue {
-                        HStack(spacing: 6) {
-                            Image(systemName: "link")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Text("Fixes: \(issue.category)")
-                                .font(.caption.weight(.medium))
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.uturn.right")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(DS.Colors.success)
+                            Text(issue.category)
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
+                        }
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(issue.severity.color)
+                                .frame(width: 6, height: 6)
                             Text(issue.severity.rawValue)
-                                .font(.caption2.weight(.medium))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(issue.severity.color.opacity(0.15), in: .capsule)
+                                .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(issue.severity.color)
                         }
-                    }
-                }
-
-                // Photo
-                if let urlString = photo.photoURL {
-                    if urlString.hasPrefix("pending://") {
-                        let photoId = String(urlString.dropFirst("pending://".count))
-                        ZStack(alignment: .topTrailing) {
-                            if let localImage = syncQueue.loadPendingImage(photoId: photoId) {
-                                Image(uiImage: localImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 160)
-                                    .clipped()
-                                    .clipShape(.rect(cornerRadius: 8))
-                            } else {
-                                photoPlaceholder("Pending upload")
-                            }
-                            Image(systemName: "arrow.triangle.2.circlepath.icloud.fill")
-                                .font(.caption)
-                                .foregroundStyle(.white)
-                                .padding(5)
-                                .background(.ultraThinMaterial, in: .circle)
-                                .padding(6)
-                        }
-                    } else if let url = URL(string: urlString) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 160)
-                                    .clipped()
-                                    .clipShape(.rect(cornerRadius: 8))
-                            case .failure:
-                                photoPlaceholder("Failed to load")
-                            default:
-                                ProgressView()
-                                    .frame(height: 160)
-                            }
-                        }
-                    }
-                }
-
-                // Bottom row — consistent height
-                HStack(spacing: 6) {
-                    if !photo.resolutionNotes.isEmpty {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(DS.Colors.success)
-                            .font(.caption)
-                        Text(photo.resolutionNotes)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
                     } else {
-                        Image(systemName: "text.badge.plus")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        Text("Add notes")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                        Text("Fix photo")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
                     }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+
+                    if !photo.resolutionNotes.isEmpty {
+                        Text(photo.resolutionNotes)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                 }
-                .frame(height: 20)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.quaternary)
             }
-            .padding(10)
-            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 8))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
         .buttonStyle(.plain)
     }
 
+    // MARK: - Shared Photo Thumbnail
+
+    private func photoThumbnail(url: String?, size: CGFloat) -> some View {
+        Group {
+            if let urlString = url {
+                if urlString.hasPrefix("pending://") {
+                    let photoId = String(urlString.dropFirst("pending://".count))
+                    ZStack(alignment: .topTrailing) {
+                        if let localImage = syncQueue.loadPendingImage(photoId: photoId) {
+                            Image(uiImage: localImage)
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            Color(.systemGray5)
+                        }
+                        Image(systemName: "arrow.triangle.2.circlepath.icloud.fill")
+                            .font(.system(size: 7))
+                            .foregroundStyle(.white)
+                            .padding(3)
+                            .background(.ultraThinMaterial, in: .circle)
+                            .padding(3)
+                    }
+                } else if let imageUrl = URL(string: urlString) {
+                    AsyncImage(url: imageUrl) { phase in
+                        if let img = phase.image {
+                            img.resizable().scaledToFill()
+                        } else {
+                            Color(.systemGray5)
+                        }
+                    }
+                } else {
+                    Color(.systemGray5)
+                }
+            } else {
+                Color(.systemGray5)
+                    .overlay(
+                        Image(systemName: "camera")
+                            .font(.system(size: size * 0.2))
+                            .foregroundStyle(.tertiary)
+                    )
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(.rect(cornerRadius: size > 40 ? 12 : 6))
+    }
+
     // MARK: - Helpers
 
-    private func photoPlaceholder(_ text: String) -> some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(.gray.opacity(0.1))
-            .frame(height: 200)
-            .overlay {
-                Text(text)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
+    private var resolvedCount: Int {
+        liveForm.issuePhotos.filter { linkedFixPhoto(for: $0.id) != nil }.count
     }
 
     /// Finds the FixPhoto that resolves a given audit issue
@@ -644,23 +625,25 @@ private struct FormHeroStat: View {
     let icon: String
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.6))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
             Text(value)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
             Text(label)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.45))
+                .textCase(.uppercase)
+                .tracking(0.3)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(.white.opacity(0.08), in: .rect(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                .strokeBorder(.white.opacity(0.06), lineWidth: 1)
         )
     }
 }

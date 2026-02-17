@@ -106,6 +106,23 @@ struct JobsListView: View {
         .animation(.easeInOut(duration: 0.2), value: navPath.isEmpty)
     }
 
+    private var endOfListFooter: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 24))
+                .foregroundStyle(DS.Colors.primary.opacity(0.2))
+            Text("You're all caught up!")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.tertiary)
+            Text("\(filteredJobs.count) job\(filteredJobs.count == 1 ? "" : "s")")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.quaternary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .padding(.bottom, 60)
+    }
+
     private var hasActiveFilters: Bool {
         selectedStage != nil || sortOrder != .nearest
     }
@@ -196,7 +213,9 @@ struct JobsListView: View {
                 .id(listVersion)
                 .padding(.horizontal, DS.Spacing.m)
                 .padding(.top, DS.Spacing.xs)
-                .padding(.bottom, DS.Spacing.xl)
+                .padding(.bottom, DS.Spacing.s)
+
+                endOfListFooter
             }
         }
         .refreshable {

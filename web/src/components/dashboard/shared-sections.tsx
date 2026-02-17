@@ -1,0 +1,427 @@
+"use client";
+
+import { Card, CardContent } from "@/components/ui/card";
+import { StageBadge } from "@/components/shared/stage-badge";
+import { formatCurrency, formatDate, stageConfig } from "@/lib/utils";
+import { JobStage } from "@/types";
+import dynamic from "next/dynamic";
+import {
+  ArrowRight,
+  Camera,
+  Users,
+  Package,
+  MapPin,
+} from "lucide-react";
+import Link from "next/link";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  Label,
+} from "recharts";
+import { DashboardProps, STAGE_COLORS, tooltipStyle } from "./types";
+
+const JobMap = dynamic(() => import("@/components/shared/job-map"), { ssr: false });
+
+export function SharedSections({
+  analytics,
+  allJobs,
+  recentJobs,
+  photoDays,
+  setPhotoDays,
+  mapStageFilter,
+  setMapStageFilter,
+}: DashboardProps) {
+  const stageData = Object.entries(analytics.jobsByStage || {})
+    .filter(([key]) => key in stageConfig)
+    .map(([key, value]) => ({
+      name: stageConfig[key as keyof typeof stageConfig].label,
+      value,
+    }));
+
+  // Weekly aggregation for jobs over time
+  const weeklyJobs = (analytics.jobsOverTime || []).reduce<{ date: string; count: number }[]>((acc, item) => {
+    const d = new Date(item.date);
+    const weekStart = new Date(d);
+    weekStart.setDate(d.getDate() - d.getDay());
+    const key = weekStart.toISOString().split("T")[0];
+    const existing = acc.find((a) => a.date === key);
+    if (existing) existing.count += item.count;
+    else acc.push({ date: key, count: item.count });
+    return acc;
+  }, []);
+
+  return (
+    <>
+      {/* Recent Jobs + Map */}
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-12 lg:col-span-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold">Recent Jobs</h3>
+            <Link href="/jobs" className="text-xs text-[#FF6B35] font-semibold hover:underline flex items-center gap-1">
+              View all <ArrowRight size={12} />
+            </Link>
+          </div>
+          <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
+            {recentJobs.map((job) => (
+              <Link key={job.id} href={`/jobs/${job.id}`} className="group block">
+                <Card className="hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                  <CardContent className="p-0">
+                    <div className="flex">
+                      <div className="w-24 h-24 flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-50 rounded-l-xl overflow-hidden">
+                        {job.houseImageURL ? (
+                          <img src={job.houseImageURL} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Camera className="h-6 w-6 text-gray-200" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 p-3 min-w-0">
+                        <p className="text-sm font-semibold leading-snug group-hover:text-[#FF6B35] transition-colors truncate">
+                          {job.streetAddress || "Untitled"}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {job.photoCount} photo{job.photoCount !== 1 ? "s" : ""} &middot; {job.issueCount} issue{job.issueCount !== 1 ? "s" : ""}
+                          {job.fixCount > 0 && <> &middot; {job.fixCount} fix{job.fixCount !== 1 ? "es" : ""}</>}
+                        </p>
+                        <div className="flex items-center justify-between mt-2 text-[11px] text-gray-400">
+                          <span>{formatDate(job.createdAt)}</span>
+                          <StageBadge stage={job.currentStage} size="sm" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Map */}
+        <div className="col-span-12 lg:col-span-7">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              <MapPin size={14} className="text-[#FF6B35]" />
+              Job Locations
+            </h3>
+            <div className="flex items-center gap-1.5">
+              {([
+                { value: "", label: "All", color: "#6B7280" },
+                { value: "auditPending", label: "Audit", color: "#9CA3AF" },
+                { value: "workInProgress", label: "WIP", color: "#F59E0B" },
+                { value: "inspectionPending", label: "Inspection", color: "#FF6B35" },
+                { value: "completed", label: "Done", color: "#10B981" },
+              ] as const).map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setMapStageFilter(s.value)}
+                  className="px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all"
+                  style={{
+                    backgroundColor: mapStageFilter === s.value ? s.color : `${s.color}15`,
+                    color: mapStageFilter === s.value ? "#fff" : s.color,
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Card className="overflow-hidden">
+            <JobMap
+              jobs={mapStageFilter ? allJobs.filter((j) => j.currentStage === (mapStageFilter as JobStage)) : allJobs}
+              className="h-[340px]"
+            />
+          </Card>
+        </div>
+      </div>
+
+      {/* Jobs Over Time + Stage Donut */}
+      <div className="grid grid-cols-12 gap-6">
+        <Card className="col-span-12 lg:col-span-8">
+          <CardContent className="p-6">
+            <h3 className="text-sm font-semibold mb-6">Jobs Over Time</h3>
+            <ResponsiveContainer width="100%" height={320}>
+              <AreaChart data={weeklyJobs}>
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#FF6B35" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#FF6B35" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                  tickFormatter={(d) => new Date(d).toLocaleDateString("en", { month: "short", day: "numeric" })}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} allowDecimals={false} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelFormatter={(d) => `Week of ${new Date(d as string).toLocaleDateString("en", { month: "short", day: "numeric" })}`}
+                />
+                <Area type="monotone" dataKey="count" stroke="#FF6B35" fill="url(#areaGrad)" strokeWidth={2.5} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-12 lg:col-span-4">
+          <CardContent className="p-6">
+            <h3 className="text-sm font-semibold mb-6">Jobs by Stage</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={stageData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  dataKey="value"
+                  paddingAngle={3}
+                  strokeWidth={0}
+                >
+                  {stageData.map((entry) => (
+                    <Cell key={entry.name} fill={STAGE_COLORS[entry.name] || "#9CA3AF"} />
+                  ))}
+                  <Label
+                    value={`${analytics.totalJobs}`}
+                    position="center"
+                    className="text-2xl font-bold"
+                    fill="#111827"
+                  />
+                </Pie>
+                <Tooltip contentStyle={tooltipStyle} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4 justify-center">
+              {stageData.map((s) => (
+                <div key={s.name} className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: STAGE_COLORS[s.name] || "#9CA3AF" }} />
+                  <span className="text-gray-500">{s.name}</span>
+                  <span className="font-bold text-gray-700">{s.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Issues by Category + Photos Trend */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="text-sm font-semibold mb-6">Top Issues by Category</h3>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={(analytics.issuesByCategory || []).slice(0, 8)} margin={{ bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis
+                  dataKey="category"
+                  tick={{ fontSize: 10, fill: "#9CA3AF" }}
+                  axisLine={false}
+                  tickLine={false}
+                  angle={-35}
+                  textAnchor="end"
+                  interval={0}
+                />
+                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} allowDecimals={false} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={32} label={{ position: "top", fontSize: 11, fill: "#6B7280", fontWeight: 600 }}>
+                  {(analytics.issuesByCategory || []).slice(0, 8).map((entry, i) => (
+                    <Cell key={entry.category} fill={i < 2 ? "#EF4444" : i < 5 ? "#FF6B35" : "#F59E0B"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-sm font-semibold">Photos Collected</h3>
+              <div className="flex gap-1">
+                {([7, 30, 90] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setPhotoDays(d)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      photoDays === d
+                        ? "bg-blue-500 text-white"
+                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={320}>
+              <AreaChart data={(analytics.photosTrend || []).slice(-photoDays)}>
+                <defs>
+                  <linearGradient id="photosGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                  tickFormatter={(d) => new Date(d).toLocaleDateString("en", { month: "short", day: "numeric" })}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} allowDecimals={false} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelFormatter={(d) => new Date(d as string).toLocaleDateString("en", { weekday: "short", month: "short", day: "numeric" })}
+                />
+                <Area type="monotone" dataKey="count" stroke="#3B82F6" fill="url(#photosGrad)" strokeWidth={2.5} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Inspectors + Fix Rate + Materials */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold">Top Inspectors</h3>
+            </div>
+            {(analytics.topInspectors || []).length > 0 ? (
+              <div className="space-y-2.5">
+                {(analytics.topInspectors || []).slice(0, 5).map((inspector, i) => {
+                  const max = (analytics.topInspectors || [])[0].count;
+                  const pct = max > 0 ? (inspector.count / max) * 100 : 0;
+                  return (
+                    <div key={inspector.name} className="flex items-center gap-2.5">
+                      <div className="w-5 text-[11px] font-bold text-gray-300 text-right">{i + 1}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-xs font-medium truncate">{inspector.name}</span>
+                          <span className="text-xs font-bold text-gray-700 ml-2">{inspector.count}</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${pct}%`,
+                              background: i === 0
+                                ? "linear-gradient(90deg, #FF6B35, #FF8C61)"
+                                : i === 1
+                                  ? "linear-gradient(90deg, #F59E0B, #FBBF24)"
+                                  : "#E5E7EB",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-gray-300">
+                <Users className="h-8 w-8 mb-2" />
+                <p className="text-xs">No inspector data yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <h3 className="text-sm font-semibold mb-4">Fix Rate</h3>
+            {(() => {
+              const fixRate = analytics.totalIssues > 0
+                ? Math.round((analytics.totalFixes / analytics.totalIssues) * 100)
+                : 0;
+              const circumference = 2 * Math.PI * 62;
+              const offset = circumference - (fixRate / 100) * circumference;
+              const color = fixRate >= 80 ? "#10B981" : fixRate >= 50 ? "#F59E0B" : "#EF4444";
+              return (
+                <>
+                  <div className="flex justify-center">
+                    <div className="relative w-[160px] h-[160px]">
+                      <svg viewBox="0 0 140 140" className="w-full h-full -rotate-90">
+                        <circle cx="70" cy="70" r="62" fill="none" stroke="#f3f4f6" strokeWidth="10" />
+                        <circle
+                          cx="70" cy="70" r="62" fill="none"
+                          stroke={color}
+                          strokeWidth="10"
+                          strokeLinecap="round"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={offset}
+                          className="transition-all duration-700"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-3xl font-bold" style={{ color }}>{fixRate}%</span>
+                        <span className="text-[10px] text-gray-400">resolved</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-center gap-6 mt-3">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-red-500">{analytics.totalIssues}</p>
+                      <p className="text-[10px] text-gray-400">Issues</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-emerald-500">{analytics.totalFixes}</p>
+                      <p className="text-[10px] text-gray-400">Fixes</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-gray-400">{analytics.totalIssues - analytics.totalFixes}</p>
+                      <p className="text-[10px] text-gray-400">Open</p>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Package className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold">Materials Used</h3>
+            </div>
+            {(analytics.materialsByType || []).length > 0 ? (
+              <div className="space-y-2">
+                {(analytics.materialsByType || []).map((mat) => (
+                  <div
+                    key={mat.type}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-gray-50"
+                  >
+                    <span className="text-xs font-medium capitalize text-gray-600 truncate">{mat.type}</span>
+                    <span className="text-sm font-bold text-gray-800 ml-2">{mat.count}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-gray-300">
+                <Package className="h-8 w-8 mb-2" />
+                <p className="text-xs">No materials yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}

@@ -19,6 +19,16 @@ export type JobType =
 
 export type IssueSeverity = "critical" | "major" | "minor";
 
+export interface ActivityLogEntry {
+  id: string;
+  type: string;
+  title: string;
+  subtitle: string;
+  date: string;
+  icon: string;
+  color: string;
+}
+
 // ─── Rebate Types ─────────────────────────────────────────────────────
 
 export type IncomeTier = "below_80" | "80_to_150" | "above_150";
@@ -124,6 +134,8 @@ export interface Job {
   profitMargin?: number;
   netProfit?: number;
   companyId?: string;
+  stageHistory?: { stage: JobStage; date: string; changedBy?: string }[];
+  activityLog?: ActivityLogEntry[];
 }
 
 export interface IssuePhoto {
