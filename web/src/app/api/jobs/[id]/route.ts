@@ -26,8 +26,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const forms = await fetchForms(id);
-    return NextResponse.json({ job, forms });
+    const [forms, timeSnap] = await Promise.all([
+      fetchForms(id),
+      db.collection("jobs").doc(id).collection("timeEntries").orderBy("clockInTime", "desc").get(),
+    ]);
+    const timeEntries = timeSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        clockInTime: data.clockInTime?.toDate?.()?.toISOString() ?? data.clockInTime,
+        clockOutTime: data.clockOutTime?.toDate?.()?.toISOString() ?? data.clockOutTime ?? null,
+      };
+    });
+    return NextResponse.json({ job, forms, timeEntries });
   } catch (error) {
     console.error("Error fetching job:", error);
     return NextResponse.json({ error: "Failed to fetch job" }, { status: 500 });

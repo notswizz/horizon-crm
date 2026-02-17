@@ -246,6 +246,19 @@ export interface PhotoWithContext {
   inspectorName: string;
 }
 
+export interface TimeEntry {
+  id: string;
+  jobId: string;
+  workerId: string;
+  workerName: string;
+  clockInTime: string;
+  clockOutTime?: string;
+  clockInLocation: { latitude: number; longitude: number };
+  clockOutLocation?: { latitude: number; longitude: number };
+  totalSeconds?: number;
+  isAutoStopped: boolean;
+}
+
 export interface AnalyticsData {
   totalJobs: number;
   totalPhotos: number;

@@ -6,6 +6,8 @@ struct JobsListView: View {
     var configStore: ConfigStore
     var networkMonitor: NetworkMonitor
     var syncQueue: PhotoSyncQueue
+    var authManager: AuthManager
+    var timeTracker: TimeTracker
     var onSettingsTap: () -> Void = {}
     var onCameraTap: () -> Void = {}
     @State private var searchText = ""
@@ -37,7 +39,7 @@ struct JobsListView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: UUID.self) { jobId in
                 if let job = store.jobs.first(where: { $0.id == jobId }) {
-                    JobDetailView(job: job, store: store, configStore: configStore, networkMonitor: networkMonitor, syncQueue: syncQueue)
+                    JobDetailView(job: job, store: store, configStore: configStore, networkMonitor: networkMonitor, syncQueue: syncQueue, locationManager: locationManager, authManager: authManager, timeTracker: timeTracker)
                 }
             }
             .toolbar {

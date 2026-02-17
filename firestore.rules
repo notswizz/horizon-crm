@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Config: readable by any authenticated user
+    // Global config: readable by any authenticated user
     match /config/{document=**} {
       allow read: if request.auth != null;
       allow write: if false; // server-side only
@@ -31,6 +31,11 @@ service cloud.firestore {
 
       // Forms subcollection
       match /forms/{formId} {
+        allow read, write: if request.auth != null;
+      }
+
+      // Time entries subcollection
+      match /timeEntries/{entryId} {
         allow read, write: if request.auth != null;
       }
     }

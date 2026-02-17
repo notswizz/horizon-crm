@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseCore
 import FirebaseFirestore
+import UserNotifications
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
@@ -28,6 +29,7 @@ struct inspectApp: App {
     @State private var configStore = ConfigStore()
     @State private var networkMonitor = NetworkMonitor()
     @State private var photoSyncQueue = PhotoSyncQueue()
+    @State private var timeTracker = TimeTracker()
 
     var body: some Scene {
         WindowGroup {
@@ -61,7 +63,8 @@ struct inspectApp: App {
                         configStore: configStore,
                         authManager: authManager,
                         networkMonitor: networkMonitor,
-                        photoSyncQueue: photoSyncQueue
+                        photoSyncQueue: photoSyncQueue,
+                        timeTracker: timeTracker
                     )
                     .onAppear { startListeningWithCompany() }
                     .onChange(of: authManager.companyId) { _, _ in
@@ -71,6 +74,8 @@ struct inspectApp: App {
             }
             .onAppear {
                 authManager.start()
+                timeTracker.restoreActiveSession()
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
             }
             .onChange(of: networkMonitor.isConnected) { _, connected in
                 if connected {

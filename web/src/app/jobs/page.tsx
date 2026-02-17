@@ -10,14 +10,19 @@ import { StageBadge } from "@/components/shared/stage-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Job, JobStage, RebateStatus } from "@/types";
 import Image from "next/image";
-import { Search, Loader2, Trash2, Download, ChevronLeft, ChevronRight, Plus, X, MapPin, User, Phone, Mail, FileText, Home } from "lucide-react";
+import { Search, Loader2, Trash2, Download, ChevronLeft, ChevronRight, Plus, X, MapPin, User, Phone, Mail, FileText, Home, Building2 } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 
 export default function JobsPage() {
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === "admin";
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
   const [rebateFilter, setRebateFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -25,12 +30,22 @@ export default function JobsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showNewJob, setShowNewJob] = useState(false);
 
+  // Fetch companies list for admin filter
+  useEffect(() => {
+    if (!isAdmin) return;
+    fetch("/api/admin/companies")
+      .then((r) => r.json())
+      .then((data) => setCompanies(data.companies || []))
+      .catch(() => {});
+  }, [isAdmin]);
+
   const fetchJobs = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (stageFilter) params.set("stage", stageFilter);
     if (rebateFilter) params.set("rebate", rebateFilter);
+    if (companyFilter) params.set("companyId", companyFilter);
     params.set("sort", sort);
     params.set("page", String(page));
     params.set("limit", "50");
@@ -41,7 +56,7 @@ export default function JobsPage() {
     setTotalPages(data.totalPages || 1);
     setTotal(data.total || 0);
     setLoading(false);
-  }, [search, stageFilter, rebateFilter, sort, page]);
+  }, [search, stageFilter, rebateFilter, companyFilter, sort, page]);
 
   useEffect(() => {
     const timer = setTimeout(fetchJobs, 300);
@@ -137,6 +152,14 @@ export default function JobsPage() {
                 <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
               ))}
             </Select>
+            {isAdmin && companies.length > 0 && (
+              <Select value={companyFilter} onChange={(e) => { setCompanyFilter(e.target.value); setPage(1); }} className="w-48">
+                <option value="">All Companies</option>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+            )}
             <Select value={sort} onChange={(e) => setSort(e.target.value)} className="w-40">
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>

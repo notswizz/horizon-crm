@@ -5,10 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PhotoLightbox, buildLightboxPhotos } from "@/components/shared/photo-lightbox";
 import { formatDate, formatCurrency, severityConfig, estimateJobValue, stageConfig, DEFAULT_WEIGHTS, calculateJobRevenueValue, DEFAULT_VALUATION } from "@/lib/utils";
-import { Job, InspectionForm, JobStage, IssuePhoto, FixPhoto, DatasetValueWeights, DatasetValuationConfig } from "@/types";
+import { Job, InspectionForm, JobStage, IssuePhoto, FixPhoto, DatasetValueWeights, DatasetValuationConfig, TimeEntry } from "@/types";
 import {
   Loader2, MapPin, User, Phone, Mail, Camera, AlertTriangle,
-  ChevronRight, Package, CheckCircle, Database, DollarSign,
+  ChevronRight, Package, CheckCircle, Database, DollarSign, Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
@@ -28,6 +28,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [weights, setWeights] = useState<DatasetValueWeights>(DEFAULT_WEIGHTS);
   const [valuation, setValuation] = useState<DatasetValuationConfig>(DEFAULT_VALUATION);
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
 
   useEffect(() => {
     fetch(`/api/jobs/${id}`)
@@ -35,6 +36,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       .then((data) => {
         setJob(data.job);
         setForms(data.forms || []);
+        setTimeEntries(data.timeEntries || []);
         setEditStage(data.job.currentStage);
         setLoading(false);
       });
@@ -430,6 +432,66 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           )}
         </div>
       </div>
+
+      {/* Time Log */}
+      {timeEntries.length > 0 && (
+        <Card className="mt-6">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Clock size={14} className="text-[#FF6B35]" />
+                <h3 className="text-sm font-semibold">Time Log</h3>
+              </div>
+              <span className="text-xs text-gray-400">
+                {(timeEntries.reduce((s, e) => s + (e.totalSeconds || 0), 0) / 3600).toFixed(1)} hrs &middot; {timeEntries.length} visit{timeEntries.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-gray-400">
+                    <th className="pb-2 font-medium">Worker</th>
+                    <th className="pb-2 font-medium">Date</th>
+                    <th className="pb-2 font-medium">Clock In</th>
+                    <th className="pb-2 font-medium">Clock Out</th>
+                    <th className="pb-2 font-medium text-right">Duration</th>
+                    <th className="pb-2 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {timeEntries.map((entry) => {
+                    const secs = entry.totalSeconds || 0;
+                    const h = Math.floor(secs / 3600);
+                    const m = Math.floor((secs % 3600) / 60);
+                    return (
+                      <tr key={entry.id} className="border-b last:border-0">
+                        <td className="py-2.5 font-medium">{entry.workerName || "Unknown"}</td>
+                        <td className="py-2.5 text-gray-500">
+                          {entry.clockInTime ? new Date(entry.clockInTime).toLocaleDateString("en", { month: "short", day: "numeric" }) : "—"}
+                        </td>
+                        <td className="py-2.5 text-gray-500">
+                          {entry.clockInTime ? new Date(entry.clockInTime).toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" }) : "—"}
+                        </td>
+                        <td className="py-2.5 text-gray-500">
+                          {entry.clockOutTime ? new Date(entry.clockOutTime).toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" }) : "—"}
+                        </td>
+                        <td className="py-2.5 text-right font-mono font-semibold">
+                          {entry.totalSeconds ? `${h}h ${m}m` : "—"}
+                        </td>
+                        <td className="py-2.5 pl-2">
+                          {entry.isAutoStopped && (
+                            <span className="text-[10px] font-bold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded">Auto</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lightbox */}
       {lightboxPhotos && (

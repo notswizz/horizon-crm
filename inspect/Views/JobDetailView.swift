@@ -9,6 +9,9 @@ struct JobDetailView: View {
     var configStore: ConfigStore
     var networkMonitor: NetworkMonitor
     var syncQueue: PhotoSyncQueue
+    var locationManager: LocationManager
+    var authManager: AuthManager
+    var timeTracker: TimeTracker
 
     @State private var editedStage: JobStage
     @State private var rebateText: String
@@ -20,18 +23,23 @@ struct JobDetailView: View {
     @State private var selectedHousePhoto: PhotosPickerItem?
     @State private var isUploadingHouseImage = false
     @State private var notesExpanded = false
+    @State private var clockInError: String?
+    @State private var showTimeLog = false
 
     /// Live version from the store's listener, falls back to the passed-in snapshot
     private var liveJob: Job {
         store.jobs.first { $0.id == job.id } ?? job
     }
 
-    init(job: Job, store: JobStore, configStore: ConfigStore, networkMonitor: NetworkMonitor, syncQueue: PhotoSyncQueue) {
+    init(job: Job, store: JobStore, configStore: ConfigStore, networkMonitor: NetworkMonitor, syncQueue: PhotoSyncQueue, locationManager: LocationManager, authManager: AuthManager, timeTracker: TimeTracker) {
         self.job = job
         self.store = store
         self.configStore = configStore
         self.networkMonitor = networkMonitor
         self.syncQueue = syncQueue
+        self.locationManager = locationManager
+        self.authManager = authManager
+        self.timeTracker = timeTracker
         self._editedStage = State(initialValue: job.currentStage)
         self._rebateText = State(initialValue: job.rebateAmount > 0 ? String(format: "%.0f", job.rebateAmount) : "")
     }
@@ -53,6 +61,7 @@ struct JobDetailView: View {
                     VStack(spacing: DS.Spacing.s) {
                         contactRow
                         metricsCard
+                        timeTrackingSection
                     }
                     .padding(.horizontal, DS.Spacing.m)
                     .padding(.top, DS.Spacing.s)
@@ -81,8 +90,12 @@ struct JobDetailView: View {
                 }
             }
         }
-        .onAppear { store.startListeningToForms(for: liveJob.id) }
+        .onAppear {
+            store.startListeningToForms(for: liveJob.id)
+            Task { await timeTracker.fetchTimeEntries(for: liveJob.id) }
+        }
         .refreshable { await store.refreshForms(for: liveJob.id) }
+        .sheet(isPresented: $showTimeLog) { timeLogSheet }
         .sheet(isPresented: $showNewSpotSheet) { newSpotSheet }
         .sheet(item: $selectedSpotForIssue) { spot in
             NavigationStack {
@@ -102,6 +115,242 @@ struct JobDetailView: View {
         } message: {
             Text("Enter the approved rebate amount.")
         }
+    }
+
+    // MARK: - Time Tracking
+
+    private var isClockedInToThisJob: Bool {
+        timeTracker.activeJobId == liveJob.id
+    }
+
+    private var isClockedInToOtherJob: Bool {
+        timeTracker.isTracking && timeTracker.activeJobId != liveJob.id
+    }
+
+    private var distanceToJob: Double? {
+        locationManager.distance(to: liveJob)
+    }
+
+    private var timeLogButton: some View {
+        Button { showTimeLog = true } label: {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(DS.Colors.info)
+                .frame(width: 32, height: 32)
+                .background(DS.Colors.info.opacity(0.1), in: .circle)
+        }
+    }
+
+    private var timeTrackingSection: some View {
+        VStack(spacing: 8) {
+            if isClockedInToThisJob {
+                // Active timer for this job
+                HStack(spacing: 12) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 8, height: 8)
+                        Text(TimeTracker.formatDuration(timeTracker.elapsedSeconds))
+                            .font(.system(size: 22, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.primary)
+                    }
+
+                    Spacer()
+
+                    timeLogButton
+
+                    Button {
+                        Task {
+                            await timeTracker.clockOut(locationManager: locationManager, store: store)
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 10))
+                            Text("Clock Out")
+                                .font(.system(size: 13, weight: .bold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(DS.Colors.error.gradient, in: .capsule)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(DS.Colors.success.opacity(0.06), in: .rect(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(DS.Colors.success.opacity(0.2), lineWidth: 1))
+
+            } else if isClockedInToOtherJob {
+                // Clocked in elsewhere
+                let otherAddress = store.jobs.first(where: { $0.id == timeTracker.activeJobId })?.streetAddress ?? "another job"
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.badge.exclamationmark")
+                        .font(.system(size: 13))
+                        .foregroundStyle(DS.Colors.warning)
+                    Text(otherAddress)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer()
+                    Text(TimeTracker.formatDuration(timeTracker.elapsedSeconds))
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundStyle(DS.Colors.warning)
+                    timeLogButton
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(DS.Colors.warning.opacity(0.08), in: .rect(cornerRadius: 12))
+
+            } else {
+                // Not clocked in — show clock in button
+                HStack(spacing: 10) {
+                    Button {
+                        guard let uid = authManager.uid else { return }
+                        let error = timeTracker.clockIn(
+                            job: liveJob,
+                            workerId: uid,
+                            workerName: authManager.displayName,
+                            locationManager: locationManager,
+                            store: store
+                        )
+                        clockInError = error
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 10))
+                            Text("Clock In")
+                                .font(.system(size: 13, weight: .bold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            (timeTracker.canClockIn(job: liveJob, locationManager: locationManager)
+                                ? DS.Colors.success.gradient
+                                : Color.gray.gradient),
+                            in: .capsule
+                        )
+                    }
+                    .disabled(!timeTracker.canClockIn(job: liveJob, locationManager: locationManager))
+
+                    // Distance indicator
+                    if let dist = distanceToJob {
+                        let inRange = dist <= 500
+                        HStack(spacing: 3) {
+                            Image(systemName: inRange ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(inRange ? DS.Colors.success : DS.Colors.error)
+                            Text(dist < 1000
+                                ? String(format: "%.0fm", dist)
+                                : String(format: "%.1fkm", dist / 1000))
+                                .font(.system(size: 12))
+                                .foregroundStyle(inRange ? DS.Colors.success : DS.Colors.error)
+                        }
+                    } else {
+                        HStack(spacing: 3) {
+                            Image(systemName: "location.slash")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                            Text("No location")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    timeLogButton
+                }
+
+                if let error = clockInError {
+                    Text(error)
+                        .font(.system(size: 12))
+                        .foregroundStyle(DS.Colors.error)
+                }
+            }
+        }
+    }
+
+    // MARK: - Time History
+
+    private var timeLogSheet: some View {
+        NavigationStack {
+            Group {
+                if timeTracker.timeEntries.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.tertiary)
+                        Text("No time entries yet")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        let totalSecs = timeTracker.timeEntries.compactMap(\.totalSeconds).reduce(0, +)
+                        let hours = Double(totalSecs) / 3600.0
+
+                        Section {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(String(format: "%.1f hours", hours))
+                                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                                    Text("\(timeTracker.timeEntries.count) visit\(timeTracker.timeEntries.count == 1 ? "" : "s")")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+                        }
+
+                        Section {
+                            ForEach(timeTracker.timeEntries) { entry in
+                                HStack(spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(entry.workerName.isEmpty ? "Unknown" : entry.workerName)
+                                            .font(.system(size: 14, weight: .semibold))
+                                        Text(entry.clockInTime.formatted(date: .abbreviated, time: .shortened))
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    if entry.isAutoStopped {
+                                        Text("Auto")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundStyle(DS.Colors.warning)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(DS.Colors.warning.opacity(0.12), in: .capsule)
+                                    }
+
+                                    if let secs = entry.totalSeconds {
+                                        Text(TimeTracker.formatDuration(secs))
+                                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                            .foregroundStyle(.primary)
+                                    } else {
+                                        Text("In progress")
+                                            .font(.caption)
+                                            .foregroundStyle(DS.Colors.success)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Time Log")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { showTimeLog = false }
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 
     // MARK: - Hero Helpers
