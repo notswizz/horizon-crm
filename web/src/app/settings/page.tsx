@@ -109,7 +109,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
-      {/* Header */}
+      {/* Header with Account + Join Code */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 p-6 shadow-xl">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIvPjwvc3ZnPg==')] opacity-50" />
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#FF6B35]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -120,7 +120,6 @@ export default function SettingsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white">Settings</h1>
-              <p className="text-sm text-gray-400 mt-0.5">Configure your workspace and app options</p>
             </div>
           </div>
           <button
@@ -144,37 +143,29 @@ export default function SettingsPage() {
             {saving ? "Saving..." : saved ? "Saved" : "Save Changes"}
           </button>
         </div>
-      </div>
 
-      {/* Account + Join Code row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Signed-in email */}
-        <div className="group relative overflow-hidden rounded-xl bg-white border border-gray-100 p-5 hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-300">
-          <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 to-blue-400" />
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm shadow-blue-200/50">
-              <Mail className="h-4.5 w-4.5 text-white" />
+        {/* Account + Join Code inline */}
+        <div className="relative flex items-center gap-4 mt-5 pt-5 border-t border-white/10">
+          {/* Signed-in email */}
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/[0.07] backdrop-blur-sm">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center">
+              <Mail className="h-3.5 w-3.5 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Signed in as</p>
-              <p className="text-sm font-bold truncate text-gray-900">{appUser?.email}</p>
+              <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">Signed in as</p>
+              <p className="text-sm font-bold truncate text-white">{appUser?.email}</p>
             </div>
           </div>
-        </div>
 
-        {/* Join Code */}
-        {appUser?.joinCode && (
-          <div className="group relative overflow-hidden rounded-xl bg-white border border-gray-100 p-5 hover:shadow-lg hover:shadow-orange-100/50 transition-all duration-300">
-            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[#FF6B35] to-[#FF8C61]" />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B35] to-[#E5532D] flex items-center justify-center shadow-sm shadow-orange-200/50">
-                  <KeyRound className="h-4.5 w-4.5 text-white" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Company Join Code</p>
-                  <p className="text-lg font-extrabold font-mono tracking-[0.25em] text-gray-900">{appUser.joinCode}</p>
-                </div>
+          {/* Join Code */}
+          {appUser?.joinCode && (
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/[0.07] backdrop-blur-sm">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#E5532D] flex items-center justify-center">
+                <KeyRound className="h-3.5 w-3.5 text-white" />
+              </div>
+              <div>
+                <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">Join Code</p>
+                <p className="text-sm font-extrabold font-mono tracking-[0.2em] text-white">{appUser.joinCode}</p>
               </div>
               <button
                 onClick={() => {
@@ -182,76 +173,63 @@ export default function SettingsPage() {
                   setCodeCopied(true);
                   setTimeout(() => setCodeCopied(false), 2000);
                 }}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                className={`ml-1 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-300 ${
                   codeCopied
-                    ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200"
-                    : "bg-gray-50 text-gray-500 hover:bg-orange-50 hover:text-[#FF6B35] ring-1 ring-gray-100 hover:ring-orange-200"
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : "bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white"
                 }`}
               >
-                {codeCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                {codeCopied ? "Copied!" : "Copy"}
+                {codeCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                {codeCopied ? "Copied" : "Copy"}
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Team Web Access */}
+      {/* Team Web Access — compact inline */}
       {teamMembers.length > 0 && (
-        <div className="relative overflow-hidden rounded-xl bg-white border border-gray-100 shadow-sm">
-          <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-indigo-500 to-purple-500" />
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
-                <Monitor className="h-4 w-4 text-white" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">Web Dashboard Access</h3>
-                <p className="text-xs text-gray-400">
-                  Control which team members can access the web dashboard
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-1">
-              {teamMembers.map((member) => (
-                <div
-                  key={member.uid}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-50/80 transition-all duration-200 group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-500 flex-shrink-0">
-                      {(member.displayName || member.email).charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate text-gray-800">
-                        {member.displayName || member.email}
-                        {member.isSelf && (
-                          <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold ring-1 ring-blue-100">You</span>
-                        )}
-                      </p>
-                      {member.displayName && (
-                        <p className="text-xs text-gray-400 truncate">{member.email}</p>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => toggleWebAccess(member.uid, !member.webAccess)}
-                    disabled={member.isSelf || togglingUid === member.uid}
-                    className="flex-shrink-0 disabled:opacity-40 transition-transform hover:scale-110"
-                    title={member.isSelf ? "Cannot revoke your own access" : (member.webAccess ? "Revoke web access" : "Grant web access")}
-                  >
-                    {togglingUid === member.uid ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-gray-300" />
-                    ) : member.webAccess ? (
-                      <ToggleRight className="h-6 w-6 text-emerald-500" />
-                    ) : (
-                      <ToggleLeft className="h-6 w-6 text-gray-300" />
-                    )}
-                  </button>
+        <div className="rounded-xl bg-gray-50/80 border border-gray-100 px-5 py-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Monitor className="h-3.5 w-3.5 text-gray-400" />
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Web Dashboard Access</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {teamMembers.map((member) => (
+              <div
+                key={member.uid}
+                className="flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-lg bg-white border border-gray-100 hover:border-gray-200 transition-all duration-200"
+              >
+                <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-400 flex-shrink-0">
+                  {(member.displayName || member.email).charAt(0).toUpperCase()}
                 </div>
-              ))}
-            </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-gray-700 truncate">
+                    {member.displayName || member.email}
+                    {member.isSelf && (
+                      <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-500 font-bold">You</span>
+                    )}
+                  </p>
+                  {member.displayName && (
+                    <p className="text-[10px] text-gray-400 truncate">{member.email}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => toggleWebAccess(member.uid, !member.webAccess)}
+                  disabled={member.isSelf || togglingUid === member.uid}
+                  className="flex-shrink-0 disabled:opacity-30 transition-transform hover:scale-110 ml-auto"
+                  title={member.isSelf ? "Cannot revoke your own access" : (member.webAccess ? "Revoke web access" : "Grant web access")}
+                >
+                  {togglingUid === member.uid ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-300" />
+                  ) : member.webAccess ? (
+                    <ToggleRight className="h-5 w-5 text-emerald-500" />
+                  ) : (
+                    <ToggleLeft className="h-5 w-5 text-gray-300" />
+                  )}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -261,7 +239,7 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-6">
           <SimpleList
             title="Job Types"
-            description="Types of work that can be assigned to a job"
+            description=""
             icon={<Briefcase className="h-4 w-4 text-white" />}
             iconBg="from-[#FF6B35] to-[#E5532D]"
             accentColor="#FF6B35"
@@ -276,7 +254,7 @@ export default function SettingsPage() {
 
           <SimpleList
             title="Material Types"
-            description="Types of materials used in fixes"
+            description=""
             icon={<Package className="h-4 w-4 text-white" />}
             iconBg="from-blue-500 to-blue-600"
             accentColor="#3B82F6"
@@ -381,7 +359,7 @@ function SimpleList({
           </div>
           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-400 ring-1 ring-gray-100">{items.length} items</span>
         </div>
-        <p className="text-xs text-gray-400 mb-4">{description}</p>
+        {description && <p className="text-xs text-gray-400 mb-4">{description}</p>}
 
         <div className="flex flex-wrap gap-2 overflow-y-auto flex-1 min-h-0 content-start">
           {items.map((item, i) => (
@@ -502,9 +480,6 @@ function IssueCategoryList({
           </div>
           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-400 ring-1 ring-gray-100">{categories.length} items</span>
         </div>
-        <p className="text-xs text-gray-400 mb-4">
-          Categories inspectors choose when documenting issues. Link to job types or leave empty for all.
-        </p>
 
         <div className="space-y-0.5 max-h-[500px] overflow-y-auto pr-1 flex-1 min-h-0">
           {categories.map((cat, i) => (
@@ -685,9 +660,6 @@ function CombinedValueEditor({
             </div>
             <h3 className="text-sm font-bold text-gray-900">Point-Based Value</h3>
           </div>
-          <p className="text-xs text-gray-400 mb-4">
-            (base + photos &times; pts + issues &times; pts) &times; multipliers
-          </p>
 
           <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Points</label>
           <div className="grid grid-cols-3 gap-2 mt-1.5 mb-4">
@@ -752,9 +724,6 @@ function CombinedValueEditor({
             </div>
             <h3 className="text-sm font-bold text-gray-900">Revenue-Based Value</h3>
           </div>
-          <p className="text-xs text-gray-400 mb-4">
-            Rebate Revenue &times; Base %
-          </p>
 
           <div className="flex items-center justify-between">
             <div>
@@ -864,9 +833,6 @@ function InspectorNameList({
           </div>
           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-400 ring-1 ring-gray-100">{names.length} inspectors</span>
         </div>
-        <p className="text-xs text-gray-400 mb-4">
-          Click the pencil to rename — updates all existing forms in Firestore and iOS.
-        </p>
 
         <div className="space-y-1">
           {names.map((name, i) => (

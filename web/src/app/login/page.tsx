@@ -56,52 +56,94 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex items-center justify-center">
-      <form onSubmit={handleSubmit} className="w-80">
-        <div className="bg-white rounded-2xl shadow-lg p-8 space-y-5">
+    <div className="h-screen relative overflow-hidden flex items-center justify-center bg-[#0a1628]">
+      {/* Animated gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0d2137] via-[#0a1628] to-[#071020]" />
+
+      {/* Floating ambient orbs */}
+      <div
+        className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[#4CAF50]/15 blur-[120px]"
+        style={{ animation: "drift 8s ease-in-out infinite" }}
+      />
+      <div
+        className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-[#1a3a5c]/40 blur-[120px]"
+        style={{ animation: "drift 8s ease-in-out infinite reverse" }}
+      />
+      <div
+        className="absolute top-[40%] right-[20%] w-[300px] h-[300px] rounded-full bg-[#FF6B35]/10 blur-[100px]"
+        style={{ animation: "drift 12s ease-in-out infinite 2s" }}
+      />
+
+      {/* Glass card */}
+      <form
+        onSubmit={handleSubmit}
+        className="relative z-10 w-96"
+        style={{ animation: "fadeSlideUp 0.6s ease-out" }}
+      >
+        <div className="bg-white/[0.07] backdrop-blur-xl rounded-2xl border border-white/[0.10] shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-8 space-y-5">
+          {/* Branding */}
           <div className="flex flex-col items-center gap-2">
-            <Image src="/logo.png" alt="RetrofitIQ" width={48} height={48} className="rounded-xl" />
-            <h1 className="text-lg font-bold text-gray-800">RetrofitIQ</h1>
-            <p className="text-xs text-gray-400">{isSignUp ? "Create an account" : "Sign in to continue"}</p>
+            <Image src="/logo.png" alt="RetrofitIQ" width={52} height={52} className="rounded-xl" />
+            <h1 className="text-xl font-bold text-white">Retrofit<span className="ml-1 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-[#FF6B35] to-[#4CAF50] text-white text-lg">IQ</span></h1>
+            <p className="text-sm text-white/50">
+              {isSignUp ? "Create an account" : "Sign in to continue"}
+            </p>
           </div>
+
+          {/* Email input */}
           <input
             type="email"
             value={email}
             onChange={(e) => { setEmail(e.target.value); setError(""); }}
             placeholder="Email"
             autoFocus
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm outline-none transition-colors focus:border-[#FF6B35]"
+            className="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.1] text-sm text-white placeholder:text-white/40 outline-none transition-all duration-200 focus:border-[#FF6B35]/70 focus:ring-1 focus:ring-[#FF6B35]/30 focus:bg-white/[0.08]"
           />
+
+          {/* Password input */}
           <input
             type="password"
             value={password}
             onChange={(e) => { setPassword(e.target.value); setError(""); }}
             placeholder="Password"
-            className={`w-full px-4 py-2.5 rounded-lg border text-sm outline-none transition-colors ${
-              error ? "border-red-400 bg-red-50" : "border-gray-200 focus:border-[#FF6B35]"
+            className={`w-full px-4 py-3 rounded-xl bg-white/[0.06] border text-sm text-white placeholder:text-white/40 outline-none transition-all duration-200 ${
+              error
+                ? "border-red-400/60 bg-red-500/[0.08]"
+                : "border-white/[0.1] focus:border-[#FF6B35]/70 focus:ring-1 focus:ring-[#FF6B35]/30 focus:bg-white/[0.08]"
             }`}
           />
-          {error && <p className="text-xs text-red-500 -mt-2">{error}</p>}
+
+          {/* Error message */}
+          {error && (
+            <p className="text-xs text-red-300 bg-red-500/[0.12] border border-red-400/20 rounded-lg px-3 py-2 -mt-2">
+              {error}
+            </p>
+          )}
+
+          {/* Submit button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-[#FF6B35] text-white text-sm font-semibold hover:bg-[#E5532D] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-[#FF6B35] to-[#E5532D] text-white text-sm font-semibold transition-all duration-200 hover:shadow-[0_4px_20px_rgba(255,107,53,0.4)] hover:brightness-110 disabled:opacity-50 disabled:hover:shadow-none flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : null}
             {loading ? (isSignUp ? "Creating account..." : "Signing in...") : (isSignUp ? "Sign Up" : "Sign In")}
           </button>
-          <p className="text-xs text-center text-gray-400">
+
+          {/* Toggle sign in / sign up */}
+          <p className="text-sm text-center text-white/40">
             {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
             <button
               type="button"
               onClick={() => { setIsSignUp(!isSignUp); setError(""); }}
-              className="text-[#FF6B35] font-semibold hover:underline"
+              className="text-[#FF6B35] font-semibold hover:text-[#ff8a5c] transition-colors"
             >
               {isSignUp ? "Sign In" : "Sign Up"}
             </button>
           </p>
         </div>
       </form>
+
     </div>
   );
 }
