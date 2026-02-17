@@ -8,10 +8,45 @@ import {
   Wrench,
   Camera,
   Activity,
+  Clock,
+  Building2,
 } from "lucide-react";
 import Link from "next/link";
 import { DashboardProps, formatTimeAgo, ActivityEvent } from "./types";
 import { SharedSections } from "./shared-sections";
+import { useState, useEffect } from "react";
+
+function LiveClock() {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const time = now.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  const date = now.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+  return (
+    <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100/80 border border-gray-200/60">
+      <Clock size={14} className="text-orange-500" />
+      <div className="flex items-baseline gap-2">
+        <span className="text-sm font-bold tabular-nums tracking-tight text-gray-900">{time}</span>
+        <span className="text-[11px] font-medium text-gray-400">{date}</span>
+      </div>
+    </div>
+  );
+}
 
 const ACTIVITY_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>> = {
   briefcase: Briefcase,
@@ -64,12 +99,26 @@ export function CompanyDashboard({
   const hasPipelineData = totalPipeline > 0 || approvedPending > 0 || totalPaid > 0 || avgMargin > 0 || totalProfit !== 0;
 
   return (
-    <div className="space-y-8 max-w-[1400px]">
+    <div className="space-y-5 max-w-[1400px]">
       <div className="grid grid-cols-12 gap-4">
         {/* Left: KPI + Pipeline */}
         <div className="col-span-12 lg:col-span-8 space-y-4">
           {companyName && (
-            <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 -mt-2">{companyName}</h1>
+            <div className="relative group -mt-1">
+              <div className="absolute -inset-[1px] rounded-xl bg-gradient-to-r from-[#FF6B35]/20 via-[#FF8C61]/10 to-[#FF6B35]/20 group-hover:from-[#FF6B35]/30 group-hover:via-[#FF8C61]/15 group-hover:to-[#FF6B35]/30 transition-all duration-500" />
+              <div className="relative flex items-center justify-between px-5 py-2.5 rounded-xl bg-white/80 backdrop-blur-sm border border-[#FF6B35]/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#E5532D] flex items-center justify-center shadow-sm shadow-orange-200/50">
+                    <Building2 size={15} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-[#FF6B35]/60 uppercase tracking-widest leading-none">Dashboard</p>
+                    <h1 className="text-xl font-extrabold tracking-tight text-gray-900 leading-tight">{companyName}</h1>
+                  </div>
+                </div>
+                <LiveClock />
+              </div>
+            </div>
           )}
           {/* Metrics row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -147,13 +196,16 @@ export function CompanyDashboard({
 
         {/* Right: Activity Feed */}
         <div className="col-span-12 lg:col-span-4">
-          <Card className="h-full">
-            <CardContent className="p-5 h-full">
-              <div className="flex items-center gap-2 mb-3">
-                <Activity className="h-4 w-4 text-[#FF6B35]" />
-                <h3 className="text-sm font-semibold">Activity Feed</h3>
+          <div className="relative overflow-hidden rounded-xl bg-white border border-gray-100 shadow-sm">
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[#FF6B35] to-amber-400" />
+            <div className="p-5">
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#E5532D] flex items-center justify-center shadow-sm shadow-orange-200/50">
+                  <Activity className="h-3.5 w-3.5 text-white" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900">Activity Feed</h3>
               </div>
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-3">
                 {([
                   { value: "job_created", label: "Jobs", color: "#FF6B35" },
                   { value: "issue_found", label: "Issues", color: "#EF4444" },
@@ -164,7 +216,7 @@ export function CompanyDashboard({
                   <button
                     key={f.value}
                     onClick={() => setActivityFilter(activityFilter === f.value ? "" : f.value)}
-                    className="px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all"
+                    className="px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all duration-200"
                     style={{
                       backgroundColor: activityFilter === f.value ? f.color : `${f.color}15`,
                       color: activityFilter === f.value ? "#fff" : f.color,
@@ -174,7 +226,7 @@ export function CompanyDashboard({
                   </button>
                 ))}
               </div>
-              <div className="space-y-0.5 max-h-[200px] overflow-y-auto pr-1">
+              <div className="space-y-0.5 max-h-[240px] overflow-y-auto pr-1">
                 {(() => {
                   const filtered = activityFilter
                     ? activityEvents.filter((e: ActivityEvent) =>
@@ -191,13 +243,13 @@ export function CompanyDashboard({
                         <Link
                           key={event.id}
                           href={`/jobs/${event.jobId}`}
-                          className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                          className="flex items-start gap-3 px-2.5 py-2.5 rounded-lg hover:bg-gray-50 transition-colors group"
                         >
-                          <div className="p-1.5 rounded-md mt-0.5 flex-shrink-0" style={{ backgroundColor: `${event.color}15` }}>
-                            <IconComponent size={12} className="flex-shrink-0" style={{ color: event.color }} />
+                          <div className="p-1.5 rounded-lg mt-0.5 flex-shrink-0" style={{ backgroundColor: `${event.color}12` }}>
+                            <IconComponent size={14} className="flex-shrink-0" style={{ color: event.color }} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-gray-800 leading-tight group-hover:text-[#FF6B35] transition-colors">{event.title}</p>
+                            <p className="text-[13px] font-semibold text-gray-800 leading-snug group-hover:text-[#FF6B35] transition-colors">{event.title}</p>
                             <p className="text-[11px] text-gray-400 truncate mt-0.5">{event.subtitle}</p>
                           </div>
                           <span className="text-[10px] text-gray-300 flex-shrink-0 mt-0.5 whitespace-nowrap">{timeAgo}</span>
@@ -212,8 +264,8 @@ export function CompanyDashboard({
                   );
                 })()}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -12,9 +12,43 @@ import {
   CheckCircle,
   Banknote,
   DollarSign,
+  Clock,
 } from "lucide-react";
 import { DashboardProps, CompanyOption } from "./types";
 import { SharedSections } from "./shared-sections";
+import { useState, useEffect } from "react";
+
+function LiveClock() {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const time = now.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  const date = now.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+  return (
+    <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100/80 border border-gray-200/60">
+      <Clock size={14} className="text-orange-500" />
+      <div className="flex items-baseline gap-2">
+        <span className="text-sm font-bold tabular-nums tracking-tight text-gray-900">{time}</span>
+        <span className="text-[11px] font-medium text-gray-400">{date}</span>
+      </div>
+    </div>
+  );
+}
 
 interface AdminDashboardProps extends DashboardProps {
   companies: CompanyOption[];
@@ -61,9 +95,10 @@ export function AdminDashboard({
   const hasPipelineData = totalPipeline > 0 || approvedPending > 0 || totalPaid > 0 || avgMargin > 0 || totalProfit !== 0;
 
   return (
-    <div className="space-y-8 max-w-[1400px]">
-      {/* Company Filter */}
+    <div className="space-y-5 max-w-[1400px]">
+      {/* Company Filter + Clock */}
       {companies.length > 0 && (
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <Building2 size={15} />
@@ -82,6 +117,8 @@ export function AdminDashboard({
             </select>
             <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
+        </div>
+        <LiveClock />
         </div>
       )}
 
