@@ -7,8 +7,8 @@ import { AppShell } from "@/components/layout/app-shell";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Horizon Energy South — Admin",
-  description: "Admin dashboard for Horizon Energy South CRM",
+  title: "RetrofitIQ",
+  description: "RetrofitIQ admin dashboard",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

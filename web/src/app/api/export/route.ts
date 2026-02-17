@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       return new NextResponse(rows.join("\n"), {
         headers: {
           "Content-Type": "text/csv",
-          "Content-Disposition": `attachment; filename="horizon_export_${Date.now()}.csv"`,
+          "Content-Disposition": `attachment; filename="retrofitiq_export_${Date.now()}.csv"`,
         },
       });
     }
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
     return new NextResponse(lines.join("\n"), {
       headers: {
         "Content-Type": "application/jsonl",
-        "Content-Disposition": `attachment; filename="horizon_training_data_${Date.now()}.jsonl"`,
+        "Content-Disposition": `attachment; filename="retrofitiq_export_${Date.now()}.jsonl"`,
       },
     });
   } catch (error) {

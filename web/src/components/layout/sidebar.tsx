@@ -53,7 +53,7 @@ export function Sidebar({ collapsed, onToggle, isAdmin, companyName, onLogout }:
         <Image src="/logo.png" alt="RetrofitIQ" width={36} height={36} className="rounded-lg flex-shrink-0" />
         {!collapsed && (
           <div className="min-w-0">
-            <h1 className="text-sm font-bold tracking-tight truncate">{companyName || "RetrofitIQ"}</h1>
+            <h1 className="text-base font-bold tracking-tight truncate"><span className="text-[#1E3A6E]">Retrofit</span><span className="text-emerald-500">IQ</span></h1>
           </div>
         )}
       </div>

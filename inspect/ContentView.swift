@@ -12,34 +12,15 @@ struct ContentView: View {
     @State private var showSettings = false
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            JobsListView(
-                store: store,
-                locationManager: locationManager,
-                configStore: configStore,
-                networkMonitor: networkMonitor,
-                syncQueue: photoSyncQueue,
-                onSettingsTap: { showSettings = true }
-            )
-
-            // Floating camera button
-            Button {
-                showCapture = true
-            } label: {
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 60, height: 60)
-                    .background(
-                        DS.Gradients.primaryButton,
-                        in: .circle
-                    )
-                    .shadow(color: DS.Colors.primary.opacity(0.35), radius: 8, y: 4)
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 24)
-            .sensoryFeedback(.impact(weight: .medium), trigger: showCapture)
-        }
+        JobsListView(
+            store: store,
+            locationManager: locationManager,
+            configStore: configStore,
+            networkMonitor: networkMonitor,
+            syncQueue: photoSyncQueue,
+            onSettingsTap: { showSettings = true },
+            onCameraTap: { showCapture = true }
+        )
         .fullScreenCover(isPresented: $showCapture) {
             NavigationStack {
                 QuickCaptureView(store: store, locationManager: locationManager, configStore: configStore, networkMonitor: networkMonitor, photoSyncQueue: photoSyncQueue)

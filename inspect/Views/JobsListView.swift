@@ -7,15 +7,19 @@ struct JobsListView: View {
     var networkMonitor: NetworkMonitor
     var syncQueue: PhotoSyncQueue
     var onSettingsTap: () -> Void = {}
+    var onCameraTap: () -> Void = {}
     @State private var searchText = ""
+    @State private var navPath = NavigationPath()
     @State private var selectedStage: JobStage? = nil
     @State private var sortOrder: JobSortOrder = .nearest
     @State private var showFilter = false
     @State private var showError = false
     @State private var appeared: Set<UUID> = []
+    @State private var listVersion = 0
 
     var body: some View {
-        NavigationStack {
+        ZStack(alignment: .bottomTrailing) {
+        NavigationStack(path: $navPath) {
             VStack(spacing: 0) {
                 SyncBanner(networkMonitor: networkMonitor, syncQueue: syncQueue, jobStore: store)
 
@@ -31,6 +35,11 @@ struct JobsListView: View {
                 .frame(maxHeight: .infinity)
             }
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: UUID.self) { jobId in
+                if let job = store.jobs.first(where: { $0.id == jobId }) {
+                    JobDetailView(job: job, store: store, configStore: configStore, networkMonitor: networkMonitor, syncQueue: syncQueue)
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -64,6 +73,9 @@ struct JobsListView: View {
                     .presentationDragIndicator(.visible)
             }
             .sensoryFeedback(.selection, trigger: selectedStage)
+            .onChange(of: selectedStage) { _, _ in appeared = []; listVersion += 1 }
+            .onChange(of: sortOrder) { _, _ in appeared = []; listVersion += 1 }
+            .onChange(of: searchText) { _, _ in appeared = []; listVersion += 1 }
             .onChange(of: store.errorMessage) { _, newValue in
                 if newValue != nil { showError = true }
             }
@@ -73,6 +85,23 @@ struct JobsListView: View {
                 Text(store.errorMessage ?? "Unknown error")
             }
         }
+
+            // Floating camera button — only on root list
+            if navPath.isEmpty {
+                Button(action: onCameraTap) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 60, height: 60)
+                        .background(DS.Gradients.primaryButton, in: .circle)
+                        .shadow(color: DS.Colors.primary.opacity(0.35), radius: 8, y: 4)
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 24)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: navPath.isEmpty)
     }
 
     private var hasActiveFilters: Bool {
@@ -148,7 +177,7 @@ struct JobsListView: View {
             } else {
                 LazyVStack(spacing: DS.Spacing.m) {
                     ForEach(Array(filteredJobs.enumerated()), id: \.element.id) { index, job in
-                        NavigationLink(destination: JobDetailView(job: job, store: store, configStore: configStore, networkMonitor: networkMonitor, syncQueue: syncQueue)) {
+                        NavigationLink(value: job.id) {
                             JobCard(job: job, isNearby: job.id == nearbyJobId)
                         }
                         .buttonStyle(DSCardPressStyle())
@@ -162,6 +191,7 @@ struct JobsListView: View {
                         .onAppear { appeared.insert(job.id) }
                     }
                 }
+                .id(listVersion)
                 .padding(.horizontal, DS.Spacing.m)
                 .padding(.top, DS.Spacing.xs)
                 .padding(.bottom, DS.Spacing.xl)

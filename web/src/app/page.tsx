@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StageBadge } from "@/components/shared/stage-badge";
 import { formatCurrency, formatDate, stageConfig } from "@/lib/utils";
 import { AnalyticsData, Job, JobStage } from "@/types";
+import dynamic from "next/dynamic";
 import {
   Briefcase,
   AlertTriangle,
@@ -22,7 +23,10 @@ import {
   Banknote,
   Building2,
   ChevronDown,
+  MapPin,
 } from "lucide-react";
+
+const JobMap = dynamic(() => import("@/components/shared/job-map"), { ssr: false });
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -69,6 +73,7 @@ export default function DashboardPage() {
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [photoDays, setPhotoDays] = useState<7 | 30 | 90>(30);
+  const [mapStageFilter, setMapStageFilter] = useState<JobStage | "">("");
 
   // Admin company filter
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
@@ -183,8 +188,8 @@ export default function DashboardPage() {
 
       {/* Row 1: KPI Cards */}
       <div className="grid grid-cols-12 gap-4">
-        {/* Hero: Dataset Values — split card (admin only) */}
-        {isAdmin && (
+        {/* Hero: Dataset Values (admin) or Company Name (regular user) */}
+        {isAdmin ? (
           <Card className="col-span-12 lg:col-span-4 overflow-hidden border-0 shadow-lg">
             <div className="grid grid-cols-2 h-full">
               <div className="p-5 bg-gradient-to-br from-[#FF6B35] via-[#FF8C61] to-[#E5532D] text-white">
@@ -201,6 +206,14 @@ export default function DashboardPage() {
                   {formatCurrency(analytics.totalJobs > 0 ? analytics.revenueDatasetValue / analytics.totalJobs : 0)}/avg
                 </p>
               </div>
+            </div>
+          </Card>
+        ) : (
+          <Card className="col-span-12 lg:col-span-4 overflow-hidden border-0 shadow-lg">
+            <div className="h-full p-5 bg-gradient-to-br from-[#FF6B35] via-[#FF8C61] to-[#E5532D] text-white flex flex-col justify-center">
+              <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Dashboard</span>
+              <p className="text-2xl font-extrabold leading-tight tracking-tight mt-1">{appUser?.companyName || "My Company"}</p>
+              <p className="text-[11px] text-white/50 mt-2">{appUser?.email}</p>
             </div>
           </Card>
         )}
@@ -321,7 +334,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
+          <Card className="hover:shadow-md hover:scale-[1.02] transition-all border-2 border-yellow-400">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Paid</span>
@@ -329,7 +342,7 @@ export default function DashboardPage() {
                   <Banknote className="h-3.5 w-3.5 text-emerald-500" />
                 </div>
               </div>
-              <p className="text-2xl font-bold text-emerald-600 border border-yellow-400 rounded-md px-2 py-0.5 inline-block">{formatCurrency(totalPaid)}</p>
+              <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totalPaid)}</p>
               <div className="flex items-center justify-between mt-0.5">
                 <p className="text-[10px] text-gray-400">Total collected</p>
                 <p className="text-[10px] font-semibold text-gray-400">{paidJobs.length} job{paidJobs.length !== 1 ? "s" : ""}</p>
@@ -361,43 +374,87 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Recent Jobs — full width */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold">Recent Jobs</h3>
-          <Link href="/jobs" className="text-xs text-[#FF6B35] font-semibold hover:underline flex items-center gap-1">
-            View all <ArrowRight size={12} />
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-          {recentJobs.slice(0, 5).map((job) => (
-            <Link key={job.id} href={`/jobs/${job.id}`} className="group">
-              <Card className="h-full hover:shadow-lg hover:-translate-y-0.5 transition-all">
-                <div className="h-28 bg-gradient-to-br from-gray-100 to-gray-50 rounded-t-xl overflow-hidden">
-                  {job.houseImageURL ? (
-                    <img src={job.houseImageURL} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Camera className="h-8 w-8 text-gray-200" />
-                    </div>
-                  )}
-                </div>
-                <CardContent className="p-4">
-                  <p className="text-sm font-semibold leading-snug group-hover:text-[#FF6B35] transition-colors mb-2">
-                    {job.streetAddress || "Untitled"}
-                  </p>
-                  <p className="text-xs text-gray-400 mb-3">
-                    {job.photoCount} photo{job.photoCount !== 1 ? "s" : ""} &middot; {job.issueCount} issue{job.issueCount !== 1 ? "s" : ""}
-                    {job.fixCount > 0 && <> &middot; {job.fixCount} fix{job.fixCount !== 1 ? "es" : ""}</>}
-                  </p>
-                  <div className="flex items-center justify-between text-[11px] text-gray-400">
-                    <span>{formatDate(job.createdAt)}</span>
-                    <StageBadge stage={job.currentStage} size="sm" />
-                  </div>
-                </CardContent>
-              </Card>
+      {/* Recent Jobs + Map */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Recent Jobs — left side */}
+        <div className="col-span-12 lg:col-span-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold">Recent Jobs</h3>
+            <Link href="/jobs" className="text-xs text-[#FF6B35] font-semibold hover:underline flex items-center gap-1">
+              View all <ArrowRight size={12} />
             </Link>
-          ))}
+          </div>
+          <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
+            {recentJobs.map((job) => (
+              <Link key={job.id} href={`/jobs/${job.id}`} className="group block">
+                <Card className="hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                  <CardContent className="p-0">
+                    <div className="flex">
+                      <div className="w-24 h-24 flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-50 rounded-l-xl overflow-hidden">
+                        {job.houseImageURL ? (
+                          <img src={job.houseImageURL} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Camera className="h-6 w-6 text-gray-200" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 p-3 min-w-0">
+                        <p className="text-sm font-semibold leading-snug group-hover:text-[#FF6B35] transition-colors truncate">
+                          {job.streetAddress || "Untitled"}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {job.photoCount} photo{job.photoCount !== 1 ? "s" : ""} &middot; {job.issueCount} issue{job.issueCount !== 1 ? "s" : ""}
+                          {job.fixCount > 0 && <> &middot; {job.fixCount} fix{job.fixCount !== 1 ? "es" : ""}</>}
+                        </p>
+                        <div className="flex items-center justify-between mt-2 text-[11px] text-gray-400">
+                          <span>{formatDate(job.createdAt)}</span>
+                          <StageBadge stage={job.currentStage} size="sm" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Map — right side */}
+        <div className="col-span-12 lg:col-span-7">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              <MapPin size={14} className="text-[#FF6B35]" />
+              Job Locations
+            </h3>
+            <div className="flex items-center gap-1.5">
+              {([
+                { value: "", label: "All", color: "#6B7280" },
+                { value: "auditPending", label: "Audit", color: "#9CA3AF" },
+                { value: "workInProgress", label: "WIP", color: "#F59E0B" },
+                { value: "inspectionPending", label: "Inspection", color: "#FF6B35" },
+                { value: "completed", label: "Done", color: "#10B981" },
+              ] as const).map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setMapStageFilter(s.value)}
+                  className="px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all"
+                  style={{
+                    backgroundColor: mapStageFilter === s.value ? s.color : `${s.color}15`,
+                    color: mapStageFilter === s.value ? "#fff" : s.color,
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Card className="overflow-hidden">
+            <JobMap
+              jobs={mapStageFilter ? allJobs.filter((j) => j.currentStage === mapStageFilter) : allJobs}
+              className="h-[340px]"
+            />
+          </Card>
         </div>
       </div>
 

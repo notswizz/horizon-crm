@@ -9,29 +9,33 @@ export async function GET() {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!session.isAdmin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
 
-    const companiesSnap = await db.collection("companies").get();
-    const companies = await Promise.all(
-      companiesSnap.docs.map(async (doc) => {
-        const data = doc.data();
-        // Count jobs for this company
-        const jobsSnap = await db.collection("jobs").where("companyId", "==", doc.id).count().get();
-        const jobCount = jobsSnap.data().count;
+    // Two queries total instead of 2*N
+    const [companiesSnap, jobsSnap] = await Promise.all([
+      db.collection("companies").get(),
+      db.collection("jobs").select("companyId", "photoCount").get(),
+    ]);
 
-        // Count photos across jobs
-        const jobsForPhotos = await db.collection("jobs").where("companyId", "==", doc.id).select("photoCount").get();
-        const photoCount = jobsForPhotos.docs.reduce((sum, j) => sum + (j.data().photoCount || 0), 0);
+    // Aggregate jobs in memory
+    const jobCounts: Record<string, number> = {};
+    const photoCounts: Record<string, number> = {};
+    for (const doc of jobsSnap.docs) {
+      const cid = doc.data().companyId || "";
+      jobCounts[cid] = (jobCounts[cid] || 0) + 1;
+      photoCounts[cid] = (photoCounts[cid] || 0) + (doc.data().photoCount || 0);
+    }
 
-        return {
-          id: doc.id,
-          name: data.name || "",
-          email: data.email || "",
-          joinCode: data.joinCode || "",
-          jobCount,
-          photoCount,
-          createdAt: toDate(data.createdAt),
-        };
-      })
-    );
+    const companies = companiesSnap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name || "",
+        email: data.email || "",
+        joinCode: data.joinCode || "",
+        jobCount: jobCounts[doc.id] || 0,
+        photoCount: photoCounts[doc.id] || 0,
+        createdAt: toDate(data.createdAt),
+      };
+    });
 
     return NextResponse.json({ companies });
   } catch (error) {

@@ -94,7 +94,7 @@ export default function ExportPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `horizon_export_${Date.now()}.${format === "csv" ? "csv" : "jsonl"}`;
+      a.download = `retrofitiq_export_${Date.now()}.${format === "csv" ? "csv" : "jsonl"}`;
       a.click();
       URL.revokeObjectURL(url);
     } finally {

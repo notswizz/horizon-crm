@@ -191,7 +191,7 @@ export default function OnboardingPage() {
                   type="text"
                   value={companyName}
                   onChange={(e) => { setCompanyName(e.target.value); setError(""); }}
-                  placeholder="e.g. Horizon Energy South"
+                  placeholder="e.g. Acme Energy"
                   autoFocus
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm outline-none transition-colors focus:border-[#FF6B35]"
                 />

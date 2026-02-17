@@ -18,7 +18,7 @@ struct TutorialView: View {
 
     private var stepTitle: String {
         switch currentStep {
-        case 0: "Welcome to Horizon Inspect"
+        case 0: "Welcome to RetrofitIQ"
         case 1: "Step 1: Create a Job & Spots"
         case 2: "Step 2: Audit — Find Issues"
         case 3: "Step 3: Inspection — Fix Issues"
@@ -115,7 +115,7 @@ struct TutorialView: View {
 
     private func stepTitleFor(_ index: Int) -> String {
         [
-            "Welcome to Horizon Inspect",
+            "Welcome to RetrofitIQ",
             "Step 1: Create a Job & Spots",
             "Step 2: Audit — Find Issues",
             "Step 3: Inspection — Fix Issues",

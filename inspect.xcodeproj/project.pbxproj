@@ -271,6 +271,7 @@
 				DEVELOPMENT_TEAM = 2XX5D58B87;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = RetrofitIQ;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos of completed work for quality inspection.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to show the closest job sites first.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Select before and after photos for quality inspection.";
@@ -306,6 +307,7 @@
 				DEVELOPMENT_TEAM = 2XX5D58B87;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = RetrofitIQ;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos of completed work for quality inspection.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to show the closest job sites first.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Select before and after photos for quality inspection.";
