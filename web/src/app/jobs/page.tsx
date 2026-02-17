@@ -102,164 +102,185 @@ export default function JobsPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
+      {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Jobs</h1>
-          <p className="text-sm text-gray-500 mt-1">{total} total jobs</p>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B35] to-[#E5532D] flex items-center justify-center shadow-md shadow-orange-200/50">
+            <Building2 size={18} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Jobs</h1>
+            <p className="text-[12px] text-gray-400 font-medium mt-0.5">{total} total job{total !== 1 ? "s" : ""}</p>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {selected.size > 0 && (
             <>
-              <Button variant="outline" size="sm" onClick={exportCSV}>
-                <Download size={14} className="mr-1.5" /> Export {selected.size}
-              </Button>
-              <Button variant="destructive" size="sm" onClick={deleteSelected}>
-                <Trash2 size={14} className="mr-1.5" /> Delete {selected.size}
-              </Button>
+              <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                <Download size={13} /> Export {selected.size}
+              </button>
+              <button onClick={deleteSelected} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors">
+                <Trash2 size={13} /> Delete {selected.size}
+              </button>
             </>
           )}
-          <Button variant="outline" size="sm" onClick={exportCSV}>
-            <Download size={14} className="mr-1.5" /> Export CSV
-          </Button>
-          <Button size="sm" onClick={() => setShowNewJob(true)} className="bg-[#FF6B35] hover:bg-[#E85A28] text-white">
-            <Plus size={14} className="mr-1.5" /> New Job
-          </Button>
+          <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+            <Download size={13} /> Export CSV
+          </button>
+          <button onClick={() => setShowNewJob(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#FF6B35] to-[#E5532D] text-white text-xs font-bold shadow-md shadow-orange-200/50 hover:shadow-lg hover:shadow-orange-200/60 transition-all">
+            <Plus size={13} /> New Job
+          </button>
         </div>
       </div>
 
       {/* Filters */}
-      <Card className="mt-6 flex-shrink-0">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search by address or contact..."
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="pl-9"
-              />
-            </div>
-            <Select value={stageFilter} onChange={(e) => { setStageFilter(e.target.value); setPage(1); }} className="w-48">
-              <option value="">All Stages</option>
-              {(["auditPending", "workInProgress", "inspectionPending", "completed", "cancelled"] as JobStage[]).map((s) => (
-                <option key={s} value={s}>{s.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase())}</option>
-              ))}
-            </Select>
-            <Select value={rebateFilter} onChange={(e) => { setRebateFilter(e.target.value); setPage(1); }} className="w-40">
-              <option value="">All Rebates</option>
-              {(["none", "calculated", "submitted", "accepted", "declined", "paid"] as RebateStatus[]).map((r) => (
-                <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
-              ))}
-            </Select>
-            {isAdmin && companies.length > 0 && (
-              <Select value={companyFilter} onChange={(e) => { setCompanyFilter(e.target.value); setPage(1); }} className="w-48">
-                <option value="">All Companies</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </Select>
-            )}
-            <Select value={sort} onChange={(e) => setSort(e.target.value)} className="w-40">
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="address">Address A–Z</option>
-              <option value="issues">Most Issues</option>
-            </Select>
+      <div className="mt-5 flex-shrink-0 relative overflow-hidden rounded-xl bg-white border border-gray-100 p-4">
+        <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[#FF6B35] to-amber-400" />
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by address or contact..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="pl-9"
+            />
           </div>
-        </CardContent>
-      </Card>
+          <Select value={stageFilter} onChange={(e) => { setStageFilter(e.target.value); setPage(1); }} className="w-48">
+            <option value="">All Stages</option>
+            {(["auditPending", "workInProgress", "inspectionPending", "completed", "cancelled"] as JobStage[]).map((s) => (
+              <option key={s} value={s}>{s.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase())}</option>
+            ))}
+          </Select>
+          <Select value={rebateFilter} onChange={(e) => { setRebateFilter(e.target.value); setPage(1); }} className="w-40">
+            <option value="">All Rebates</option>
+            {(["none", "calculated", "submitted", "accepted", "declined", "paid"] as RebateStatus[]).map((r) => (
+              <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+            ))}
+          </Select>
+          {isAdmin && companies.length > 0 && (
+            <Select value={companyFilter} onChange={(e) => { setCompanyFilter(e.target.value); setPage(1); }} className="w-48">
+              <option value="">All Companies</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
+          )}
+          <Select value={sort} onChange={(e) => setSort(e.target.value)} className="w-40">
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="address">Address A-Z</option>
+            <option value="issues">Most Issues</option>
+          </Select>
+        </div>
+      </div>
 
       {/* Table */}
-      <Card className="mt-4 flex-1 min-h-0 flex flex-col">
+      <div className="mt-4 flex-1 min-h-0 flex flex-col relative overflow-hidden rounded-xl bg-white border border-gray-100">
         <div className="overflow-auto flex-1">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-white">
-              <tr className="border-b bg-gray-50/80 backdrop-blur">
-                <th className="p-3 text-left w-10">
-                  <input type="checkbox" checked={selected.size === jobs.length && jobs.length > 0} onChange={toggleAll} className="rounded" />
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-gray-50/90 backdrop-blur-sm border-b border-gray-100">
+                <th className="px-4 py-3 text-left w-10">
+                  <input type="checkbox" checked={selected.size === jobs.length && jobs.length > 0} onChange={toggleAll} className="rounded border-gray-300" />
                 </th>
-                <th className="p-3 text-left font-medium text-gray-500">Address</th>
-                <th className="p-3 text-left font-medium text-gray-500">Contact</th>
-                <th className="p-3 text-left font-medium text-gray-500">Stage</th>
-                <th className="p-3 text-center font-medium text-gray-500">Photos</th>
-                <th className="p-3 text-center font-medium text-gray-500">Issues</th>
-                <th className="p-3 text-center font-medium text-gray-500">Fixes</th>
-                <th className="p-3 text-left font-medium text-gray-500">Rebate</th>
-                <th className="p-3 text-left font-medium text-gray-500">Created</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Address</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Contact</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Stage</th>
+                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Photos</th>
+                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Issues</th>
+                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Fixes</th>
+                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Rebate</th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Created</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="p-12 text-center">
+                  <td colSpan={9} className="p-16 text-center">
                     <Loader2 className="h-6 w-6 animate-spin text-[#FF6B35] mx-auto" />
                   </td>
                 </tr>
               ) : jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-12 text-center text-gray-400">No jobs found</td>
+                  <td colSpan={9} className="p-16 text-center">
+                    <div className="flex flex-col items-center gap-2 text-gray-300">
+                      <Building2 size={28} />
+                      <span className="text-sm">No jobs found</span>
+                    </div>
+                  </td>
                 </tr>
               ) : (
-                jobs.map((job) => (
-                  <tr key={job.id} className="border-b hover:bg-gray-50/50 transition-colors">
-                    <td className="p-3">
-                      <input type="checkbox" checked={selected.has(job.id)} onChange={() => toggleSelect(job.id)} className="rounded" />
+                jobs.map((job, idx) => (
+                  <tr key={job.id} className="group border-b border-gray-50 hover:bg-orange-50/30 transition-colors">
+                    <td className="px-4 py-3">
+                      <input type="checkbox" checked={selected.has(job.id)} onChange={() => toggleSelect(job.id)} className="rounded border-gray-300" />
                     </td>
-                    <td className="p-3">
-                      <Link href={`/jobs/${job.id}`} className="flex items-center gap-3 group">
+                    <td className="px-4 py-3">
+                      <Link href={`/jobs/${job.id}`} className="flex items-center gap-3 group/link">
                         {job.houseImageURL ? (
                           <Image
                             src={job.houseImageURL}
                             alt="House"
-                            width={36}
-                            height={36}
-                            className="rounded-full object-cover flex-shrink-0"
-                            style={{ width: 36, height: 36 }}
+                            width={40}
+                            height={40}
+                            className="rounded-xl object-cover flex-shrink-0 shadow-sm group-hover/link:shadow-md transition-shadow"
+                            style={{ width: 40, height: 40 }}
                           />
                         ) : (
-                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                            <Home size={16} className="text-gray-400" />
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-100">
+                            <Home size={16} className="text-gray-300" />
                           </div>
                         )}
-                        <span className="font-medium text-gray-900 group-hover:text-[#FF6B35] transition-colors">
-                          {job.address || "Untitled"}
-                        </span>
+                        <div className="min-w-0">
+                          <span className="font-semibold text-gray-900 group-hover/link:text-[#FF6B35] transition-colors block truncate">
+                            {job.address || "Untitled"}
+                          </span>
+                          {(job.city || job.state) && (
+                            <span className="text-[10px] text-gray-400">{[job.city, job.state].filter(Boolean).join(", ")}</span>
+                          )}
+                        </div>
                       </Link>
                     </td>
-                    <td className="p-3 text-gray-500">{job.contactName || "—"}</td>
-                    <td className="p-3"><StageBadge stage={job.currentStage} size="sm" /></td>
-                    <td className="p-3 text-center text-gray-500">{job.photoCount}</td>
-                    <td className="p-3 text-center">
+                    <td className="px-4 py-3">
+                      <span className="text-[13px] text-gray-600 font-medium">{job.contactName || <span className="text-gray-300">—</span>}</span>
+                    </td>
+                    <td className="px-4 py-3"><StageBadge stage={job.currentStage} size="sm" /></td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`text-[13px] font-semibold tabular-nums ${job.photoCount > 0 ? "text-gray-700" : "text-gray-300"}`}>{job.photoCount}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
                       {job.issueCount > 0 ? (
-                        <span className="text-red-600 font-medium">{job.issueCount}</span>
+                        <span className="text-[13px] font-bold text-red-500 tabular-nums">{job.issueCount}</span>
                       ) : (
-                        <span className="text-gray-300">0</span>
+                        <span className="text-[13px] text-gray-300">0</span>
                       )}
                     </td>
-                    <td className="p-3 text-center">
+                    <td className="px-4 py-3 text-center">
                       {job.fixCount > 0 ? (
-                        <span className="text-emerald-600 font-medium">{job.fixCount}</span>
+                        <span className="text-[13px] font-bold text-emerald-500 tabular-nums">{job.fixCount}</span>
                       ) : (
-                        <span className="text-gray-300">0</span>
+                        <span className="text-[13px] text-gray-300">0</span>
                       )}
                     </td>
-                    <td className="p-3">
+                    <td className="px-4 py-3 text-center">
                       {job.rebateStatus === "none" || (job.rebateStatus === "calculated" && !job.rebateAmount) ? (
                         <span className="text-xs text-gray-300">—</span>
                       ) : (
-                        <span className={`text-xs font-semibold ${
-                          job.rebateStatus === "submitted" ? "text-blue-600" :
-                          job.rebateStatus === "declined" ? "text-red-500" :
-                          job.rebateStatus === "accepted" ? "text-emerald-600" :
-                          job.rebateStatus === "paid" ? "text-emerald-600 border border-yellow-400 rounded px-1.5 py-0.5" :
-                          "text-gray-500"
+                        <span className={`text-xs font-bold px-2 py-1 rounded-md inline-block ${
+                          job.rebateStatus === "submitted" ? "text-blue-600 bg-blue-50" :
+                          job.rebateStatus === "declined" ? "text-red-500 bg-red-50" :
+                          job.rebateStatus === "accepted" ? "text-emerald-600 bg-emerald-50" :
+                          job.rebateStatus === "paid" ? "text-emerald-700 bg-emerald-50 ring-1 ring-yellow-400" :
+                          "text-gray-500 bg-gray-50"
                         }`}>
                           {formatCurrency(job.rebateAmount)}
                         </span>
                       )}
                     </td>
-                    <td className="p-3 text-gray-400 text-xs">{formatDate(job.createdAt)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-[12px] text-gray-400 font-medium">{formatDate(job.createdAt)}</span>
+                    </td>
                   </tr>
                 ))
               )}
@@ -269,19 +290,19 @@ export default function JobsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0">
-            <p className="text-xs text-gray-400">Page {page} of {totalPages}</p>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 flex-shrink-0 bg-gray-50/50">
+            <p className="text-[11px] text-gray-400 font-medium">Page {page} of {totalPages}</p>
+            <div className="flex gap-1.5">
+              <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:bg-white hover:text-gray-600 disabled:opacity-30 transition-colors">
                 <ChevronLeft size={14} />
-              </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              </button>
+              <button disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:bg-white hover:text-gray-600 disabled:opacity-30 transition-colors">
                 <ChevronRight size={14} />
-              </Button>
+              </button>
             </div>
           </div>
         )}
-      </Card>
+      </div>
 
       {/* New Job Modal */}
       {showNewJob && (
