@@ -179,16 +179,18 @@ export interface FilteredJobsResult {
 export async function fetchFilteredJobs(params: FilteredJobsParams): Promise<FilteredJobsResult> {
   const { search, stage, rebate, sort = "newest", page = 1, limit = 50, companyId } = params;
 
-  const needsMemoryFilter = !!search || !!rebate || sort === "issues";
+  // Stage + companyId requires a composite index; fall back to memory filter
+  const needsMemoryFilter = !!search || !!rebate || sort === "issues" || (!!stage && !!companyId);
 
-  // --- Build base query with stage filter pushed to Firestore ---
+  // --- Build base query ---
   let baseQuery: FirebaseFirestore.Query = db.collection("jobs");
 
   if (companyId) {
     baseQuery = baseQuery.where("companyId", "==", companyId);
   }
 
-  if (stage && STAGE_TO_FIRESTORE[stage as JobStage]) {
+  // Only push stage filter to Firestore when no companyId (avoids composite index requirement)
+  if (stage && STAGE_TO_FIRESTORE[stage as JobStage] && !companyId) {
     baseQuery = baseQuery.where("currentStage", "==", STAGE_TO_FIRESTORE[stage as JobStage]);
   }
 
@@ -219,6 +221,10 @@ export async function fetchFilteredJobs(params: FilteredJobsParams): Promise<Fil
         j.contactName.toLowerCase().includes(q) ||
         j.contactEmail.toLowerCase().includes(q)
     );
+  }
+
+  if (stage) {
+    filtered = filtered.filter((j) => j.currentStage === stage);
   }
 
   if (rebate) {

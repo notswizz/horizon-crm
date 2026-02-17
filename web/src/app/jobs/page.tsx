@@ -134,8 +134,8 @@ export default function JobsPage() {
       </div>
 
       {/* Filters */}
-      <div className="mt-5 flex-shrink-0 relative overflow-hidden rounded-xl bg-white border border-gray-100 p-4">
-        <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[#FF6B35] to-amber-400" />
+      <div className="mt-5 flex-shrink-0 relative rounded-xl bg-white border border-gray-100 p-4 pt-5">
+        <div className="absolute top-0 left-0 w-full h-[3px] rounded-t-xl bg-gradient-to-r from-[#FF6B35] to-amber-400" />
         <div className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
