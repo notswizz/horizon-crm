@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { randomUUID } from "crypto";
@@ -113,8 +113,8 @@ const JOBS: JobDef[] = [
     contactEmail: "sarah.m@gmail.com",
     notes: "Large Victorian home. Multiple air sealing issues found during initial walkthrough.",
     stage: "Inspection Pending",
-    rebateStatus: "none",
-    rebateAmount: 0,
+    rebateStatus: "submitted",
+    rebateAmount: 3800,
     houseIdx: 1,
     spots: [
       { title: "Master Bedroom Windows", jobType: "Air Sealing" },
@@ -133,8 +133,8 @@ const JOBS: JobDef[] = [
     contactEmail: "dchen@outlook.com",
     notes: "New HVAC system installed. Needs final inspection before rebate approval.",
     stage: "Work In Progress",
-    rebateStatus: "none",
-    rebateAmount: 0,
+    rebateStatus: "calculated",
+    rebateAmount: 4200,
     houseIdx: 2,
     spots: [
       { title: "Main HVAC Unit", jobType: "HVAC Installation" },
@@ -188,8 +188,8 @@ const JOBS: JobDef[] = [
     contactEmail: "phughes@gmail.com",
     notes: "Duct sealing needed throughout. Older ductwork with visible tape repairs.",
     stage: "Inspection Pending",
-    rebateStatus: "none",
-    rebateAmount: 0,
+    rebateStatus: "calculated",
+    rebateAmount: 2600,
     houseIdx: 5,
     spots: [
       { title: "Main Trunk Line", jobType: "Duct Sealing" },
@@ -245,7 +245,7 @@ const JOBS: JobDef[] = [
     contactEmail: "rokafor@gmail.com",
     notes: "Elderly homeowner, fixed income. Prioritize most impactful upgrades for rebate qualification.",
     stage: "Completed",
-    rebateStatus: "accepted",
+    rebateStatus: "paid",
     rebateAmount: 4500,
     houseIdx: 8,
     spots: [
@@ -382,7 +382,7 @@ const JOBS: JobDef[] = [
     contactEmail: "wduarte@email.com",
     notes: "High-rise condo. Limited scope — HVAC and window sealing only. Building engineer must be present.",
     stage: "Completed",
-    rebateStatus: "accepted",
+    rebateStatus: "paid",
     rebateAmount: 1800,
     houseIdx: 15,
     spots: [
@@ -532,7 +532,7 @@ function buildJobData(jobDef: JobDef, daysAgo: number) {
   const totalFixes = inspectionForm?._fixCount ?? 0;
   const totalPhotos = totalIssues + totalFixes;
 
-  const jobDoc = {
+  const jobDoc: Record<string, unknown> = {
     id: jobId,
     streetAddress: jobDef.streetAddress,
     city: jobDef.city,
@@ -718,17 +718,74 @@ export async function DELETE() {
   }
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     const session = await getAuthSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!session.isAdmin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
 
+    const body = await req.json().catch(() => ({}));
+    const seedAll = body.seedCompanies === true;
+
+    if (seedAll) {
+      // Seed data for each non-admin company
+      const companiesSnap = await db.collection("companies").get();
+      const companies = companiesSnap.docs.map((d) => ({ id: d.id, name: d.data().name || "" }));
+      // Exclude admin company
+      const nonAdminCompanies = companies.filter((c) => c.id !== session.companyId);
+
+      if (nonAdminCompanies.length === 0) {
+        return NextResponse.json({ error: "No non-admin companies found" }, { status: 400 });
+      }
+
+      const allResults: Record<string, string[]> = {};
+
+      for (const company of nonAdminCompanies) {
+        // Each company gets a randomized subset of 5-8 jobs
+        const numJobs = 5 + Math.floor(Math.random() * 4);
+        const shuffled = [...JOBS].sort(() => Math.random() - 0.5).slice(0, numJobs);
+        const results: string[] = [];
+
+        for (let i = 0; i < shuffled.length; i++) {
+          const daysAgo = 45 - i * 5 + Math.floor(Math.random() * 5);
+          const { jobId, jobDoc, auditForm, inspectionForm } = buildJobData(shuffled[i], daysAgo);
+
+          // Stamp company
+          jobDoc.companyId = company.id;
+
+          await db.collection("jobs").doc(jobId).set(jobDoc);
+
+          if (auditForm) {
+            await db.collection("jobs").doc(jobId).collection("forms").doc(auditForm.id).set(auditForm);
+          }
+
+          if (inspectionForm) {
+            const { _fixCount, ...formDoc } = inspectionForm;
+            await db.collection("jobs").doc(jobId).collection("forms").doc(formDoc.id).set(formDoc);
+          }
+
+          const issueCount = auditForm?.spots.flatMap((s: { issuePhotos: unknown[] }) => s.issuePhotos).length ?? 0;
+          results.push(`${jobDoc.streetAddress} — ${issueCount} issues, ${inspectionForm?._fixCount ?? 0} fixes`);
+        }
+
+        allResults[company.name || company.id] = results;
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Seeded data for ${Object.keys(allResults).length} companies`,
+        details: allResults,
+      });
+    }
+
+    // Default: seed for admin's company (original behavior)
     const results: string[] = [];
 
     for (let i = 0; i < JOBS.length; i++) {
-      const daysAgo = 60 - i * 3; // stagger creation dates over ~2 months
+      const daysAgo = 60 - i * 3;
       const { jobId, jobDoc, auditForm, inspectionForm } = buildJobData(JOBS[i], daysAgo);
+
+      jobDoc.companyId = session.companyId;
 
       await db.collection("jobs").doc(jobId).set(jobDoc);
 

@@ -4,18 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { AnalyticsData } from "@/types";
+import { formatDate } from "@/lib/utils";
 import {
   Building2,
-  Briefcase,
-  Camera,
   Shield,
   Loader2,
   ArrowRight,
   X,
-  Download,
-  Settings,
+  Search,
   Wrench,
   ChevronDown,
   ChevronRight,
@@ -26,7 +22,6 @@ import {
   UserMinus,
   Globe,
 } from "lucide-react";
-import Link from "next/link";
 
 interface CompanyRow {
   id: string;
@@ -55,11 +50,11 @@ export default function AdminPage() {
   const { appUser } = useAuth();
   const router = useRouter();
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [impersonating, setImpersonating] = useState<string | null>(null);
   const [migrating, setMigrating] = useState(false);
   const [migrateResult, setMigrateResult] = useState<string | null>(null);
+  const [companySearch, setCompanySearch] = useState("");
 
   // Expanded company state
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -80,12 +75,8 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/admin/companies").then((r) => r.json()),
-      fetch("/api/analytics").then((r) => r.json()),
-    ]).then(([c, a]) => {
+    fetch("/api/admin/companies").then((r) => r.json()).then((c) => {
       setCompanies(c.companies || []);
-      setAnalytics(a);
       setLoading(false);
     });
   }, []);
@@ -234,61 +225,6 @@ export default function AdminPage() {
           <Shield size={20} className="text-[#FF6B35]" />
           <h1 className="text-2xl font-bold tracking-tight">Admin Panel</h1>
         </div>
-        <p className="text-sm text-gray-500">Platform overview and company management</p>
-      </div>
-
-      {/* Platform Stats */}
-      {analytics && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="overflow-hidden border-0 shadow-md">
-            <div className="p-4 bg-gradient-to-br from-[#FF6B35] via-[#FF8C61] to-[#E5532D] text-white">
-              <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Point-Based Value</span>
-              <p className="text-2xl font-extrabold mt-1">{formatCurrency(analytics.estimatedValue)}</p>
-            </div>
-          </Card>
-          <Card className="overflow-hidden border-0 shadow-md">
-            <div className="p-4 bg-gradient-to-br from-[#7C3AED] via-[#8B5CF6] to-[#6D28D9] text-white">
-              <span className="text-[10px] font-semibold text-white/60 uppercase tracking-widest">Rebate-Based Value</span>
-              <p className="text-2xl font-extrabold mt-1">{formatCurrency(analytics.revenueDatasetValue)}</p>
-            </div>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Total Jobs</span>
-                <Briefcase size={14} className="text-[#FF6B35]" />
-              </div>
-              <p className="text-2xl font-bold">{analytics.totalJobs}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Total Photos</span>
-                <Camera size={14} className="text-blue-500" />
-              </div>
-              <p className="text-2xl font-bold">{analytics.totalPhotos.toLocaleString()}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Quick Links */}
-      <div className="flex gap-3">
-        <Link
-          href="/export"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
-        >
-          <Download size={14} />
-          Export Data
-        </Link>
-        <Link
-          href="/settings"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
-        >
-          <Settings size={14} />
-          Weights & Config
-        </Link>
       </div>
 
       {/* Companies */}
@@ -297,19 +233,36 @@ export default function AdminPage() {
           <div className="flex items-center gap-2">
             <Building2 size={16} className="text-gray-400" />
             <h3 className="text-sm font-semibold">Companies</h3>
+            <span className="text-xs text-gray-400">{companies.length} total</span>
           </div>
-          <span className="text-xs text-gray-400">{companies.length} companies</span>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={companySearch}
+              onChange={(e) => setCompanySearch(e.target.value)}
+              placeholder="Search companies..."
+              className="pl-9 pr-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35] w-56"
+            />
+          </div>
         </div>
 
-        {companies.length === 0 ? (
+        {(() => {
+          const filtered = companySearch
+            ? companies.filter((c) => {
+                const q = companySearch.toLowerCase();
+                return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.joinCode.toLowerCase().includes(q);
+              })
+            : companies;
+          return filtered.length === 0 ? (
           <Card>
             <CardContent className="p-8">
-              <p className="text-sm text-gray-400 text-center">No companies yet</p>
+              <p className="text-sm text-gray-400 text-center">{companySearch ? "No matching companies" : "No companies yet"}</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {companies.map((company) => {
+          <div className="space-y-3 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
+            {filtered.map((company) => {
               const isExpanded = expandedId === company.id;
               const detail = expandedData[company.id];
 
@@ -498,7 +451,8 @@ export default function AdminPage() {
               );
             })}
           </div>
-        )}
+        );
+        })()}
 
         {migrateResult && (
           <div className="mt-4 p-3 rounded-lg bg-blue-50 text-blue-700 text-sm">

@@ -65,13 +65,18 @@ interface JobMapProps {
 
 export default function JobMap({ jobs, className = "" }: JobMapProps) {
   const [ready, setReady] = useState(false);
-  const id = useId();
+  const [mapKey, setMapKey] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Delay mount by one tick so the container DOM node is fully available
   // and avoids the "Map container is being reused" error in strict mode
   useEffect(() => {
     setReady(true);
-    return () => setReady(false);
+    return () => {
+      setReady(false);
+      // Force a new map instance on next mount to avoid container reuse
+      setMapKey((k) => k + 1);
+    };
   }, []);
 
   const mappableJobs = jobs.filter((j) => j.latitude != null && j.longitude != null);
@@ -91,9 +96,9 @@ export default function JobMap({ jobs, className = "" }: JobMapProps) {
   const center: [number, number] = [mappableJobs[0].latitude!, mappableJobs[0].longitude!];
 
   return (
-    <div className={`rounded-xl overflow-hidden ${className}`}>
+    <div ref={containerRef} className={`rounded-xl overflow-hidden ${className}`}>
       <MapContainer
-        key={id}
+        key={`map-${mapKey}`}
         center={center}
         zoom={12}
         scrollWheelZoom={true}

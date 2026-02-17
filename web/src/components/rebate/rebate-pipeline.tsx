@@ -4,11 +4,10 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
   FileText, CheckCircle, XCircle, DollarSign,
-  Clock, AlertTriangle, Save, Check,
+  Clock, AlertTriangle, Save, Check, ArrowRight, RotateCcw, Pencil,
 } from "lucide-react";
 import { Job, RebateStatus } from "@/types";
 import { formatDate } from "@/lib/utils";
@@ -27,6 +26,27 @@ const statusConfig: Record<RebateStatus, { label: string; color: string; icon: t
   paid: { label: "Paid", color: "bg-emerald-100 text-emerald-700", icon: DollarSign },
 };
 
+const NEXT_STAGE: Record<RebateStatus, RebateStatus | null> = {
+  none: "calculated",
+  calculated: "submitted",
+  submitted: "accepted",
+  accepted: "paid",
+  declined: "submitted",
+  paid: null,
+};
+
+const NEXT_LABEL: Record<RebateStatus, string> = {
+  none: "Mark Calculated",
+  calculated: "Mark Submitted",
+  submitted: "Mark Accepted",
+  accepted: "Mark Paid",
+  declined: "Resubmit",
+  paid: "",
+};
+
+// Stages that can be declined
+const CAN_DECLINE: RebateStatus[] = ["submitted", "accepted"];
+
 export function RebatePipeline({ job, onUpdate }: Props) {
   const rebate = job.rebate;
 
@@ -40,7 +60,7 @@ export function RebatePipeline({ job, onUpdate }: Props) {
     );
   }
 
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<"advance" | "decline" | "edit" | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -53,13 +73,15 @@ export function RebatePipeline({ job, onUpdate }: Props) {
   const [declineReason, setDeclineReason] = useState(rebate.declineReason || "");
   const [paidAmount, setPaidAmount] = useState(rebate.paidAmount || 0);
   const [paidDate, setPaidDate] = useState(rebate.paidDate || "");
-  const [status, setStatus] = useState<RebateStatus>(
-    statusConfig[rebate.status] ? rebate.status : "none"
-  );
+
+  const currentStatus: RebateStatus = statusConfig[rebate.status] ? rebate.status : "none";
+  const nextStage = NEXT_STAGE[currentStatus];
+  const targetStatus = editing === "decline" ? "declined" : editing === "advance" && nextStage ? nextStage : currentStatus;
 
   const handleSave = async () => {
     setSaving(true);
 
+    const newStatus = editing === "edit" ? currentStatus : targetStatus;
     const variance = approvedAmount > 0 ? claimedAmount - approvedAmount : undefined;
 
     await onUpdate({
@@ -68,24 +90,28 @@ export function RebatePipeline({ job, onUpdate }: Props) {
         claimedAmount,
         submittedDate: submittedDate || undefined,
         claimNumber: claimNumber || undefined,
-        status,
-        approvedAmount: status === "accepted" || status === "paid" ? approvedAmount : undefined,
-        approvedDate: status === "accepted" || status === "paid" ? approvedDate || undefined : undefined,
-        declineReason: status === "declined" ? declineReason : undefined,
-        paidAmount: status === "paid" ? paidAmount : undefined,
-        paidDate: status === "paid" ? paidDate || undefined : undefined,
+        status: newStatus,
+        approvedAmount: newStatus === "accepted" || newStatus === "paid" ? approvedAmount : undefined,
+        approvedDate: newStatus === "accepted" || newStatus === "paid" ? approvedDate || undefined : undefined,
+        declineReason: newStatus === "declined" ? declineReason : undefined,
+        paidAmount: newStatus === "paid" ? paidAmount : undefined,
+        paidDate: newStatus === "paid" ? paidDate || undefined : undefined,
         variance,
       },
     });
 
     setSaving(false);
     setSaved(true);
-    setEditing(false);
+    setEditing(null);
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const cfg = statusConfig[status] || statusConfig.none;
+  const cfg = statusConfig[currentStatus];
   const Icon = cfg.icon;
+
+  // Pipeline progress dots
+  const stages: RebateStatus[] = ["none", "calculated", "submitted", "accepted", "paid"];
+  const currentIdx = stages.indexOf(currentStatus === "declined" ? "submitted" : currentStatus);
 
   return (
     <Card>
@@ -96,6 +122,19 @@ export function RebatePipeline({ job, onUpdate }: Props) {
             Rebate Pipeline
           </h3>
           <Badge className={cfg.color + " text-[10px]"}>{cfg.label}</Badge>
+        </div>
+
+        {/* Progress bar */}
+        <div className="flex items-center gap-1 mb-4">
+          {stages.map((s, i) => (
+            <div key={s} className="flex-1 flex items-center gap-1">
+              <div
+                className={`h-1.5 flex-1 rounded-full transition-colors ${
+                  i <= currentIdx ? "bg-[#FF6B35]" : "bg-gray-200"
+                } ${currentStatus === "declined" && i >= currentIdx ? "bg-red-200" : ""}`}
+              />
+            </div>
+          ))}
         </div>
 
         {!editing ? (
@@ -180,31 +219,58 @@ export function RebatePipeline({ job, onUpdate }: Props) {
               </div>
             )}
 
-            <Button
-              onClick={() => setEditing(true)}
-              variant="outline"
-              className="w-full mt-2"
-              size="sm"
-            >
-              Update Pipeline
-            </Button>
-          </div>
-        ) : (
-          // Edit mode
-          <div className="space-y-3">
-            <div>
-              <label className="block text-[11px] font-medium text-gray-500 mb-1">Status</label>
-              <Select value={status} onChange={(e) => setStatus(e.target.value as RebateStatus)} className="text-sm h-9">
-                <option value="none">None</option>
-                <option value="calculated">Calculated</option>
-                <option value="submitted">Submitted</option>
-                <option value="accepted">Accepted</option>
-                <option value="declined">Declined</option>
-                <option value="paid">Paid</option>
-              </Select>
+            {/* Action buttons */}
+            <div className="flex gap-2 pt-1">
+              {nextStage && (
+                <Button
+                  onClick={() => setEditing("advance")}
+                  className="flex-1"
+                  size="sm"
+                >
+                  {currentStatus === "declined" ? (
+                    <><RotateCcw size={14} className="mr-1.5" /> {NEXT_LABEL[currentStatus]}</>
+                  ) : (
+                    <><ArrowRight size={14} className="mr-1.5" /> {NEXT_LABEL[currentStatus]}</>
+                  )}
+                </Button>
+              )}
+              {CAN_DECLINE.includes(currentStatus) && (
+                <Button
+                  onClick={() => setEditing("decline")}
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  size="sm"
+                >
+                  <XCircle size={14} className="mr-1.5" /> Decline
+                </Button>
+              )}
+              {currentStatus !== "none" && (
+                <button
+                  onClick={() => setEditing("edit")}
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <Pencil size={11} /> Edit
+                </button>
+              )}
             </div>
 
-            {status !== "none" && status !== "calculated" && (
+            {saved && (
+              <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-medium">
+                <Check size={14} /> Saved
+              </div>
+            )}
+          </div>
+        ) : (
+          // Edit mode — fields based on target status
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Badge className={statusConfig[targetStatus].color + " text-[10px]"}>
+                {editing === "edit" ? `Editing: ${statusConfig[currentStatus].label}` : `→ ${statusConfig[targetStatus].label}`}
+              </Badge>
+            </div>
+
+            {/* Submitted fields: show when advancing to submitted, or editing submitted+ */}
+            {(targetStatus === "submitted" || (editing === "edit" && ["submitted", "accepted", "paid"].includes(currentStatus))) && (
               <>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-500 mb-1">Claimed Amount ($)</label>
@@ -238,7 +304,8 @@ export function RebatePipeline({ job, onUpdate }: Props) {
               </>
             )}
 
-            {(status === "accepted" || status === "paid") && (
+            {/* Accepted fields: show when advancing to accepted, or editing accepted/paid */}
+            {(targetStatus === "accepted" || targetStatus === "paid" || (editing === "edit" && ["accepted", "paid"].includes(currentStatus))) && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-gray-500 mb-1">Approved Amount ($)</label>
@@ -261,7 +328,8 @@ export function RebatePipeline({ job, onUpdate }: Props) {
               </div>
             )}
 
-            {status === "declined" && (
+            {/* Decline fields */}
+            {targetStatus === "declined" && (
               <div>
                 <label className="block text-[11px] font-medium text-gray-500 mb-1">Decline Reason</label>
                 <textarea
@@ -274,7 +342,8 @@ export function RebatePipeline({ job, onUpdate }: Props) {
               </div>
             )}
 
-            {status === "paid" && (
+            {/* Paid fields: show when advancing to paid, or editing paid */}
+            {(targetStatus === "paid" || (editing === "edit" && currentStatus === "paid")) && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-gray-500 mb-1">Paid Amount ($)</label>
@@ -301,17 +370,15 @@ export function RebatePipeline({ job, onUpdate }: Props) {
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className={`flex-1 ${saved ? "bg-emerald-500 hover:bg-emerald-600" : ""}`}
+                className={`flex-1 ${editing === "decline" ? "bg-red-600 hover:bg-red-700" : ""}`}
                 size="sm"
               >
-                {saving ? "Saving..." : saved ? (
-                  <><Check size={14} className="mr-1" /> Saved</>
-                ) : (
-                  <><Save size={14} className="mr-1" /> Save</>
+                {saving ? "Saving..." : (
+                  <><Save size={14} className="mr-1" /> {editing === "decline" ? "Decline Rebate" : editing === "edit" ? "Save Changes" : `Advance to ${statusConfig[targetStatus].label}`}</>
                 )}
               </Button>
               <Button
-                onClick={() => setEditing(false)}
+                onClick={() => setEditing(null)}
                 variant="outline"
                 className="flex-1"
                 size="sm"
