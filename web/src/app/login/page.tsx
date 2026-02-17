@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { signIn, signUp } from "@/lib/firebase-client";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { refreshUser } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,8 +37,9 @@ export default function LoginPage() {
         throw new Error("Failed to create session");
       }
 
-      const { needsOnboarding } = await res.json();
-      router.push(needsOnboarding ? "/onboarding" : "/");
+      // Load profile into auth context, then navigate
+      await refreshUser();
+      router.push("/");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong";
       if (message.includes("auth/invalid-credential") || message.includes("auth/wrong-password") || message.includes("auth/user-not-found")) {

@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseCore
+import FirebaseFirestore
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
@@ -7,6 +8,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseApp.configure()
+
+        // Enable offline persistence with 100MB cache
+        let settings = Firestore.firestore().settings
+        settings.isPersistenceEnabled = true
+        settings.cacheSizeBytes = 100 * 1024 * 1024
+        Firestore.firestore().settings = settings
+
         return true
     }
 }
@@ -18,6 +26,8 @@ struct inspectApp: App {
     @State private var store = JobStore()
     @State private var locationManager = LocationManager()
     @State private var configStore = ConfigStore()
+    @State private var networkMonitor = NetworkMonitor()
+    @State private var photoSyncQueue = PhotoSyncQueue()
 
     var body: some Scene {
         WindowGroup {
@@ -45,16 +55,27 @@ struct inspectApp: App {
                     NameSetupView(authManager: authManager)
 
                 } else {
-                    ContentView(store: store, locationManager: locationManager, configStore: configStore, authManager: authManager)
-                        .onAppear { startListeningWithCompany() }
-                        .onChange(of: authManager.companyId) { _, _ in
-                            startListeningWithCompany()
-                        }
+                    ContentView(
+                        store: store,
+                        locationManager: locationManager,
+                        configStore: configStore,
+                        authManager: authManager,
+                        networkMonitor: networkMonitor,
+                        photoSyncQueue: photoSyncQueue
+                    )
+                    .onAppear { startListeningWithCompany() }
+                    .onChange(of: authManager.companyId) { _, _ in
+                        startListeningWithCompany()
+                    }
                 }
             }
             .onAppear {
-                // Start auth listener AFTER Firebase is configured by AppDelegate
                 authManager.start()
+            }
+            .onChange(of: networkMonitor.isConnected) { _, connected in
+                if connected {
+                    photoSyncQueue.processQueue()
+                }
             }
         }
     }
@@ -62,5 +83,7 @@ struct inspectApp: App {
     private func startListeningWithCompany() {
         store.companyId = authManager.companyId
         store.startListening()
+        configStore.companyId = authManager.companyId
+        configStore.reload()
     }
 }

@@ -7,6 +7,8 @@ struct JobDetailView: View {
     let job: Job
     var store: JobStore
     var configStore: ConfigStore
+    var networkMonitor: NetworkMonitor
+    var syncQueue: PhotoSyncQueue
 
     @State private var editedStage: JobStage
     @State private var rebateText: String
@@ -24,10 +26,12 @@ struct JobDetailView: View {
         store.jobs.first { $0.id == job.id } ?? job
     }
 
-    init(job: Job, store: JobStore, configStore: ConfigStore) {
+    init(job: Job, store: JobStore, configStore: ConfigStore, networkMonitor: NetworkMonitor, syncQueue: PhotoSyncQueue) {
         self.job = job
         self.store = store
         self.configStore = configStore
+        self.networkMonitor = networkMonitor
+        self.syncQueue = syncQueue
         self._editedStage = State(initialValue: job.currentStage)
         self._rebateText = State(initialValue: job.rebateAmount > 0 ? String(format: "%.0f", job.rebateAmount) : "")
     }
@@ -41,26 +45,30 @@ struct JobDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                VStack(spacing: DS.Spacing.s) {
-                    contactRow
-                    metricsCard
-                }
-                .padding(.horizontal, DS.Spacing.m)
-                .padding(.top, DS.Spacing.s)
-                .padding(.bottom, DS.Spacing.m)
+        VStack(spacing: 0) {
+            SyncBanner(networkMonitor: networkMonitor, syncQueue: syncQueue, jobStore: store)
 
-                heroBanner
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(spacing: DS.Spacing.s) {
+                        contactRow
+                        metricsCard
+                    }
+                    .padding(.horizontal, DS.Spacing.m)
+                    .padding(.top, DS.Spacing.s)
+                    .padding(.bottom, DS.Spacing.m)
 
-                VStack(spacing: DS.Spacing.s) {
-                    spotsSection
-                    auditSection
-                    inspectionsSection
+                    heroBanner
+
+                    VStack(spacing: DS.Spacing.s) {
+                        spotsSection
+                        auditSection
+                        inspectionsSection
+                    }
+                    .padding(.horizontal, DS.Spacing.m)
+                    .padding(.top, DS.Spacing.m)
+                    .padding(.bottom, DS.Spacing.xl)
                 }
-                .padding(.horizontal, DS.Spacing.m)
-                .padding(.top, DS.Spacing.m)
-                .padding(.bottom, DS.Spacing.xl)
             }
         }
         .background(DS.Colors.background)
@@ -588,7 +596,7 @@ struct JobDetailView: View {
 
             // Content
             if let audit {
-                NavigationLink(destination: FormDetailView(form: audit, job: liveJob, store: store, configStore: configStore)) {
+                NavigationLink(destination: FormDetailView(form: audit, job: liveJob, store: store, configStore: configStore, syncQueue: syncQueue)) {
                     HStack(spacing: 12) {
                         Image(systemName: "person.fill")
                             .font(.system(size: 14, weight: .medium))
@@ -703,7 +711,7 @@ struct JobDetailView: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(inspections) { inspection in
-                        NavigationLink(destination: FormDetailView(form: inspection, job: liveJob, store: store, configStore: configStore)) {
+                        NavigationLink(destination: FormDetailView(form: inspection, job: liveJob, store: store, configStore: configStore, syncQueue: syncQueue)) {
                             HStack(spacing: 12) {
                                 Image(systemName: "person.fill")
                                     .font(.system(size: 14, weight: .medium))

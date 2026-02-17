@@ -684,17 +684,34 @@ export async function DELETE() {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!session.isAdmin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
 
-    const snapshot = await db.collection("jobs").get();
-    let deleted = 0;
-    for (const doc of snapshot.docs) {
+    const counts: Record<string, number> = {};
+
+    // Delete all jobs + their forms subcollections
+    const jobsSnap = await db.collection("jobs").get();
+    counts.jobs = jobsSnap.size;
+    for (const doc of jobsSnap.docs) {
       const formsSnap = await doc.ref.collection("forms").get();
       for (const formDoc of formsSnap.docs) {
         await formDoc.ref.delete();
       }
       await doc.ref.delete();
-      deleted++;
     }
-    return NextResponse.json({ success: true, deleted });
+
+    // Delete all users
+    const usersSnap = await db.collection("users").get();
+    counts.users = usersSnap.size;
+    for (const doc of usersSnap.docs) {
+      await doc.ref.delete();
+    }
+
+    // Delete all companies
+    const companiesSnap = await db.collection("companies").get();
+    counts.companies = companiesSnap.size;
+    for (const doc of companiesSnap.docs) {
+      await doc.ref.delete();
+    }
+
+    return NextResponse.json({ success: true, deleted: counts });
   } catch (error) {
     console.error("Delete error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });

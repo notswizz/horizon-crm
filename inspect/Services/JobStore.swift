@@ -11,6 +11,10 @@ final class JobStore {
     var isLoading = false
     var errorMessage: String?
 
+    /// Offline sync tracking
+    var pendingSyncCount: Int = 0
+    var isSyncing: Bool = false
+
     /// The companyId to scope queries to. Set by AuthManager after sign-in.
     var companyId: String?
 
@@ -62,17 +66,33 @@ final class JobStore {
         }
         query = query.order(by: "createdAt", descending: true)
 
+        print("[JobStore] startListening companyId=\(companyId ?? "nil")")
+
         jobsListener = query.addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
                 self.isLoading = false
                 if let error {
+                    let nsError = error as NSError
+                    print("[JobStore] Listener error: code=\(nsError.code) domain=\(nsError.domain) \(error.localizedDescription)")
+                    // Don't surface transient permission errors — the listener will retry automatically
+                    if nsError.domain == "FIRFirestoreErrorDomain" && nsError.code == 7 {
+                        print("[JobStore] Permission denied — will retry on next snapshot")
+                        return
+                    }
                     self.errorMessage = error.localizedDescription
                     return
                 }
-                guard let documents = snapshot?.documents else { return }
-                self.jobs = documents.compactMap { doc in
+                guard let snapshot else { return }
+
+                // Track pending writes for sync status
+                let hasPending = snapshot.metadata.hasPendingWrites
+                self.isSyncing = hasPending
+                self.pendingSyncCount = hasPending ? snapshot.documentChanges.filter { $0.document.metadata.hasPendingWrites }.count : 0
+
+                self.jobs = snapshot.documents.compactMap { doc in
                     try? doc.data(as: Job.self)
                 }
+                print("[JobStore] Loaded \(self.jobs.count) jobs (pendingWrites: \(hasPending))")
             }
     }
 

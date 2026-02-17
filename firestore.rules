@@ -12,6 +12,12 @@ service cloud.firestore {
     match /companies/{companyId} {
       allow read, create: if request.auth != null;
       allow update, delete: if false; // server-side only
+
+      // Per-company config subcollection
+      match /config/{document=**} {
+        allow read: if request.auth != null;
+        allow write: if false; // server-side only
+      }
     }
 
     // Users: only the user themselves can read/write their doc

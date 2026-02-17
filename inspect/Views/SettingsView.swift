@@ -9,34 +9,23 @@ struct SettingsView: View {
     @State private var editedName = ""
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    inspectorCard
-                    tutorialCard
-                    signOutCard
-                }
-                .padding()
+        ScrollView {
+            VStack(spacing: 20) {
+                inspectorCard
+                tutorialCard
+                signOutCard
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Image("Logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 36, height: 36)
-                        .clipShape(.rect(cornerRadius: 8))
-                }
-            }
-            .sheet(isPresented: $showTutorial) {
-                TutorialView()
-                    .onDisappear { hasSeenTutorial = true }
-            }
-            .onAppear {
-                if !hasSeenTutorial { showTutorial = true }
-            }
+            .padding()
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showTutorial) {
+            TutorialView()
+                .onDisappear { hasSeenTutorial = true }
+        }
+        .onAppear {
+            if !hasSeenTutorial { showTutorial = true }
         }
     }
 
@@ -81,6 +70,17 @@ struct SettingsView: View {
                 Text(email)
                     .font(DS.Typography.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if let companyName = authManager.companyName, !companyName.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "building.2.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                    Text(companyName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .dsCard()

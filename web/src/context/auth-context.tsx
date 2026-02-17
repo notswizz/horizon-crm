@@ -26,44 +26,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchAppUser = useCallback(async () => {
+  const refreshUser = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/me");
       if (res.ok) {
         const data = await res.json();
-        if (data.companyId) {
+        if (data.uid && !data.error) {
           setAppUser({
             uid: data.uid,
-            email: data.email,
-            companyId: data.companyId,
-            companyName: data.companyName,
-            role: data.role,
-            joinCode: data.joinCode,
-            webAccess: data.webAccess,
+            email: data.email || "",
+            companyId: data.companyId || "",
+            companyName: data.companyName || "",
+            role: data.role || "user",
+            joinCode: data.joinCode || "",
+            webAccess: data.webAccess ?? false,
           });
-        } else {
-          setAppUser(null);
+          return;
         }
-      } else {
-        setAppUser(null);
       }
-    } catch {
-      setAppUser(null);
-    }
+    } catch {}
+    setAppUser(null);
   }, []);
 
   useEffect(() => {
-    const unsub = onAuthChange(async (u) => {
+    // Check for existing server session on mount
+    refreshUser().then(() => setLoading(false));
+
+    // Listen for Firebase Auth state — only used for tracking user object + sign-out
+    const unsub = onAuthChange((u) => {
       setUser(u);
-      if (u) {
-        await fetchAppUser();
-      } else {
+      if (!u) {
         setAppUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
     return unsub;
-  }, [fetchAppUser]);
+  }, [refreshUser]);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/session", { method: "DELETE" });
@@ -73,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, appUser, loading, logout, refreshUser: fetchAppUser }}>
+    <AuthContext.Provider value={{ user, appUser, loading, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

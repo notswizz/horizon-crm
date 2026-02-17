@@ -262,4 +262,6 @@ export interface AnalyticsData {
   photosTrend: { date: string; count: number }[];
   topInspectors: { name: string; count: number }[];
   materialsByType: { type: string; count: number }[];
+  totalCompanies?: number;
+  totalUsers?: number;
 }

@@ -5,6 +5,7 @@ struct FormDetailView: View {
     let job: Job
     var store: JobStore
     var configStore: ConfigStore
+    var syncQueue: PhotoSyncQueue
 
     /// Live version of the form from the store's listener, falls back to the passed-in snapshot
     private var liveForm: InspectionForm {
@@ -305,7 +306,7 @@ struct FormDetailView: View {
     }
 
     private func issuePhotoCard(_ photo: IssuePhoto, spotId: UUID) -> some View {
-        NavigationLink(destination: IssueDetailView(issueId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store, configStore: configStore)) {
+        NavigationLink(destination: IssueDetailView(issueId: photo.id, formId: liveForm.id, spotId: spotId, job: job, store: store, configStore: configStore, syncQueue: syncQueue)) {
             VStack(alignment: .leading, spacing: 8) {
                 // Category + severity
                 HStack(spacing: 6) {
@@ -327,22 +328,46 @@ struct FormDetailView: View {
                 }
 
                 // Photo
-                if let urlString = photo.photoURL, let url = URL(string: urlString) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 160)
-                                .clipped()
-                                .clipShape(.rect(cornerRadius: 8))
-                        case .failure:
-                            photoPlaceholder("Failed to load")
-                        default:
-                            ProgressView()
-                                .frame(height: 160)
+                if let urlString = photo.photoURL {
+                    if urlString.hasPrefix("pending://") {
+                        // Pending upload — show local image with sync badge
+                        let photoId = String(urlString.dropFirst("pending://".count))
+                        ZStack(alignment: .topTrailing) {
+                            if let localImage = syncQueue.loadPendingImage(photoId: photoId) {
+                                Image(uiImage: localImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 160)
+                                    .clipped()
+                                    .clipShape(.rect(cornerRadius: 8))
+                            } else {
+                                photoPlaceholder("Pending upload")
+                            }
+                            Image(systemName: "arrow.triangle.2.circlepath.icloud.fill")
+                                .font(.caption)
+                                .foregroundStyle(.white)
+                                .padding(5)
+                                .background(.ultraThinMaterial, in: .circle)
+                                .padding(6)
+                        }
+                    } else if let url = URL(string: urlString) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 160)
+                                    .clipped()
+                                    .clipShape(.rect(cornerRadius: 8))
+                            case .failure:
+                                photoPlaceholder("Failed to load")
+                            default:
+                                ProgressView()
+                                    .frame(height: 160)
+                            }
                         }
                     }
                 }
@@ -456,22 +481,45 @@ struct FormDetailView: View {
                 }
 
                 // Photo
-                if let urlString = photo.photoURL, let url = URL(string: urlString) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 160)
-                                .clipped()
-                                .clipShape(.rect(cornerRadius: 8))
-                        case .failure:
-                            photoPlaceholder("Failed to load")
-                        default:
-                            ProgressView()
-                                .frame(height: 160)
+                if let urlString = photo.photoURL {
+                    if urlString.hasPrefix("pending://") {
+                        let photoId = String(urlString.dropFirst("pending://".count))
+                        ZStack(alignment: .topTrailing) {
+                            if let localImage = syncQueue.loadPendingImage(photoId: photoId) {
+                                Image(uiImage: localImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 160)
+                                    .clipped()
+                                    .clipShape(.rect(cornerRadius: 8))
+                            } else {
+                                photoPlaceholder("Pending upload")
+                            }
+                            Image(systemName: "arrow.triangle.2.circlepath.icloud.fill")
+                                .font(.caption)
+                                .foregroundStyle(.white)
+                                .padding(5)
+                                .background(.ultraThinMaterial, in: .circle)
+                                .padding(6)
+                        }
+                    } else if let url = URL(string: urlString) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 160)
+                                    .clipped()
+                                    .clipShape(.rect(cornerRadius: 8))
+                            case .failure:
+                                photoPlaceholder("Failed to load")
+                            default:
+                                ProgressView()
+                                    .frame(height: 160)
+                            }
                         }
                     }
                 }

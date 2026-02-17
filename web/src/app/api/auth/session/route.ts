@@ -18,9 +18,9 @@ export async function POST(req: NextRequest) {
     // Create session cookie
     const sessionCookie = await auth.createSessionCookie(idToken, { expiresIn: EXPIRES_IN });
 
-    // Check if user doc exists (needs onboarding?)
+    // Check if user doc exists with a companyId (needs onboarding?)
     const userDoc = await db.collection("users").doc(decoded.uid).get();
-    const needsOnboarding = !userDoc.exists;
+    const needsOnboarding = !userDoc.exists || !userDoc.data()?.companyId;
 
     // Set httpOnly cookie
     const cookieStore = await cookies();

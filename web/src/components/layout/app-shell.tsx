@@ -18,9 +18,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading || NO_SHELL_PATHS.includes(pathname)) return;
 
-    if (!user) {
+    if (!user || !appUser) {
+      // No Firebase user or no server session — go to login
       router.push("/login");
-    } else if (!appUser) {
+    } else if (!appUser.companyId) {
+      // Has session but no company — needs onboarding
       router.push("/onboarding");
     }
   }, [user, appUser, loading, pathname, router]);
@@ -30,17 +32,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#FF6B35]" />
-      </div>
-    );
-  }
-
-  // Waiting for redirect
-  if (!user || !appUser) {
+  // Loading or waiting for redirect
+  if (loading || !user || !appUser || !appUser.companyId) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-[#FF6B35]" />

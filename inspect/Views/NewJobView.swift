@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreLocation
 import MapKit
+import PhotosUI
 
 // MARK: - Focus Fields
 
@@ -27,10 +28,16 @@ struct NewJobView: View {
     @State private var suppressCompleter = false
     @FocusState private var focusedField: Field?
 
+    // Property photo
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var propertyImage: UIImage?
+    @State private var showCamera = false
+
     var body: some View {
         ZStack {
             ScrollView {
                 VStack(spacing: DS.Spacing.l) {
+                    propertyPhotoCard
                     jobDetailsCard
                     contactCard
                     notesCard
@@ -46,6 +53,22 @@ struct NewJobView: View {
                 Button("OK") { }
             } message: {
                 Text(store.errorMessage ?? "An unknown error occurred.")
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPickerView { image in
+                    propertyImage = image
+                }
+                .ignoresSafeArea()
+            }
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                guard let newItem else { return }
+                Task {
+                    if let data = try? await newItem.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        propertyImage = image
+                    }
+                    selectedPhotoItem = nil
+                }
             }
 
             // Success overlay
@@ -72,6 +95,85 @@ struct NewJobView: View {
         .padding(DS.Spacing.xxl)
         .background(.ultraThinMaterial, in: .rect(cornerRadius: DS.Spacing.l))
         .shadow(color: .black.opacity(0.1), radius: DS.Spacing.l, y: DS.Spacing.xs)
+    }
+
+    // MARK: - Property Photo Card
+
+    private var propertyPhotoCard: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
+            Label {
+                Text("Property Photo")
+                    .font(.headline)
+            } icon: {
+                Image(systemName: "photo.fill")
+                    .foregroundStyle(DS.Colors.primary)
+            }
+
+            if let propertyImage {
+                ZStack(alignment: .topTrailing) {
+                    Image(uiImage: propertyImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 180)
+                        .clipped()
+                        .clipShape(.rect(cornerRadius: 12))
+
+                    Button {
+                        self.propertyImage = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 2)
+                    }
+                    .padding(8)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    // Camera
+                    Button {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            showCamera = true
+                        }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: "camera.fill")
+                                .font(.title3)
+                            Text("Camera")
+                                .font(.caption.weight(.medium))
+                        }
+                        .foregroundStyle(DS.Colors.primary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 80)
+                        .background(DS.Colors.primary.opacity(0.08), in: .rect(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(DS.Colors.primary.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+
+                    // Library
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        VStack(spacing: 6) {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.title3)
+                            Text("Library")
+                                .font(.caption.weight(.medium))
+                        }
+                        .foregroundStyle(DS.Colors.primary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 80)
+                        .background(DS.Colors.primary.opacity(0.08), in: .rect(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(DS.Colors.primary.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                }
+            }
+        }
+        .dsCard()
     }
 
     // MARK: - Job Details Card
@@ -330,16 +432,14 @@ struct NewJobView: View {
 
         // If coords already set (from autocomplete), save directly
         if job.latitude != nil {
-            store.addJob(job)
-            finishSave()
+            commitJob()
             return
         }
 
         // Otherwise geocode the manually-typed address
         let addressString = job.address
         guard !addressString.isEmpty else {
-            store.addJob(job)
-            finishSave()
+            commitJob()
             return
         }
 
@@ -348,9 +448,27 @@ struct NewJobView: View {
                 job.latitude = location.coordinate.latitude
                 job.longitude = location.coordinate.longitude
             }
-            store.addJob(job)
-            finishSave()
+            commitJob()
         }
+    }
+
+    private func commitJob() {
+        let jobId = job.id
+
+        // Upload property photo in background if present
+        if let image = propertyImage,
+           let data = image.jpegData(compressionQuality: 0.85) {
+            Task {
+                if let url = try? await store.uploadHouseImage(imageData: data, jobId: jobId) {
+                    job.houseImageURL = url
+                }
+                store.addJob(job)
+            }
+        } else {
+            store.addJob(job)
+        }
+
+        finishSave()
     }
 
     private func finishSave() {

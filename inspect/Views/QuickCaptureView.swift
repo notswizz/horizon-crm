@@ -42,6 +42,8 @@ struct QuickCaptureView: View {
     var store: JobStore
     var locationManager: LocationManager
     var configStore: ConfigStore
+    var networkMonitor: NetworkMonitor
+    var photoSyncQueue: PhotoSyncQueue
     @AppStorage("inspectorName") private var inspectorName = ""
 
     // Photo state
@@ -72,6 +74,9 @@ struct QuickCaptureView: View {
     // Materials (inspection only)
     @State private var materials: [Material] = []
 
+    // Step state (0 = job+type, 1 = spot+details, 2 = materials+save)
+    @State private var taggingStep = 0
+
     // Save state
     @State private var isSaving = false
     @State private var showSuccess = false
@@ -98,7 +103,9 @@ struct QuickCaptureView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            SyncBanner(networkMonitor: networkMonitor, syncQueue: photoSyncQueue, jobStore: store)
+
             ZStack {
                 if store.jobs.isEmpty {
                     emptyState
@@ -113,32 +120,22 @@ struct QuickCaptureView: View {
                         .transition(.scale.combined(with: .opacity))
                 }
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Quick Capture")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Image("Logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 36, height: 36)
-                        .clipShape(.rect(cornerRadius: 8))
-                }
+            .frame(maxHeight: .infinity)
+        }
+        .background(Color(.systemGroupedBackground))
+        .alert("Save Error", isPresented: $showError) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred.")
+        }
+        .sheet(isPresented: $showNewSpotSheet) {
+            newSpotSheet
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPickerView { image in
+                importCameraImage(image)
             }
-            .alert("Save Error", isPresented: $showError) {
-                Button("OK") { }
-            } message: {
-                Text(errorMessage ?? "An unknown error occurred.")
-            }
-            .sheet(isPresented: $showNewSpotSheet) {
-                newSpotSheet
-            }
-            .fullScreenCover(isPresented: $showCamera) {
-                CameraPickerView { image in
-                    importCameraImage(image)
-                }
-                .ignoresSafeArea()
-            }
+            .ignoresSafeArea()
         }
     }
 
@@ -184,12 +181,6 @@ struct QuickCaptureView: View {
 
             Text("Capture & Tag")
                 .font(.title2.weight(.bold))
-                .padding(.bottom, 6)
-
-            Text("Take a photo or choose from library,\nthen tag it to a job")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
                 .padding(.bottom, 36)
 
             // Two action buttons
@@ -292,65 +283,266 @@ struct QuickCaptureView: View {
         .padding()
     }
 
-    // MARK: - Phase 2: Tagging
+    // MARK: - Phase 2: Tagging (multi-step)
+
+    private var totalSteps: Int {
+        captureType == .inspection ? 3 : 2
+    }
 
     private var taggingPhase: some View {
+        VStack(spacing: 0) {
+            compactPhotoPreview
+            stepIndicator
+
+            // Step content
+            Group {
+                switch taggingStep {
+                case 0: step0JobAndType
+                case 1: step1SpotAndDetails
+                default: step2MaterialsAndSave
+                }
+            }
+            .transition(.asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .move(edge: .leading).combined(with: .opacity)
+            ))
+
+            Spacer(minLength: 0)
+
+            // Navigation bar
+            stepNavigation
+        }
+    }
+
+    // MARK: - Compact Photo Preview (sticky)
+
+    private var compactPhotoPreview: some View {
+        HStack(spacing: 12) {
+            if let displayImage {
+                Image(uiImage: displayImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 80, height: 80)
+                    .clipShape(.rect(cornerRadius: 10))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Photo captured")
+                    .font(.subheadline.weight(.semibold))
+                Text(stepSubtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                taggingStep = 0
+                resetPhoto()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.counterclockwise")
+                    Text("Retake")
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(DS.Colors.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(DS.Colors.primary.opacity(0.1), in: .capsule)
+            }
+        }
+        .padding(DS.Spacing.m)
+        .frame(height: 120)
+        .background(DS.Colors.surface)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+    }
+
+    private var stepSubtitle: String {
+        switch taggingStep {
+        case 0: return "Step 1: Select job & type"
+        case 1: return "Step 2: Spot & details"
+        default: return "Step 3: Materials & save"
+        }
+    }
+
+    // MARK: - Step Indicator
+
+    private var stepIndicator: some View {
+        HStack(spacing: 0) {
+            stepDot(index: 0, label: "Job")
+            stepLine(filled: taggingStep >= 1)
+            stepDot(index: 1, label: "Details")
+            if captureType == .inspection {
+                stepLine(filled: taggingStep >= 2)
+                stepDot(index: 2, label: "Materials")
+            }
+        }
+        .padding(.horizontal, DS.Spacing.xl)
+        .padding(.vertical, DS.Spacing.s)
+        .background(DS.Colors.surface)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+        .animation(DS.Animation.defaultSpring, value: captureType)
+    }
+
+    private func stepDot(index: Int, label: String) -> some View {
+        let isCurrent = taggingStep == index
+        let isDone = taggingStep > index
+
+        return VStack(spacing: 4) {
+            ZStack {
+                Circle()
+                    .fill(isCurrent ? DS.Colors.primary : isDone ? DS.Colors.primary : Color(.systemGray4))
+                    .frame(width: isCurrent ? 10 : 8, height: isCurrent ? 10 : 8)
+
+                if isDone {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 5, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+            Text(label)
+                .font(.system(size: 9, weight: isCurrent ? .bold : .medium))
+                .foregroundStyle(isCurrent || isDone ? DS.Colors.primary : .secondary)
+        }
+    }
+
+    private func stepLine(filled: Bool) -> some View {
+        Rectangle()
+            .fill(filled ? DS.Colors.primary : Color(.systemGray4))
+            .frame(height: 2)
+            .padding(.bottom, 14)
+    }
+
+    // MARK: - Step 0: Job + Type
+
+    private var step0JobAndType: some View {
         ScrollView {
             VStack(spacing: DS.Spacing.l) {
-                photoPreviewCard
                 jobPickerCard
                 typeToggleCard
-
-                if captureType == .audit {
-                    issueDetailsCard
-                } else {
-                    fixDetailsCard
-                    materialsCard
-                }
-
-                saveButton
             }
             .padding()
         }
         .scrollDismissesKeyboard(.interactively)
     }
 
-    // MARK: - Photo Preview Card
+    // MARK: - Step 1: Spot + Details
 
-    private var photoPreviewCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label {
-                    Text("Photo")
-                        .font(.headline)
-                } icon: {
-                    Image(systemName: "photo.fill")
-                        .foregroundStyle(DS.Colors.primary)
+    private var step1SpotAndDetails: some View {
+        ScrollView {
+            VStack(spacing: DS.Spacing.l) {
+                if captureType == .audit {
+                    issueDetailsCard
+                } else {
+                    fixDetailsCard
                 }
-                Spacer()
+            }
+            .padding()
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    // MARK: - Step 2: Materials + Save (inspection only)
+
+    private var step2MaterialsAndSave: some View {
+        ScrollView {
+            VStack(spacing: DS.Spacing.l) {
+                materialsCard
+            }
+            .padding()
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    // MARK: - Step Navigation
+
+    private var canAdvanceStep0: Bool {
+        selectedJobId != nil
+    }
+
+    private var canAdvanceStep1: Bool {
+        spotId != nil
+    }
+
+    private var stepNavigation: some View {
+        HStack(spacing: 12) {
+            // Back button
+            if taggingStep > 0 {
                 Button {
-                    resetPhoto()
+                    withAnimation(DS.Animation.defaultSpring) {
+                        taggingStep -= 1
+                    }
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "arrow.counterclockwise")
-                        Text("Retake")
+                        Image(systemName: "chevron.left")
+                            .font(.caption.weight(.semibold))
+                        Text("Back")
                     }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(DS.Colors.primary)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(height: 50)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 14))
                 }
             }
 
-            if let displayImage {
-                Image(uiImage: displayImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 200)
-                    .clipped()
-                    .clipShape(.rect(cornerRadius: 12))
+            // Next / Save button
+            let isLastStep = taggingStep == totalSteps - 1
+            let canAdvance: Bool = {
+                switch taggingStep {
+                case 0: return canAdvanceStep0
+                case 1: return canAdvanceStep1
+                default: return canSave
+                }
+            }()
+
+            Button {
+                if isLastStep {
+                    Task { await save() }
+                } else {
+                    withAnimation(DS.Animation.defaultSpring) {
+                        taggingStep += 1
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    } else if isLastStep {
+                        Image(systemName: "square.and.arrow.up.fill")
+                            .font(.caption)
+                        Text("Save")
+                    } else {
+                        Text("Next")
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(height: 50)
+                .frame(maxWidth: .infinity)
+                .background(
+                    canAdvance
+                        ? DS.Colors.primary
+                        : Color(.systemGray3),
+                    in: .rect(cornerRadius: 14)
+                )
             }
+            .disabled(!canAdvance || isSaving)
+            .sensoryFeedback(.impact(weight: .medium), trigger: isSaving)
         }
-        .dsCard()
+        .padding(.horizontal, DS.Spacing.m)
+        .padding(.vertical, DS.Spacing.s)
+        .background(DS.Colors.surface)
+        .overlay(alignment: .top) {
+            Divider()
+        }
     }
 
     // MARK: - Job Picker Card
@@ -786,48 +978,6 @@ struct QuickCaptureView: View {
         }
     }
 
-    // MARK: - Save Button
-
-    private var saveButton: some View {
-        VStack(spacing: 12) {
-            Button {
-                Task { await save() }
-            } label: {
-                HStack(spacing: 8) {
-                    Spacer()
-                    if isSaving {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Image(systemName: "square.and.arrow.up.fill")
-                        Text("Save")
-                    }
-                    Spacer()
-                }
-                .font(.headline)
-                .foregroundStyle(.white)
-                .frame(height: 54)
-                .background(
-                    LinearGradient(
-                        colors: canSave
-                            ? [DS.Colors.primary, DS.Colors.primary.opacity(0.85)]
-                            : [.gray, .gray.opacity(0.85)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    in: .capsule
-                )
-                .shadow(
-                    color: canSave ? DS.Colors.primary.opacity(0.3) : .clear,
-                    radius: 12,
-                    y: 4
-                )
-            }
-            .disabled(!canSave || isSaving)
-            .sensoryFeedback(.impact(weight: .medium), trigger: isSaving)
-        }
-        .padding(.top, 4)
-    }
 
     // MARK: - Success Overlay
 
@@ -1018,6 +1168,7 @@ struct QuickCaptureView: View {
 
     private func resetAll() {
         resetPhoto()
+        taggingStep = 0
         captureType = .audit
         spotId = nil
         category = "Other"
@@ -1040,13 +1191,11 @@ struct QuickCaptureView: View {
         defer { isSaving = false }
 
         do {
-            // Upload photo
             guard let imageData = store.loadTempPhotoData(named: photo) else {
                 throw NSError(domain: "QuickCapture", code: 1,
                               userInfo: [NSLocalizedDescriptionKey: "Could not load photo data."])
             }
 
-            // We need a form ID for the upload path — fetch or create inline
             let forms = await store.fetchForms(for: job.id)
             let existingForm: InspectionForm?
             let formId: UUID
@@ -1059,12 +1208,31 @@ struct QuickCaptureView: View {
             formId = existingForm?.id ?? UUID()
 
             let photoId = UUID()
-            let downloadURL = try await store.uploadPhoto(
-                imageData: imageData,
-                jobId: job.id,
-                formId: formId,
-                photoId: photoId
-            )
+            let storagePath = "jobs/\(job.id.uuidString)/\(formId.uuidString)/\(photoId.uuidString)/photo.jpg"
+            let downloadURL: String
+
+            if networkMonitor.isConnected {
+                // Online: upload directly
+                downloadURL = try await store.uploadPhoto(
+                    imageData: imageData,
+                    jobId: job.id,
+                    formId: formId,
+                    photoId: photoId
+                )
+            } else {
+                // Offline: enqueue for later upload, use pending placeholder
+                let photoType: PendingUpload.PhotoType = captureType == .audit ? .issue : .fix
+                _ = photoSyncQueue.enqueue(
+                    imageData: imageData,
+                    jobId: job.id,
+                    formId: formId,
+                    photoId: photoId,
+                    storagePath: storagePath,
+                    photoType: photoType,
+                    spotId: spotId
+                )
+                downloadURL = "pending://\(photoId.uuidString)"
+            }
 
             // Persist new spots to job if we added any
             var updatedJob = job
@@ -1111,11 +1279,9 @@ struct QuickCaptureView: View {
 
             store.cleanupTempPhotos()
 
-            // Capture info for overlay before resetting
             savedType = captureType
             savedJobAddress = job.address
 
-            // Show success
             withAnimation(DS.Animation.defaultSpring) {
                 showSuccess = true
             }

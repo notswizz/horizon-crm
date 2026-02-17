@@ -20,6 +20,8 @@ import {
   FileText,
   CheckCircle,
   Banknote,
+  Building2,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
@@ -54,6 +56,11 @@ const tooltipStyle = {
   boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
 };
 
+interface CompanyOption {
+  id: string;
+  name: string;
+}
+
 export default function DashboardPage() {
   const { appUser } = useAuth();
   const isAdmin = appUser?.role === "admin";
@@ -63,18 +70,38 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [photoDays, setPhotoDays] = useState<7 | 30 | 90>(30);
 
-  useEffect(() => {
+  // Admin company filter
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<string>(""); // "" = all
+
+  function fetchDashboard(companyId?: string) {
+    setLoading(true);
+    const qs = companyId ? `?companyId=${companyId}` : "";
     Promise.all([
-      fetch("/api/analytics").then((r) => r.ok ? r.json() : null),
-      fetch("/api/jobs?limit=5&sort=newest").then((r) => r.ok ? r.json() : { jobs: [] }),
-      fetch("/api/jobs?limit=500").then((r) => r.ok ? r.json() : { jobs: [] }),
+      fetch(`/api/analytics${qs}`).then((r) => r.ok ? r.json() : null),
+      fetch(`/api/jobs?limit=5&sort=newest${companyId ? `&companyId=${companyId}` : ""}`).then((r) => r.ok ? r.json() : { jobs: [] }),
+      fetch(`/api/jobs?limit=500${companyId ? `&companyId=${companyId}` : ""}`).then((r) => r.ok ? r.json() : { jobs: [] }),
     ]).then(([a, j, all]) => {
       setAnalytics(a);
       setRecentJobs(j.jobs || []);
       setAllJobs(all.jobs || []);
       setLoading(false);
     });
-  }, []);
+  }
+
+  useEffect(() => {
+    fetchDashboard();
+    if (isAdmin) {
+      fetch("/api/admin/companies").then((r) => r.json()).then((data) => {
+        setCompanies((data.companies || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+      });
+    }
+  }, [isAdmin]);
+
+  function handleCompanyChange(companyId: string) {
+    setSelectedCompany(companyId);
+    fetchDashboard(companyId || undefined);
+  }
 
   if (loading) {
     return (
@@ -131,6 +158,29 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-[1400px]">
+      {/* Admin: Company Filter */}
+      {isAdmin && companies.length > 0 && (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Building2 size={15} />
+            <span className="font-medium">Viewing:</span>
+          </div>
+          <div className="relative">
+            <select
+              value={selectedCompany}
+              onChange={(e) => handleCompanyChange(e.target.value)}
+              className="appearance-none pl-3 pr-8 py-1.5 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35] cursor-pointer"
+            >
+              <option value="">All Companies</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+      )}
+
       {/* Row 1: KPI Cards */}
       <div className="grid grid-cols-12 gap-4">
         {/* Hero: Dataset Values — split card (admin only) */}
@@ -181,35 +231,63 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Issues — 2 cols */}
-        <Card className="col-span-6 lg:col-span-2 hover:shadow-md hover:scale-[1.02] transition-all">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Issues</span>
-              <div className="p-2 rounded-lg bg-red-50">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
+        {/* Slot 3 — Issues (regular) or Companies (admin) */}
+        {isAdmin ? (
+          <Card className="col-span-6 lg:col-span-2 hover:shadow-md hover:scale-[1.02] transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Companies</span>
+                <div className="p-2 rounded-lg bg-violet-50">
+                  <Building2 className="h-4 w-4 text-violet-500" />
+                </div>
               </div>
-            </div>
-            <p className="text-3xl font-bold">{analytics.totalIssues}</p>
-          </CardContent>
-        </Card>
+              <p className="text-3xl font-bold">{analytics.totalCompanies ?? 0}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="col-span-6 lg:col-span-2 hover:shadow-md hover:scale-[1.02] transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Issues</span>
+                <div className="p-2 rounded-lg bg-red-50">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold">{analytics.totalIssues}</p>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Fixes — 2 cols */}
-        <Card className="col-span-6 lg:col-span-2 hover:shadow-md hover:scale-[1.02] transition-all">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Fixes</span>
-              <div className="p-2 rounded-lg bg-emerald-50">
-                <Wrench className="h-4 w-4 text-emerald-500" />
+        {/* Slot 4 — Fixes (regular) or Users (admin) */}
+        {isAdmin ? (
+          <Card className="col-span-6 lg:col-span-2 hover:shadow-md hover:scale-[1.02] transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Users</span>
+                <div className="p-2 rounded-lg bg-indigo-50">
+                  <Users className="h-4 w-4 text-indigo-500" />
+                </div>
               </div>
-            </div>
-            <p className="text-3xl font-bold">{analytics.totalFixes}</p>
-          </CardContent>
-        </Card>
+              <p className="text-3xl font-bold">{analytics.totalUsers ?? 0}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="col-span-6 lg:col-span-2 hover:shadow-md hover:scale-[1.02] transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Fixes</span>
+                <div className="p-2 rounded-lg bg-emerald-50">
+                  <Wrench className="h-4 w-4 text-emerald-500" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold">{analytics.totalFixes}</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Rebate Pipeline Row (admin only) */}
-      {isAdmin && hasPipelineData && (
+      {/* Rebate Pipeline Row */}
+      {hasPipelineData && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="hover:shadow-md hover:scale-[1.02] transition-all">
             <CardContent className="p-4">

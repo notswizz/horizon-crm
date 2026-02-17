@@ -4,24 +4,33 @@ struct JobsListView: View {
     var store: JobStore
     var locationManager: LocationManager
     var configStore: ConfigStore
+    var networkMonitor: NetworkMonitor
+    var syncQueue: PhotoSyncQueue
+    var onSettingsTap: () -> Void = {}
     @State private var searchText = ""
     @State private var selectedStage: JobStage? = nil
     @State private var sortOrder: JobSortOrder = .nearest
     @State private var showFilter = false
     @State private var showError = false
+    @State private var appeared: Set<UUID> = []
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.isLoading {
-                    ProgressView("Loading jobs...")
-                } else if store.jobs.isEmpty {
-                    emptyState
-                } else {
-                    jobsList
+            VStack(spacing: 0) {
+                SyncBanner(networkMonitor: networkMonitor, syncQueue: syncQueue, jobStore: store)
+
+                Group {
+                    if store.isLoading {
+                        ProgressView("Loading jobs...")
+                    } else if store.jobs.isEmpty {
+                        emptyState
+                    } else {
+                        jobsList
+                    }
                 }
+                .frame(maxHeight: .infinity)
             }
-            .navigationTitle("Jobs")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -33,11 +42,13 @@ struct JobsListView: View {
                     }
                 }
                 ToolbarItem(placement: .principal) {
-                    Image("Logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 36, height: 36)
-                        .clipShape(.rect(cornerRadius: 8))
+                    Button(action: onSettingsTap) {
+                        Image("Logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 36, height: 36)
+                            .clipShape(.rect(cornerRadius: 8))
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: NewJobView(store: store)) {
@@ -46,12 +57,13 @@ struct JobsListView: View {
                     }
                 }
             }
-            .searchable(text: $searchText, prompt: "Search by address or contact")
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search by address or contact")
             .sheet(isPresented: $showFilter) {
-                FilterSheet(selectedStage: $selectedStage, sortOrder: $sortOrder)
+                FilterSheet(sortOrder: $sortOrder)
                     .presentationDetents([.medium])
                     .presentationDragIndicator(.visible)
             }
+            .sensoryFeedback(.selection, trigger: selectedStage)
             .onChange(of: store.errorMessage) { _, newValue in
                 if newValue != nil { showError = true }
             }
@@ -67,8 +79,65 @@ struct JobsListView: View {
         selectedStage != nil || sortOrder != .nearest
     }
 
+    // MARK: - Summary Header
+
+    private var summaryHeader: some View {
+        VStack(spacing: DS.Spacing.s) {
+            // Stage filter chips
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    // "All" chip
+                    Button {
+                        selectedStage = nil
+                    } label: {
+                        Text("All")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .frame(height: 32)
+                            .foregroundStyle(selectedStage == nil ? .white : DS.Colors.primary)
+                            .background(
+                                selectedStage == nil
+                                    ? AnyShapeStyle(DS.Colors.primary)
+                                    : AnyShapeStyle(DS.Colors.primary.opacity(0.1)),
+                                in: .capsule
+                            )
+                    }
+
+                    ForEach(JobStage.allCases) { stage in
+                        Button {
+                            selectedStage = selectedStage == stage ? nil : stage
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: stage.icon)
+                                    .font(.system(size: 10))
+                                Text(stage.shortLabel)
+                            }
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .frame(height: 32)
+                            .foregroundStyle(selectedStage == stage ? .white : stage.color)
+                            .background(
+                                selectedStage == stage
+                                    ? AnyShapeStyle(stage.color)
+                                    : AnyShapeStyle(stage.color.opacity(0.1)),
+                                in: .capsule
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, DS.Spacing.m)
+            }
+        }
+        .padding(.top, DS.Spacing.xs)
+        .padding(.bottom, DS.Spacing.xs)
+    }
+
+    // MARK: - Jobs List
+
     private var jobsList: some View {
         ScrollView {
+            summaryHeader
+
             if filteredJobs.isEmpty {
                 ContentUnavailableView {
                     Label("No Matches", systemImage: "line.3.horizontal.decrease.circle")
@@ -78,11 +147,19 @@ struct JobsListView: View {
                 .padding(.top, 40)
             } else {
                 LazyVStack(spacing: DS.Spacing.m) {
-                    ForEach(filteredJobs) { job in
-                        NavigationLink(destination: JobDetailView(job: job, store: store, configStore: configStore)) {
-                            JobCard(job: job)
+                    ForEach(Array(filteredJobs.enumerated()), id: \.element.id) { index, job in
+                        NavigationLink(destination: JobDetailView(job: job, store: store, configStore: configStore, networkMonitor: networkMonitor, syncQueue: syncQueue)) {
+                            JobCard(job: job, isNearby: job.id == nearbyJobId)
                         }
                         .buttonStyle(DSCardPressStyle())
+                        .opacity(appeared.contains(job.id) ? 1 : 0)
+                        .offset(y: appeared.contains(job.id) ? 0 : 12)
+                        .animation(
+                            .spring(response: 0.45, dampingFraction: 0.8)
+                            .delay(Double(index) * 0.04),
+                            value: appeared.contains(job.id)
+                        )
+                        .onAppear { appeared.insert(job.id) }
                     }
                 }
                 .padding(.horizontal, DS.Spacing.m)
@@ -119,11 +196,26 @@ struct JobsListView: View {
         return jobs
     }
 
+    /// ID of the closest job if the worker is within ~1 mile (1609m)
+    private var nearbyJobId: UUID? {
+        guard locationManager.currentLocation != nil else { return nil }
+        var closestId: UUID?
+        var closestDist: Double = .greatestFiniteMagnitude
+        for job in store.jobs {
+            if let d = locationManager.distance(to: job), d < closestDist {
+                closestDist = d
+                closestId = job.id
+            }
+        }
+        guard closestDist <= 1609 else { return nil }
+        return closestId
+    }
+
     private var emptyState: some View {
         ContentUnavailableView {
             Label("No Jobs", systemImage: "briefcase")
         } description: {
-            Text("Create a new job from the New Job tab.")
+            Text("Tap + to create your first job.")
         }
     }
 }
@@ -132,6 +224,7 @@ struct JobsListView: View {
 
 private struct JobCard: View {
     let job: Job
+    var isNearby: Bool = false
     @Environment(\.colorScheme) private var colorScheme
 
     private var displayStreet: String {
@@ -145,96 +238,150 @@ private struct JobCard: View {
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
+    private var progress: Double {
+        let denominator = max(job.issueCount * 2, 1)
+        return min(Double(job.photoCount + job.fixCount) / Double(denominator), 1.0)
+    }
+
     var body: some View {
-        HStack(spacing: 14) {
-            // Property Photo
-            AsyncImage(url: job.houseImageURL.flatMap { URL(string: $0) }) { phase in
-                if let image = phase.image {
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(Color(.quaternaryLabel))
-                }
-            }
-            .frame(width: 72, height: 72)
-            .background(Color(.tertiarySystemFill))
-            .clipShape(.rect(cornerRadius: 14))
-            .id(job.houseImageURL)
+        let cardContent = HStack(spacing: 0) {
+            // Left accent bar
+            job.currentStage.color
+                .frame(width: DS.Components.leftAccentWidth)
 
-            // Content
-            VStack(alignment: .leading, spacing: 6) {
-                // Address
-                Text(displayStreet)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                if let locality = displayLocality {
-                    Text(locality)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-
-                // Metrics + Stage
-                HStack(spacing: 14) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(DS.Colors.info)
-                        Text("\(job.photoCount)")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(DS.Colors.info)
+            HStack(spacing: 12) {
+                // Property Photo with stage ring
+                AsyncImage(url: job.houseImageURL.flatMap { URL(string: $0) }) { phase in
+                    if let image = phase.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Image(systemName: "house.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color(.quaternaryLabel))
                     }
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(DS.Colors.error)
-                        Text("\(job.issueCount)")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(DS.Colors.error)
-                    }
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(DS.Colors.success)
-                        Text("\(job.fixCount)")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(DS.Colors.success)
-                    }
-
-                    Spacer()
-
-                    // Stage pill
-                    Text(job.currentStage.shortLabel)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(job.currentStage.color)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(job.currentStage.color.opacity(0.1), in: .capsule)
                 }
-            }
-
-            // Chevron
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.quaternary)
-        }
-        .padding(16)
-        .background(DS.Colors.surface, in: .rect(cornerRadius: 18))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(
-                    colorScheme == .dark
-                        ? DS.Colors.border.opacity(0.8)
-                        : Color.black.opacity(0.05),
-                    lineWidth: 1
+                .frame(width: 56, height: 56)
+                .background(Color(.tertiarySystemFill))
+                .clipShape(.rect(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(job.currentStage.color.opacity(0.2), lineWidth: 2)
                 )
-        )
-        .shadow(color: .black.opacity(0.03), radius: 3, y: 1)
-        .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+                .id(job.houseImageURL)
+
+                // Content
+                VStack(alignment: .leading, spacing: 5) {
+                    // Address
+                    Text(displayStreet)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if let locality = displayLocality {
+                        Text(locality)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // Metrics + Stage
+                    HStack(spacing: 12) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(DS.Colors.info)
+                            Text("\(job.photoCount)")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(DS.Colors.info)
+                        }
+                        HStack(spacing: 3) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(DS.Colors.error)
+                            Text("\(job.issueCount)")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(DS.Colors.error)
+                        }
+                        HStack(spacing: 3) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(DS.Colors.success)
+                            Text("\(job.fixCount)")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(DS.Colors.success)
+                        }
+
+                        Spacer()
+
+                        // Stage pill
+                        Text(job.currentStage.shortLabel)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(job.currentStage.color)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(job.currentStage.color.opacity(0.1), in: .capsule)
+                    }
+
+                    // Progress bar (only if there are issues)
+                    if job.issueCount > 0 {
+                        Capsule()
+                            .fill(Color(.systemGray5))
+                            .frame(height: 3)
+                            .overlay(alignment: .leading) {
+                                GeometryReader { geo in
+                                    Capsule()
+                                        .fill(job.currentStage.color)
+                                        .frame(width: geo.size.width * progress)
+                                }
+                            }
+                            .clipShape(Capsule())
+                    }
+                }
+
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.quaternary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+        }
+        .background(DS.Colors.surface, in: .rect(cornerRadius: 18))
+        .clipShape(.rect(cornerRadius: 18))
+
+        if isNearby {
+            TimelineView(.animation) { timeline in
+                let angle = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3 * 360
+                cardContent
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(
+                                AngularGradient(
+                                    colors: [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .red],
+                                    center: .center,
+                                    angle: .degrees(angle)
+                                ),
+                                lineWidth: 2.5
+                            )
+                    )
+                    .shadow(color: .purple.opacity(0.18), radius: 10, y: 2)
+                    .shadow(color: .orange.opacity(0.1), radius: 20, y: 4)
+            }
+        } else {
+            cardContent
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(
+                            colorScheme == .dark
+                                ? DS.Colors.border.opacity(0.8)
+                                : Color.black.opacity(0.05),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: .black.opacity(0.03), radius: 3, y: 1)
+                .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+        }
     }
 }
 
@@ -260,54 +407,15 @@ enum JobSortOrder: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Filter Sheet
+// MARK: - Filter Sheet (Sort only — stage filtering is now inline chips)
 
 private struct FilterSheet: View {
-    @Binding var selectedStage: JobStage?
     @Binding var sortOrder: JobSortOrder
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Button {
-                        selectedStage = nil
-                    } label: {
-                        HStack {
-                            Text("All Stages")
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            if selectedStage == nil {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(DS.Colors.primary)
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                        }
-                    }
-                    ForEach(JobStage.allCases) { stage in
-                        Button {
-                            selectedStage = stage
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: stage.icon)
-                                    .foregroundStyle(stage.color)
-                                    .frame(width: 24)
-                                Text(stage.rawValue)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if selectedStage == stage {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(DS.Colors.primary)
-                                        .font(.subheadline.weight(.semibold))
-                                }
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Stage")
-                }
-
                 Section {
                     ForEach(JobSortOrder.allCases) { order in
                         Button {
@@ -332,13 +440,12 @@ private struct FilterSheet: View {
                     Text("Sort By")
                 }
             }
-            .navigationTitle("Filter & Sort")
+            .navigationTitle("Sort")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if selectedStage != nil || sortOrder != .nearest {
+                    if sortOrder != .nearest {
                         Button("Reset") {
-                            selectedStage = nil
                             sortOrder = .nearest
                         }
                         .foregroundStyle(DS.Colors.error)

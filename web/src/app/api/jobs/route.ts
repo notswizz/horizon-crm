@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
+    const filterCompany = url.searchParams.get("companyId");
     const result = await fetchFilteredJobs({
       search: url.searchParams.get("search") || undefined,
       stage: url.searchParams.get("stage") || undefined,
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
       sort: url.searchParams.get("sort") || "newest",
       page: parseInt(url.searchParams.get("page") || "1"),
       limit: parseInt(url.searchParams.get("limit") || "50"),
-      companyId: session.isAdmin ? undefined : session.companyId,
+      companyId: session.isAdmin ? (filterCompany || undefined) : session.companyId,
     });
 
     return NextResponse.json(result);

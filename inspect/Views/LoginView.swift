@@ -7,27 +7,39 @@ struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var isLoading = false
+    @State private var appeared = false
 
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
 
-            // Logo + Title
-            VStack(spacing: DS.Spacing.s) {
-                Image("Logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 72, height: 72)
-                    .clipShape(.rect(cornerRadius: 16))
-                    .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
+            // Logo + Title + Tagline
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(DS.Colors.primary.opacity(0.12))
+                        .frame(width: 160, height: 160)
+                        .blur(radius: 40)
+
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 96, height: 96)
+                        .clipShape(.rect(cornerRadius: 22))
+                        .shadow(color: DS.Shadow.color, radius: DS.Shadow.radius, y: DS.Shadow.y)
+                }
 
                 Text("RetrofitIQ")
-                    .font(DS.Typography.display)
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .padding(.top, DS.Spacing.s)
 
-                Text(isSignUp ? "Create an account" : "Sign in to continue")
-                    .font(DS.Typography.subheadline)
+                Text("Smart tools for energy contractors")
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.secondary)
             }
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 10)
+            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: appeared)
             .padding(.bottom, DS.Spacing.xxl)
 
             // Form
@@ -103,7 +115,14 @@ struct LoginView: View {
             Spacer()
             Spacer()
         }
-        .background(Color(.systemGroupedBackground))
+        .background(
+            LinearGradient(
+                colors: [Color(.systemBackground), DS.Colors.primary.opacity(0.04)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .onAppear { appeared = true }
     }
 
     private var canSubmit: Bool {

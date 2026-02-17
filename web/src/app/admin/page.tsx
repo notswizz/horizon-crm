@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,10 +14,17 @@ import {
   Loader2,
   ArrowRight,
   X,
-  Database,
   Download,
   Settings,
   Wrench,
+  ChevronDown,
+  ChevronRight,
+  Users,
+  Trash2,
+  Pencil,
+  Check,
+  UserMinus,
+  Globe,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -31,6 +38,19 @@ interface CompanyRow {
   createdAt: string;
 }
 
+interface Member {
+  uid: string;
+  email: string;
+  displayName: string;
+  webAccess: boolean;
+  role: string;
+}
+
+interface ExpandedData {
+  members: Member[];
+  loading: boolean;
+}
+
 export default function AdminPage() {
   const { appUser } = useAuth();
   const router = useRouter();
@@ -41,11 +61,23 @@ export default function AdminPage() {
   const [migrating, setMigrating] = useState(false);
   const [migrateResult, setMigrateResult] = useState<string | null>(null);
 
+  // Expanded company state
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedData, setExpandedData] = useState<Record<string, ExpandedData>>({});
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
   // Redirect non-admin
   if (appUser && appUser.role !== "admin") {
     router.push("/");
     return null;
   }
+
+  const refreshCompanies = useCallback(async () => {
+    const c = await fetch("/api/admin/companies").then((r) => r.json());
+    setCompanies(c.companies || []);
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -57,6 +89,39 @@ export default function AdminPage() {
       setLoading(false);
     });
   }, []);
+
+  const fetchCompanyDetails = async (companyId: string) => {
+    setExpandedData((prev) => ({
+      ...prev,
+      [companyId]: { members: [], loading: true },
+    }));
+    try {
+      const res = await fetch(`/api/admin/companies/${companyId}`);
+      const data = await res.json();
+      setExpandedData((prev) => ({
+        ...prev,
+        [companyId]: { members: data.members || [], loading: false },
+      }));
+    } catch {
+      setExpandedData((prev) => ({
+        ...prev,
+        [companyId]: { members: [], loading: false },
+      }));
+    }
+  };
+
+  const toggleExpand = (companyId: string) => {
+    if (expandedId === companyId) {
+      setExpandedId(null);
+      setEditingName(null);
+      setConfirmDelete(null);
+    } else {
+      setExpandedId(companyId);
+      setEditingName(null);
+      setConfirmDelete(null);
+      fetchCompanyDetails(companyId);
+    }
+  };
 
   const handleImpersonate = async (companyId: string) => {
     await fetch("/api/admin/impersonate", {
@@ -90,13 +155,48 @@ export default function AdminPage() {
       });
       const data = await res.json();
       setMigrateResult(`Migrated ${data.updated} jobs to this company`);
-      // Refresh companies
-      const c = await fetch("/api/admin/companies").then((r) => r.json());
-      setCompanies(c.companies || []);
+      await refreshCompanies();
     } catch {
       setMigrateResult("Migration failed");
     }
     setMigrating(false);
+  };
+
+  const handleUpdateName = async (companyId: string) => {
+    if (!editNameValue.trim()) return;
+    await fetch(`/api/admin/companies/${companyId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editNameValue.trim() }),
+    });
+    setEditingName(null);
+    await refreshCompanies();
+  };
+
+  const handleDeleteCompany = async (companyId: string) => {
+    await fetch(`/api/admin/companies/${companyId}`, { method: "DELETE" });
+    setConfirmDelete(null);
+    setExpandedId(null);
+    await refreshCompanies();
+  };
+
+  const handleToggleWebAccess = async (companyId: string, uid: string, currentAccess: boolean) => {
+    await fetch(`/api/admin/companies/${companyId}/members`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, action: "toggleAccess", webAccess: !currentAccess }),
+    });
+    await fetchCompanyDetails(companyId);
+  };
+
+  const handleRemoveMember = async (companyId: string, uid: string) => {
+    await fetch(`/api/admin/companies/${companyId}/members`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, action: "remove" }),
+    });
+    await fetchCompanyDetails(companyId);
+    await refreshCompanies();
   };
 
   if (loading) {
@@ -191,75 +291,221 @@ export default function AdminPage() {
         </Link>
       </div>
 
-      {/* Companies Table */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Building2 size={16} className="text-gray-400" />
-              <h3 className="text-sm font-semibold">Companies</h3>
-            </div>
-            <span className="text-xs text-gray-400">{companies.length} companies</span>
+      {/* Companies */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Building2 size={16} className="text-gray-400" />
+            <h3 className="text-sm font-semibold">Companies</h3>
           </div>
+          <span className="text-xs text-gray-400">{companies.length} companies</span>
+        </div>
 
-          {companies.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No companies yet</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left">
-                    <th className="pb-2 font-semibold text-gray-500 text-xs uppercase tracking-wider">Company</th>
-                    <th className="pb-2 font-semibold text-gray-500 text-xs uppercase tracking-wider">Code</th>
-                    <th className="pb-2 font-semibold text-gray-500 text-xs uppercase tracking-wider">Email</th>
-                    <th className="pb-2 font-semibold text-gray-500 text-xs uppercase tracking-wider text-right">Jobs</th>
-                    <th className="pb-2 font-semibold text-gray-500 text-xs uppercase tracking-wider text-right">Photos</th>
-                    <th className="pb-2 font-semibold text-gray-500 text-xs uppercase tracking-wider">Joined</th>
-                    <th className="pb-2 font-semibold text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {companies.map((company) => (
-                    <tr key={company.id} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
-                      <td className="py-3 font-medium">{company.name}</td>
-                      <td className="py-3"><code className="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono font-bold tracking-wider">{company.joinCode}</code></td>
-                      <td className="py-3 text-gray-500">{company.email}</td>
-                      <td className="py-3 text-right font-bold">{company.jobCount}</td>
-                      <td className="py-3 text-right font-bold">{company.photoCount}</td>
-                      <td className="py-3 text-gray-400">{formatDate(company.createdAt)}</td>
-                      <td className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
+        {companies.length === 0 ? (
+          <Card>
+            <CardContent className="p-8">
+              <p className="text-sm text-gray-400 text-center">No companies yet</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {companies.map((company) => {
+              const isExpanded = expandedId === company.id;
+              const detail = expandedData[company.id];
+
+              return (
+                <Card key={company.id} className="overflow-hidden">
+                  {/* Company Header Row */}
+                  <button
+                    onClick={() => toggleExpand(company.id)}
+                    className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="text-gray-400">
+                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-sm truncate">{company.name}</span>
+                        <code className="px-2 py-0.5 rounded bg-gray-100 text-[10px] font-mono font-bold tracking-wider text-gray-500 shrink-0">
+                          {company.joinCode}
+                        </code>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">{company.email}</p>
+                    </div>
+                    <div className="flex items-center gap-6 text-xs text-gray-500 shrink-0">
+                      <div className="text-center">
+                        <p className="font-bold text-sm text-gray-900">{company.jobCount}</p>
+                        <p className="text-[10px] text-gray-400">Jobs</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-bold text-sm text-gray-900">{company.photoCount}</p>
+                        <p className="text-[10px] text-gray-400">Photos</p>
+                      </div>
+                      <div className="text-center hidden sm:block">
+                        <p className="text-xs text-gray-400">{formatDate(company.createdAt)}</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Expanded Detail Panel */}
+                  {isExpanded && (
+                    <div className="border-t bg-gray-50/50">
+                      <div className="px-5 py-4 space-y-5">
+                        {/* Action Buttons Row */}
+                        <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() => handleImpersonate(company.id)}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#FF6B35]/10 text-[#FF6B35] text-xs font-medium hover:bg-[#FF6B35]/20 transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#FF6B35]/10 text-[#FF6B35] text-xs font-medium hover:bg-[#FF6B35]/20 transition-colors"
                           >
-                            View as
-                            <ArrowRight size={12} />
+                            <ArrowRight size={13} />
+                            View as Company
                           </button>
                           <button
                             onClick={() => handleMigrate(company.id)}
                             disabled={migrating}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition-colors disabled:opacity-50"
                           >
-                            <Wrench size={12} />
-                            Migrate
+                            <Wrench size={13} />
+                            Migrate Orphan Jobs
                           </button>
+                          <button
+                            onClick={() => {
+                              setEditingName(company.id);
+                              setEditNameValue(company.name);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 text-gray-600 text-xs font-medium hover:bg-gray-200 transition-colors"
+                          >
+                            <Pencil size={13} />
+                            Rename
+                          </button>
+                          {confirmDelete === company.id ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-red-600 font-medium">Delete everything?</span>
+                              <button
+                                onClick={() => handleDeleteCompany(company.id)}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors"
+                              >
+                                <Trash2 size={12} />
+                                Yes, Delete
+                              </button>
+                              <button
+                                onClick={() => setConfirmDelete(null)}
+                                className="px-3 py-1.5 rounded-md bg-gray-200 text-gray-600 text-xs font-medium hover:bg-gray-300 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDelete(company.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition-colors"
+                            >
+                              <Trash2 size={13} />
+                              Delete Company
+                            </button>
+                          )}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
 
-          {migrateResult && (
-            <div className="mt-4 p-3 rounded-lg bg-blue-50 text-blue-700 text-sm">
-              {migrateResult}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        {/* Rename Inline */}
+                        {editingName === company.id && (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={editNameValue}
+                              onChange={(e) => setEditNameValue(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && handleUpdateName(company.id)}
+                              className="flex-1 px-3 py-1.5 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleUpdateName(company.id)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-[#FF6B35] text-white text-xs font-medium hover:bg-[#E5532D] transition-colors"
+                            >
+                              <Check size={13} />
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingName(null)}
+                              className="px-3 py-1.5 rounded-md bg-gray-200 text-gray-600 text-xs font-medium hover:bg-gray-300 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Members Section */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Users size={14} className="text-gray-400" />
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Members</h4>
+                          </div>
+
+                          {detail?.loading ? (
+                            <div className="flex items-center gap-2 py-4">
+                              <Loader2 size={14} className="animate-spin text-gray-400" />
+                              <span className="text-xs text-gray-400">Loading members...</span>
+                            </div>
+                          ) : !detail?.members.length ? (
+                            <p className="text-xs text-gray-400 py-2">No members found</p>
+                          ) : (
+                            <div className="bg-white rounded-lg border divide-y">
+                              {detail.members.map((member) => (
+                                <div key={member.uid} className="px-4 py-3 flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 shrink-0">
+                                    {(member.displayName || member.email).charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {member.displayName || "No name"}
+                                      {member.role === "admin" && (
+                                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#FF6B35]/10 text-[#FF6B35]">
+                                          ADMIN
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="text-xs text-gray-400 truncate">{member.email}</p>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                      onClick={() => handleToggleWebAccess(company.id, member.uid, member.webAccess)}
+                                      className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                                        member.webAccess
+                                          ? "bg-green-50 text-green-700 hover:bg-green-100"
+                                          : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                                      }`}
+                                      title={member.webAccess ? "Web access enabled" : "Web access disabled"}
+                                    >
+                                      <Globe size={12} />
+                                      {member.webAccess ? "Web On" : "Web Off"}
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveMember(company.id, member.uid)}
+                                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-red-500 hover:bg-red-50 transition-colors"
+                                      title="Remove member"
+                                    >
+                                      <UserMinus size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {migrateResult && (
+          <div className="mt-4 p-3 rounded-lg bg-blue-50 text-blue-700 text-sm">
+            {migrateResult}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

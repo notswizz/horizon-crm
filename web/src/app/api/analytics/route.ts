@@ -5,16 +5,23 @@ import { estimateJobValue, DEFAULT_WEIGHTS, calculateTotalRevenueValue, DEFAULT_
 import { AnalyticsData, JobStage, DatasetValueWeights, DatasetValuationConfig } from "@/types";
 import { getAuthSession } from "@/lib/auth-helpers";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getAuthSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const companyId = session.isAdmin ? undefined : session.companyId;
+    const url = new URL(request.url);
+    const filterCompany = url.searchParams.get("companyId");
+    // Admin can filter by any company or see all; non-admin always scoped
+    const companyId = session.isAdmin
+      ? (filterCompany || undefined)
+      : session.companyId;
     const jobs = await fetchAllJobs(companyId);
     const allFormsData = await fetchAllForms(companyId);
 
-    const configDoc = await db.doc("config/dropdowns").get();
+    // Read per-company config (same path as /api/config)
+    const configCompanyId = companyId || session.companyId;
+    const configDoc = await db.doc(`companies/${configCompanyId}/config/dropdowns`).get();
     const weights: DatasetValueWeights = (configDoc.exists && configDoc.data()?.datasetValueWeights) || DEFAULT_WEIGHTS;
     const valuation: DatasetValuationConfig = (configDoc.exists && configDoc.data()?.datasetValuation) || DEFAULT_VALUATION;
 
@@ -104,6 +111,18 @@ export async function GET() {
       .map(([type, count]) => ({ type, count }))
       .sort((a, b) => b.count - a.count);
 
+    // Admin-only: platform-wide company + user counts
+    let totalCompanies: number | undefined;
+    let totalUsers: number | undefined;
+    if (session.isAdmin) {
+      const [companiesSnap, usersSnap] = await Promise.all([
+        db.collection("companies").count().get(),
+        db.collection("users").count().get(),
+      ]);
+      totalCompanies = companiesSnap.data().count;
+      totalUsers = usersSnap.data().count;
+    }
+
     const data: AnalyticsData = {
       totalJobs: jobs.length,
       totalPhotos,
@@ -120,6 +139,8 @@ export async function GET() {
       photosTrend,
       topInspectors,
       materialsByType,
+      ...(totalCompanies != null && { totalCompanies }),
+      ...(totalUsers != null && { totalUsers }),
     };
 
     return NextResponse.json(data);

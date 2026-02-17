@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import FirebaseFirestore
 
-/// Reads dropdown configuration from Firestore `config/dropdowns`.
+/// Reads dropdown configuration from Firestore `companies/{companyId}/config/dropdowns`.
 /// Falls back to hardcoded defaults if offline or the document doesn't exist.
 @MainActor @Observable
 final class ConfigStore {
@@ -11,6 +11,9 @@ final class ConfigStore {
     var materialTypes: [String] = ConfigStore.defaultMaterialTypes
     var isLoaded = false
 
+    /// Set before calling loadIfNeeded
+    var companyId: String?
+
     private var db: Firestore { Firestore.firestore() }
 
     struct CategoryOption: Sendable {
@@ -18,7 +21,19 @@ final class ConfigStore {
         let jobTypes: [String]   // empty = applies to all job types
     }
 
-    init() {
+    init() {}
+
+    func loadIfNeeded() {
+        guard !isLoaded else { return }
+        Task { await fetch() }
+    }
+
+    /// Force reload (e.g. when companyId changes)
+    func reload() {
+        isLoaded = false
+        jobTypes = ConfigStore.defaultJobTypes
+        issueCategories = ConfigStore.defaultIssueCategories
+        materialTypes = ConfigStore.defaultMaterialTypes
         Task { await fetch() }
     }
 
@@ -32,15 +47,22 @@ final class ConfigStore {
     // MARK: - Fetch
 
     private func fetch() async {
+        guard let companyId, !companyId.isEmpty else {
+            print("[ConfigStore] No companyId set, using defaults")
+            isLoaded = true
+            return
+        }
+
+        let docPath = "companies/\(companyId)/config/dropdowns"
         do {
-            let snapshot = try await db.document("config/dropdowns").getDocument()
+            let snapshot = try await db.document(docPath).getDocument()
             guard snapshot.exists, let data = snapshot.data() else {
-                print("[ConfigStore] Document config/dropdowns does not exist, using defaults")
+                print("[ConfigStore] Document \(docPath) does not exist, using defaults")
                 isLoaded = true
                 return
             }
 
-            print("[ConfigStore] Loaded config/dropdowns: \(data.keys.sorted())")
+            print("[ConfigStore] Loaded \(docPath): \(data.keys.sorted())")
 
             if let jt = data["jobTypes"] as? [String], !jt.isEmpty {
                 jobTypes = jt
@@ -63,7 +85,7 @@ final class ConfigStore {
 
             isLoaded = true
         } catch {
-            print("[ConfigStore] Error fetching config/dropdowns: \(error.localizedDescription)")
+            print("[ConfigStore] Error fetching \(docPath): \(error.localizedDescription)")
             isLoaded = true
         }
     }
