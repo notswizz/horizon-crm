@@ -294,14 +294,19 @@ private struct JobCard: View {
         return min(Double(job.photoCount + job.fixCount) / Double(denominator), 1.0)
     }
 
+    private var isCompleted: Bool {
+        job.currentStage == .completed || job.currentStage == .cancelled
+    }
+
     var body: some View {
         let cardContent = HStack(spacing: 0) {
             // Left accent bar
             job.currentStage.color
                 .frame(width: DS.Components.leftAccentWidth)
+                .opacity(isCompleted ? 0.4 : 1)
 
-            HStack(spacing: 12) {
-                // Property Photo with stage ring
+            HStack(spacing: 14) {
+                // Property Photo — larger rounded rectangle
                 AsyncImage(url: job.houseImageURL.flatMap { URL(string: $0) }) { phase in
                     if let image = phase.image {
                         image
@@ -309,69 +314,89 @@ private struct JobCard: View {
                             .scaledToFill()
                     } else {
                         Image(systemName: "house.fill")
-                            .font(.system(size: 18))
+                            .font(.system(size: 22))
                             .foregroundStyle(Color(.quaternaryLabel))
                     }
                 }
-                .frame(width: 56, height: 56)
+                .frame(width: 80, height: 80)
                 .background(Color(.tertiarySystemFill))
-                .clipShape(.rect(cornerRadius: 12))
+                .clipShape(.rect(cornerRadius: 16))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(job.currentStage.color.opacity(0.2), lineWidth: 2)
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(job.currentStage.color.opacity(isCompleted ? 0.1 : 0.25), lineWidth: 2)
                 )
+                .saturation(isCompleted ? 0.6 : 1)
                 .id(job.houseImageURL)
 
                 // Content
                 VStack(alignment: .leading, spacing: 5) {
-                    // Address
-                    Text(displayStreet)
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                    // Stage badge — top right
+                    HStack {
+                        // Address
+                        Text(displayStreet)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(isCompleted ? .secondary : .primary)
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        // Stage pill — top right
+                        Text(job.currentStage.shortLabel)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(isCompleted ? .secondary : job.currentStage.color)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                (isCompleted ? Color(.systemGray4) : job.currentStage.color).opacity(0.12),
+                                in: .capsule
+                            )
+                    }
 
                     if let locality = displayLocality {
                         Text(locality)
                             .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(isCompleted ? .tertiary : .secondary)
                     }
 
-                    // Metrics + Stage
+                    // Metrics row
                     HStack(spacing: 12) {
                         HStack(spacing: 3) {
                             Image(systemName: "camera.fill")
                                 .font(.system(size: 9))
-                                .foregroundStyle(DS.Colors.info)
+                                .foregroundStyle(isCompleted ? Color(.tertiaryLabel) : DS.Colors.info)
                             Text("\(job.photoCount)")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(DS.Colors.info)
+                                .foregroundStyle(isCompleted ? Color(.tertiaryLabel) : DS.Colors.info)
                         }
                         HStack(spacing: 3) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(.system(size: 9))
-                                .foregroundStyle(DS.Colors.error)
+                                .foregroundStyle(isCompleted ? Color(.tertiaryLabel) : DS.Colors.error)
                             Text("\(job.issueCount)")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(DS.Colors.error)
+                                .foregroundStyle(isCompleted ? Color(.tertiaryLabel) : DS.Colors.error)
                         }
                         HStack(spacing: 3) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 9))
-                                .foregroundStyle(DS.Colors.success)
+                                .foregroundStyle(isCompleted ? Color(.tertiaryLabel) : DS.Colors.success)
                             Text("\(job.fixCount)")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(DS.Colors.success)
+                                .foregroundStyle(isCompleted ? Color(.tertiaryLabel) : DS.Colors.success)
                         }
 
                         Spacer()
 
-                        // Stage pill
-                        Text(job.currentStage.shortLabel)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(job.currentStage.color)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(job.currentStage.color.opacity(0.1), in: .capsule)
+                        if !job.contactName.isEmpty {
+                            HStack(spacing: 3) {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 8))
+                                Text(job.contactName)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(.tertiary)
+                        }
                     }
 
                     // Progress bar (only if there are issues)
@@ -382,7 +407,7 @@ private struct JobCard: View {
                             .overlay(alignment: .leading) {
                                 GeometryReader { geo in
                                     Capsule()
-                                        .fill(job.currentStage.color)
+                                        .fill(job.currentStage.color.opacity(isCompleted ? 0.4 : 1))
                                         .frame(width: geo.size.width * progress)
                                 }
                             }
@@ -398,7 +423,7 @@ private struct JobCard: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 14)
         }
-        .background(DS.Colors.surface, in: .rect(cornerRadius: 18))
+        .background(DS.Colors.surface.opacity(isCompleted ? 0.7 : 1), in: .rect(cornerRadius: 18))
         .clipShape(.rect(cornerRadius: 18))
 
         if isNearby {
@@ -426,12 +451,12 @@ private struct JobCard: View {
                         .strokeBorder(
                             colorScheme == .dark
                                 ? DS.Colors.border.opacity(0.8)
-                                : Color.black.opacity(0.05),
+                                : Color.black.opacity(isCompleted ? 0.03 : 0.05),
                             lineWidth: 1
                         )
                 )
-                .shadow(color: .black.opacity(0.03), radius: 3, y: 1)
-                .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+                .shadow(color: .black.opacity(isCompleted ? 0.02 : 0.04), radius: isCompleted ? 4 : 6, y: 1)
+                .shadow(color: .black.opacity(isCompleted ? 0.03 : 0.08), radius: isCompleted ? 8 : 14, y: 4)
         }
     }
 }

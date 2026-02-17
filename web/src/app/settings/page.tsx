@@ -26,6 +26,8 @@ import {
   Monitor,
   ToggleLeft,
   ToggleRight,
+  Settings,
+  Shield,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -46,7 +48,6 @@ export default function SettingsPage() {
       fetch("/api/analytics").then((r) => r.ok ? r.json() : { topInspectors: [] }),
       fetch("/api/team").then((r) => r.ok ? r.json() : { members: [] }),
     ]).then(([cfg, analytics, team]) => {
-      // Merge discovered inspector names into config list
       const saved: string[] = cfg.inspectorNames || [];
       const discovered: string[] = (analytics.topInspectors || []).map((i: { name: string }) => i.name);
       const merged = Array.from(new Set([...saved, ...discovered]));
@@ -108,61 +109,71 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Configure dropdown options used across the app
-          </p>
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 p-6 shadow-xl">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIvPjwvc3ZnPg==')] opacity-50" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#FF6B35]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#FF6B35] to-[#E5532D] flex items-center justify-center shadow-lg shadow-orange-500/20">
+              <Settings size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-white">Settings</h1>
+              <p className="text-sm text-gray-400 mt-0.5">Configure your workspace and app options</p>
+            </div>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={!dirty || saving}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+              saved
+                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25"
+                : dirty
+                  ? "bg-[#FF6B35] text-white hover:bg-[#E5532D] shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40"
+                  : "bg-white/10 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : saved ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {saving ? "Saving..." : saved ? "Saved" : "Save Changes"}
+          </button>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={!dirty || saving}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-            saved
-              ? "bg-emerald-500 text-white"
-              : dirty
-                ? "bg-[#FF6B35] text-white hover:bg-[#E5532D] shadow-sm"
-                : "bg-gray-100 text-gray-400 cursor-not-allowed"
-          }`}
-        >
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : saved ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {saving ? "Saving..." : saved ? "Saved" : "Save Changes"}
-        </button>
       </div>
 
       {/* Account + Join Code row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Signed-in email */}
-        <Card>
-          <CardContent className="p-5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-50">
-              <Mail className="h-4 w-4 text-blue-500" />
+        <div className="group relative overflow-hidden rounded-xl bg-white border border-gray-100 p-5 hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-300">
+          <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 to-blue-400" />
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm shadow-blue-200/50">
+              <Mail className="h-4.5 w-4.5 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-gray-400">Signed in as</p>
-              <p className="text-sm font-semibold truncate">{appUser?.email}</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Signed in as</p>
+              <p className="text-sm font-bold truncate text-gray-900">{appUser?.email}</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Join Code */}
         {appUser?.joinCode && (
-          <Card>
-            <CardContent className="p-5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-50">
-                  <KeyRound className="h-4 w-4 text-[#FF6B35]" />
+          <div className="group relative overflow-hidden rounded-xl bg-white border border-gray-100 p-5 hover:shadow-lg hover:shadow-orange-100/50 transition-all duration-300">
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[#FF6B35] to-[#FF8C61]" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B35] to-[#E5532D] flex items-center justify-center shadow-sm shadow-orange-200/50">
+                  <KeyRound className="h-4.5 w-4.5 text-white" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400">Company Join Code</p>
-                  <p className="text-lg font-bold font-mono tracking-widest">{appUser.joinCode}</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Company Join Code</p>
+                  <p className="text-lg font-extrabold font-mono tracking-[0.25em] text-gray-900">{appUser.joinCode}</p>
                 </div>
               </div>
               <button
@@ -171,52 +182,63 @@ export default function SettingsPage() {
                   setCodeCopied(true);
                   setTimeout(() => setCodeCopied(false), 2000);
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-300 ${
                   codeCopied
-                    ? "bg-emerald-50 text-emerald-600"
-                    : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                    ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200"
+                    : "bg-gray-50 text-gray-500 hover:bg-orange-50 hover:text-[#FF6B35] ring-1 ring-gray-100 hover:ring-orange-200"
                 }`}
               >
                 {codeCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                {codeCopied ? "Copied" : "Copy"}
+                {codeCopied ? "Copied!" : "Copy"}
               </button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
       </div>
 
       {/* Team Web Access */}
       {teamMembers.length > 0 && (
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <Monitor className="h-4 w-4 text-indigo-500" />
-              <h3 className="text-sm font-semibold">Web Dashboard Access</h3>
+        <div className="relative overflow-hidden rounded-xl bg-white border border-gray-100 shadow-sm">
+          <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-indigo-500 to-purple-500" />
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
+                <Monitor className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Web Dashboard Access</h3>
+                <p className="text-xs text-gray-400">
+                  Control which team members can access the web dashboard
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-gray-400 mb-4">
-              Control which team members can access the web dashboard. Workers without access can still use the iOS app.
-            </p>
-            <div className="space-y-1">
+
+            <div className="mt-4 space-y-1">
               {teamMembers.map((member) => (
                 <div
                   key={member.uid}
-                  className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-50/80 transition-all duration-200 group"
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {member.displayName || member.email}
-                      {member.isSelf && (
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-500 font-semibold">You</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-500 flex-shrink-0">
+                      {(member.displayName || member.email).charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate text-gray-800">
+                        {member.displayName || member.email}
+                        {member.isSelf && (
+                          <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold ring-1 ring-blue-100">You</span>
+                        )}
+                      </p>
+                      {member.displayName && (
+                        <p className="text-xs text-gray-400 truncate">{member.email}</p>
                       )}
-                    </p>
-                    {member.displayName && (
-                      <p className="text-xs text-gray-400 truncate">{member.email}</p>
-                    )}
+                    </div>
                   </div>
                   <button
                     onClick={() => toggleWebAccess(member.uid, !member.webAccess)}
                     disabled={member.isSelf || togglingUid === member.uid}
-                    className="flex-shrink-0 disabled:opacity-40"
+                    className="flex-shrink-0 disabled:opacity-40 transition-transform hover:scale-110"
                     title={member.isSelf ? "Cannot revoke your own access" : (member.webAccess ? "Revoke web access" : "Grant web access")}
                   >
                     {togglingUid === member.uid ? (
@@ -230,8 +252,8 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Top row: Job Types + Material Types stacked | Issue Categories */}
@@ -240,7 +262,12 @@ export default function SettingsPage() {
           <SimpleList
             title="Job Types"
             description="Types of work that can be assigned to a job"
-            icon={<Briefcase className="h-4 w-4 text-[#FF6B35]" />}
+            icon={<Briefcase className="h-4 w-4 text-white" />}
+            iconBg="from-[#FF6B35] to-[#E5532D]"
+            accentColor="#FF6B35"
+            chipBg="bg-orange-50"
+            chipText="text-[#FF6B35]"
+            chipHover="hover:bg-orange-100"
             items={config.jobTypes}
             onChange={(v) => updateList("jobTypes", v)}
             placeholder="e.g. Window Replacement"
@@ -250,7 +277,12 @@ export default function SettingsPage() {
           <SimpleList
             title="Material Types"
             description="Types of materials used in fixes"
-            icon={<Package className="h-4 w-4 text-blue-500" />}
+            icon={<Package className="h-4 w-4 text-white" />}
+            iconBg="from-blue-500 to-blue-600"
+            accentColor="#3B82F6"
+            chipBg="bg-blue-50"
+            chipText="text-blue-600"
+            chipHover="hover:bg-blue-100"
             items={config.materialTypes}
             onChange={(v) => updateList("materialTypes", v)}
             placeholder="e.g. Spray Foam"
@@ -297,6 +329,11 @@ function SimpleList({
   title,
   description,
   icon,
+  iconBg,
+  accentColor,
+  chipBg,
+  chipText,
+  chipHover,
   items,
   onChange,
   placeholder,
@@ -305,6 +342,11 @@ function SimpleList({
   title: string;
   description: string;
   icon: React.ReactNode;
+  iconBg: string;
+  accentColor: string;
+  chipBg: string;
+  chipText: string;
+  chipHover: string;
   items: string[];
   onChange: (items: string[]) => void;
   placeholder: string;
@@ -327,14 +369,17 @@ function SimpleList({
   }, [adding]);
 
   return (
-    <Card className={`flex flex-col ${className || ""}`}>
-      <CardContent className="p-6 flex flex-col flex-1 min-h-0">
+    <div className={`relative overflow-hidden rounded-xl bg-white border border-gray-100 shadow-sm flex flex-col ${className || ""}`}>
+      <div className={`absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r ${iconBg}`} />
+      <div className="p-6 flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            {icon}
-            <h3 className="text-sm font-semibold">{title}</h3>
+          <div className="flex items-center gap-2.5">
+            <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${iconBg} flex items-center justify-center shadow-sm`}>
+              {icon}
+            </div>
+            <h3 className="text-sm font-bold text-gray-900">{title}</h3>
           </div>
-          <span className="text-xs text-gray-400">{items.length} items</span>
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-400 ring-1 ring-gray-100">{items.length} items</span>
         </div>
         <p className="text-xs text-gray-400 mb-4">{description}</p>
 
@@ -342,12 +387,12 @@ function SimpleList({
           {items.map((item, i) => (
             <div
               key={item}
-              className="group flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+              className={`group flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-lg ${chipBg} ${chipHover} transition-all duration-200 ring-1 ring-transparent hover:ring-gray-200`}
             >
-              <span className="text-sm text-gray-700">{item}</span>
+              <span className={`text-sm font-medium ${chipText}`}>{item}</span>
               <button
                 onClick={() => onChange(items.filter((_, j) => j !== i))}
-                className="p-0.5 rounded hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-colors"
+                className="p-0.5 rounded-md hover:bg-white/80 text-gray-300 hover:text-red-500 transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -366,12 +411,14 @@ function SimpleList({
                 }}
                 onBlur={() => { if (!newValue.trim()) { setAdding(false); setNewValue(""); } }}
                 placeholder={placeholder}
-                className="text-sm px-3 py-1.5 rounded-lg border border-[#FF6B35] bg-white outline-none w-48"
+                className="text-sm px-3 py-1.5 rounded-lg border-2 bg-white outline-none w-48 transition-colors"
+                style={{ borderColor: accentColor }}
               />
               <button
                 onClick={handleAdd}
                 disabled={!newValue.trim()}
-                className="p-1.5 rounded-lg bg-[#FF6B35] text-white hover:bg-[#E5532D] disabled:opacity-30 transition-colors"
+                className="p-1.5 rounded-lg text-white hover:opacity-90 disabled:opacity-30 transition-all"
+                style={{ background: accentColor }}
               >
                 <Check className="h-3.5 w-3.5" />
               </button>
@@ -379,15 +426,15 @@ function SimpleList({
           ) : (
             <button
               onClick={() => setAdding(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-gray-300 text-sm text-gray-400 hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-dashed border-gray-200 text-sm text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all duration-200"
             >
               <Plus className="h-3.5 w-3.5" />
               Add
             </button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -443,14 +490,17 @@ function IssueCategoryList({
   }, [adding]);
 
   return (
-    <Card className="flex flex-col">
-      <CardContent className="p-6 flex flex-col min-h-0 flex-1">
+    <div className="relative overflow-hidden rounded-xl bg-white border border-gray-100 shadow-sm flex flex-col">
+      <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-red-500 to-orange-500" />
+      <div className="p-6 flex flex-col min-h-0 flex-1">
         <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-            <h3 className="text-sm font-semibold">Issue Categories</h3>
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-sm">
+              <AlertTriangle className="h-4 w-4 text-white" />
+            </div>
+            <h3 className="text-sm font-bold text-gray-900">Issue Categories</h3>
           </div>
-          <span className="text-xs text-gray-400">{categories.length} items</span>
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-400 ring-1 ring-gray-100">{categories.length} items</span>
         </div>
         <p className="text-xs text-gray-400 mb-4">
           Categories inspectors choose when documenting issues. Link to job types or leave empty for all.
@@ -459,28 +509,28 @@ function IssueCategoryList({
         <div className="space-y-0.5 max-h-[500px] overflow-y-auto pr-1 flex-1 min-h-0">
           {categories.map((cat, i) => (
             <div key={cat.name} className="group">
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-gray-50/80 transition-all duration-200">
                 <button
                   onClick={() => setEditingIndex(editingIndex === i ? null : i)}
-                  className="flex-1 flex items-center gap-1.5 text-left min-w-0"
+                  className="flex-1 flex items-center gap-2 text-left min-w-0"
                 >
                   <ChevronDown
-                    className={`h-3 w-3 text-gray-300 flex-shrink-0 transition-transform ${
+                    className={`h-3 w-3 text-gray-300 flex-shrink-0 transition-transform duration-200 ${
                       editingIndex === i ? "rotate-0" : "-rotate-90"
                     }`}
                   />
-                  <span className="text-xs font-medium text-gray-700 truncate">{cat.name}</span>
+                  <span className="text-sm font-medium text-gray-700 truncate">{cat.name}</span>
                   <span className="flex-1" />
                   {cat.jobTypes.length === 0 ? (
-                    <span className="text-[9px] px-1 py-px rounded bg-gray-100 text-gray-400 flex-shrink-0">
-                      All
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium flex-shrink-0">
+                      All types
                     </span>
                   ) : (
-                    <div className="flex gap-0.5 flex-shrink-0">
+                    <div className="flex gap-1 flex-shrink-0">
                       {cat.jobTypes.map((jt) => (
                         <span
                           key={jt}
-                          className="text-[9px] px-1 py-px rounded bg-orange-50 text-[#FF6B35] font-medium"
+                          className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-[#FF6B35] font-semibold ring-1 ring-orange-100"
                         >
                           {jt}
                         </span>
@@ -490,25 +540,25 @@ function IssueCategoryList({
                 </button>
                 <button
                   onClick={() => handleRemove(i)}
-                  className="p-0.5 rounded hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1 rounded-md hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
                 >
                   <X className="h-3 w-3" />
                 </button>
               </div>
 
               {editingIndex === i && (
-                <div className="ml-6 mt-0.5 mb-1 p-2 rounded-md bg-gray-50">
-                  <p className="text-[10px] text-gray-500 mb-1.5">Applies to job types:</p>
-                  <div className="flex flex-wrap gap-1">
+                <div className="ml-7 mt-1 mb-2 p-3 rounded-lg bg-gray-50/80 border border-gray-100">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Applies to job types</p>
+                  <div className="flex flex-wrap gap-1.5">
                     {jobTypes.map((jt) => {
                       const active = cat.jobTypes.includes(jt);
                       return (
                         <button
                           key={jt}
                           onClick={() => toggleJobType(i, jt)}
-                          className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${
+                          className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold transition-all duration-200 ${
                             active
-                              ? "bg-[#FF6B35] text-white"
+                              ? "bg-[#FF6B35] text-white shadow-sm shadow-orange-200"
                               : "bg-white border border-gray-200 text-gray-500 hover:border-[#FF6B35] hover:text-[#FF6B35]"
                           }`}
                         >
@@ -517,7 +567,7 @@ function IssueCategoryList({
                       );
                     })}
                   </div>
-                  <p className="text-[9px] text-gray-400 mt-1.5">
+                  <p className="text-[10px] text-gray-400 mt-2">
                     {cat.jobTypes.length === 0
                       ? "No types selected — appears for all job types"
                       : `Appears for ${cat.jobTypes.length} type${cat.jobTypes.length === 1 ? "" : "s"}`}
@@ -529,9 +579,9 @@ function IssueCategoryList({
         </div>
 
         {/* Sticky add category footer */}
-        <div className="sticky bottom-0 pt-3 mt-3 border-t bg-white flex-shrink-0">
+        <div className="sticky bottom-0 pt-3 mt-3 border-t border-gray-100 bg-white flex-shrink-0">
           {adding ? (
-            <div className="p-3 rounded-lg border border-[#FF6B35] bg-orange-50/30">
+            <div className="p-4 rounded-xl border-2 border-[#FF6B35]/20 bg-orange-50/30">
               <input
                 ref={inputRef}
                 value={newName}
@@ -541,9 +591,9 @@ function IssueCategoryList({
                   if (e.key === "Escape") { setAdding(false); setNewName(""); setNewJobTypes([]); }
                 }}
                 placeholder="Category name, e.g. Missing Insulation"
-                className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 bg-white outline-none w-full mb-3"
+                className="text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white outline-none w-full mb-3 focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/10 transition-all"
               />
-              <p className="text-xs text-gray-500 mb-2">Applies to job types:</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Applies to job types</p>
               <div className="flex flex-wrap gap-1.5 mb-3">
                 {jobTypes.map((jt) => {
                   const active = newJobTypes.includes(jt);
@@ -551,9 +601,9 @@ function IssueCategoryList({
                     <button
                       key={jt}
                       onClick={() => toggleNewJobType(jt)}
-                      className={`text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
+                      className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-all duration-200 ${
                         active
-                          ? "bg-[#FF6B35] text-white"
+                          ? "bg-[#FF6B35] text-white shadow-sm shadow-orange-200"
                           : "bg-white border border-gray-200 text-gray-500 hover:border-[#FF6B35] hover:text-[#FF6B35]"
                       }`}
                     >
@@ -566,14 +616,14 @@ function IssueCategoryList({
                 <button
                   onClick={handleAdd}
                   disabled={!newName.trim()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF6B35] text-white text-sm font-medium hover:bg-[#E5532D] disabled:opacity-30 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#FF6B35] text-white text-sm font-semibold hover:bg-[#E5532D] disabled:opacity-30 transition-all shadow-sm shadow-orange-200"
                 >
                   <Check className="h-3.5 w-3.5" />
                   Add Category
                 </button>
                 <button
                   onClick={() => { setAdding(false); setNewName(""); setNewJobTypes([]); }}
-                  className="px-3 py-1.5 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 transition-all"
                 >
                   Cancel
                 </button>
@@ -582,15 +632,15 @@ function IssueCategoryList({
           ) : (
             <button
               onClick={() => setAdding(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-gray-300 text-sm text-gray-400 hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors w-full justify-center"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-sm font-medium text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-200 w-full justify-center"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Category
             </button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -624,44 +674,47 @@ function CombinedValueEditor({
   ];
 
   return (
-    <Card>
-      <CardContent className="p-6 space-y-5">
+    <div className="relative overflow-hidden rounded-xl bg-white border border-gray-100 shadow-sm">
+      <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[#FF6B35] to-amber-500" />
+      <div className="p-6 space-y-5">
         {/* Point-based section */}
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Database className="h-4 w-4 text-[#FF6B35]" />
-            <h3 className="text-sm font-semibold">Point-Based Value</h3>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FF6B35] to-amber-500 flex items-center justify-center shadow-sm">
+              <Database className="h-4 w-4 text-white" />
+            </div>
+            <h3 className="text-sm font-bold text-gray-900">Point-Based Value</h3>
           </div>
-          <p className="text-xs text-gray-400 mb-3">
+          <p className="text-xs text-gray-400 mb-4">
             (base + photos &times; pts + issues &times; pts) &times; multipliers
           </p>
 
           <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Points</label>
-          <div className="grid grid-cols-3 gap-2 mt-1.5 mb-3">
+          <div className="grid grid-cols-3 gap-2 mt-1.5 mb-4">
             {points.map((f) => (
               <div key={f.key}>
-                <label className="block text-[10px] text-gray-500 mb-0.5">{f.label}</label>
+                <label className="block text-[10px] text-gray-500 mb-1">{f.label}</label>
                 <input
                   type="number"
                   value={weights[f.key]}
                   onChange={(e) => update(f.key, Number(e.target.value))}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/10 transition-all"
                 />
               </div>
             ))}
           </div>
 
           <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Multipliers</label>
-          <div className="grid grid-cols-3 gap-2 mt-1.5 mb-3">
+          <div className="grid grid-cols-3 gap-2 mt-1.5 mb-4">
             {multipliers.map((f) => (
               <div key={f.key}>
-                <label className="block text-[10px] text-gray-500 mb-0.5">{f.label}</label>
+                <label className="block text-[10px] text-gray-500 mb-1">{f.label}</label>
                 <input
                   type="number"
                   value={weights[f.key]}
                   onChange={(e) => update(f.key, Number(e.target.value))}
                   step={f.step}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/10 transition-all"
                 />
               </div>
             ))}
@@ -675,16 +728,16 @@ function CombinedValueEditor({
                   type="number"
                   value={weights.pairThreshold}
                   onChange={(e) => update("pairThreshold", Number(e.target.value))}
-                  className="w-16 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                  className="w-16 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/10 transition-all"
                 />
                 <span className="text-xs text-gray-400">%</span>
               </div>
             </div>
             <button
               onClick={() => onWeightsChange({ ...DEFAULT_WEIGHTS })}
-              className="text-[11px] text-gray-400 hover:text-[#FF6B35] transition-colors"
+              className="text-[11px] font-medium text-gray-400 hover:text-[#FF6B35] transition-colors"
             >
-              Reset
+              Reset to defaults
             </button>
           </div>
         </div>
@@ -693,11 +746,13 @@ function CombinedValueEditor({
 
         {/* Revenue-based section */}
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign className="h-4 w-4 text-purple-600" />
-            <h3 className="text-sm font-semibold">Revenue-Based Value</h3>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-sm">
+              <DollarSign className="h-4 w-4 text-white" />
+            </div>
+            <h3 className="text-sm font-bold text-gray-900">Revenue-Based Value</h3>
           </div>
-          <p className="text-xs text-gray-400 mb-3">
+          <p className="text-xs text-gray-400 mb-4">
             Rebate Revenue &times; Base %
           </p>
 
@@ -714,7 +769,7 @@ function CombinedValueEditor({
                   min={0}
                   max={100}
                   step={0.5}
-                  className="w-20 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                  className="w-20 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-right font-mono focus:outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/10 transition-all"
                 />
                 <span className="text-xs text-gray-400">%</span>
                 <span className="text-[10px] text-gray-400 ml-1">5-15% typical</span>
@@ -722,14 +777,14 @@ function CombinedValueEditor({
             </div>
             <button
               onClick={() => onValuationChange({ basePercent: 10 })}
-              className="text-[11px] text-gray-400 hover:text-[#FF6B35] transition-colors"
+              className="text-[11px] font-medium text-gray-400 hover:text-[#FF6B35] transition-colors"
             >
-              Reset
+              Reset to defaults
             </button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -797,14 +852,17 @@ function InspectorNameList({
   }
 
   return (
-    <Card>
-      <CardContent className="p-6">
+    <div className="relative overflow-hidden rounded-xl bg-white border border-gray-100 shadow-sm">
+      <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-indigo-500 to-purple-500" />
+      <div className="p-6">
         <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-indigo-500" />
-            <h3 className="text-sm font-semibold">Inspector Names</h3>
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-sm">
+              <Users className="h-4 w-4 text-white" />
+            </div>
+            <h3 className="text-sm font-bold text-gray-900">Inspector Names</h3>
           </div>
-          <span className="text-xs text-gray-400">{names.length} inspectors</span>
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-400 ring-1 ring-gray-100">{names.length} inspectors</span>
         </div>
         <p className="text-xs text-gray-400 mb-4">
           Click the pencil to rename — updates all existing forms in Firestore and iOS.
@@ -812,7 +870,7 @@ function InspectorNameList({
 
         <div className="space-y-1">
           {names.map((name, i) => (
-            <div key={`${name}-${i}`} className="group flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 transition-colors">
+            <div key={`${name}-${i}`} className="group flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50/80 transition-all duration-200">
               {editingIndex === i ? (
                 <div className="flex-1 flex items-center gap-1.5">
                   <input
@@ -824,28 +882,31 @@ function InspectorNameList({
                       if (e.key === "Escape") setEditingIndex(null);
                     }}
                     disabled={renaming}
-                    className="flex-1 text-sm px-2 py-1 rounded border border-[#FF6B35] bg-white outline-none"
+                    className="flex-1 text-sm px-3 py-1.5 rounded-lg border-2 border-indigo-400 bg-white outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
                   />
                   <button
                     onClick={() => commitRename(i)}
                     disabled={renaming}
-                    className="p-1 rounded bg-[#FF6B35] text-white hover:bg-[#E5532D] disabled:opacity-50"
+                    className="p-1.5 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 transition-all"
                   >
                     {renaming ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                   </button>
                 </div>
               ) : (
                 <>
-                  <span className="flex-1 text-sm text-gray-700">{name}</span>
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-[10px] font-bold text-indigo-500 flex-shrink-0">
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="flex-1 text-sm font-medium text-gray-700">{name}</span>
                   <button
                     onClick={() => startEdit(i)}
-                    className="p-1 rounded hover:bg-gray-200 text-gray-300 hover:text-indigo-500 transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-1.5 rounded-md hover:bg-gray-200 text-gray-300 hover:text-indigo-500 transition-all opacity-0 group-hover:opacity-100"
                   >
                     <Pencil className="h-3 w-3" />
                   </button>
                   <button
                     onClick={() => onChange(names.filter((_, j) => j !== i))}
-                    className="p-1 rounded hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-1.5 rounded-md hover:bg-gray-200 text-gray-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -868,12 +929,12 @@ function InspectorNameList({
                 }}
                 onBlur={() => { if (!newName.trim()) { setAdding(false); setNewName(""); } }}
                 placeholder="e.g. Mike Rivera"
-                className="text-sm px-3 py-1.5 rounded-lg border border-[#FF6B35] bg-white outline-none flex-1"
+                className="text-sm px-3 py-2 rounded-lg border-2 border-indigo-300 bg-white outline-none flex-1 focus:ring-2 focus:ring-indigo-100 transition-all"
               />
               <button
                 onClick={handleAdd}
                 disabled={!newName.trim()}
-                className="p-1.5 rounded-lg bg-[#FF6B35] text-white hover:bg-[#E5532D] disabled:opacity-30 transition-colors"
+                className="p-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-30 transition-all"
               >
                 <Check className="h-3.5 w-3.5" />
               </button>
@@ -881,15 +942,15 @@ function InspectorNameList({
           ) : (
             <button
               onClick={() => setAdding(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-gray-300 text-sm text-gray-400 hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors w-full justify-center"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-sm font-medium text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-200 w-full justify-center"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Inspector
             </button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
