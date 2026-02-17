@@ -6,7 +6,8 @@ import { useAuth } from "@/context/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, estimateJobValue, DEFAULT_WEIGHTS, calculateJobRevenueValue, DEFAULT_VALUATION } from "@/lib/utils";
 import { Job, InspectionForm, DatasetValueWeights, DatasetValuationConfig } from "@/types";
-import { Download, Loader2, FileJson, FileSpreadsheet, Shield, Briefcase, Camera, AlertTriangle, Wrench, DollarSign, Filter } from "lucide-react";
+import { Download, Loader2, FileJson, FileSpreadsheet, Shield, Briefcase, Camera, AlertTriangle, Wrench, DollarSign, Filter, Building2 } from "lucide-react";
+
 
 export default function ExportPage() {
   const { appUser } = useAuth();
@@ -21,11 +22,8 @@ export default function ExportPage() {
   const [anonymize, setAnonymize] = useState(false);
   const [rebateFilters, setRebateFilters] = useState<string[]>([]);
   const [stageFilters, setStageFilters] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [minPhotos, setMinPhotos] = useState(0);
-  const [minIssues, setMinIssues] = useState(0);
-  const [hasFormsOnly, setHasFormsOnly] = useState(false);
+  const [companyFilters, setCompanyFilters] = useState<string[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [exporting, setExporting] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [formsMap, setFormsMap] = useState<Record<string, InspectionForm[]>>({});
@@ -35,15 +33,18 @@ export default function ExportPage() {
 
   useEffect(() => {
     async function load() {
-      const [jobsRes, configRes] = await Promise.all([
+      const [jobsRes, configRes, companiesRes] = await Promise.all([
         fetch("/api/jobs?limit=1000"),
         fetch("/api/config"),
+        fetch("/api/admin/companies"),
       ]);
       const { jobs: allJobs } = await jobsRes.json();
       const cfg = await configRes.json();
+      const companiesData = await companiesRes.json();
       if (cfg.datasetValueWeights) setWeights(cfg.datasetValueWeights);
       if (cfg.datasetValuation) setValuation(cfg.datasetValuation);
       setJobs(allJobs || []);
+      setCompanies(companiesData.companies || []);
 
       const fMap: Record<string, InspectionForm[]> = {};
       for (const job of allJobs as Job[]) {
@@ -61,14 +62,29 @@ export default function ExportPage() {
     setter(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
   };
 
+  // Company breakdown stats — percentages are dynamic based on selection
+  const companyBreakdown = (() => {
+    const counts = companies.map((c) => {
+      const companyJobs = jobs.filter((j) => j.companyId === c.id);
+      return {
+        id: c.id,
+        name: c.name,
+        jobCount: companyJobs.length,
+        photoCount: companyJobs.reduce((s, j) => s + j.photoCount, 0),
+      };
+    });
+    // Percentages based on photos, relative to selected companies
+    const selectedIds = companyFilters.length > 0 ? companyFilters : companies.map((c) => c.id);
+    const selectedPhotos = counts.filter((c) => selectedIds.includes(c.id)).reduce((s, c) => s + c.photoCount, 0);
+    return counts
+      .map((c) => ({ ...c, pct: selectedPhotos > 0 ? (c.photoCount / selectedPhotos) * 100 : 0 }))
+      .sort((a, b) => b.photoCount - a.photoCount);
+  })();
+
   const filteredJobs = jobs.filter((j) => {
+    if (companyFilters.length > 0 && !companyFilters.includes(j.companyId || "")) return false;
     if (rebateFilters.length > 0 && !rebateFilters.includes(j.rebateStatus)) return false;
     if (stageFilters.length > 0 && !stageFilters.includes(j.currentStage)) return false;
-    if (dateFrom && new Date(j.createdAt).getTime() < new Date(dateFrom).getTime()) return false;
-    if (dateTo && new Date(j.createdAt).getTime() >= new Date(dateTo).getTime() + 86400000) return false;
-    if (minPhotos > 0 && j.photoCount < minPhotos) return false;
-    if (minIssues > 0 && j.issueCount < minIssues) return false;
-    if (hasFormsOnly && !(formsMap[j.id]?.length > 0)) return false;
     return true;
   });
 
@@ -87,7 +103,7 @@ export default function ExportPage() {
       const res = await fetch("/api/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format, anonymize, rebateFilters, stageFilters, dateFrom, dateTo, minPhotos, minIssues, hasFormsOnly }),
+        body: JSON.stringify({ format, anonymize, rebateFilters, stageFilters, companyFilters }),
       });
 
       const blob = await res.blob();
@@ -157,6 +173,50 @@ export default function ExportPage() {
                 <Filter size={14} className="text-gray-400" />
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filters</label>
               </div>
+              {/* Company filter with breakdown */}
+              {companies.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 size={13} className="text-gray-400" />
+                    <label className="text-[11px] text-gray-500">Company</label>
+                    {companyFilters.length > 0 && (
+                      <button onClick={() => setCompanyFilters([])} className="text-[10px] text-[#FF6B35] hover:underline ml-auto">Clear</button>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {companyBreakdown.map((c) => {
+                      const isSelected = companyFilters.includes(c.id);
+                      const dimmed = companyFilters.length > 0 && !isSelected;
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => toggleFilter(companyFilters, c.id, setCompanyFilters)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${
+                            isSelected ? "bg-[#FF6B35]/10 border border-[#FF6B35]/30" : "bg-gray-50 border border-transparent hover:bg-gray-100"
+                          } ${dimmed ? "opacity-40" : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            readOnly
+                            className="rounded border-gray-300 text-[#FF6B35] focus:ring-[#FF6B35] pointer-events-none"
+                          />
+                          <span className="text-xs font-medium truncate flex-1">{c.name}</span>
+                          <span className="text-[10px] text-gray-400 tabular-nums">{c.photoCount} photos</span>
+                          <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${isSelected || companyFilters.length === 0 ? "bg-[#FF6B35]" : "bg-gray-300"}`}
+                              style={{ width: `${c.pct}%` }}
+                            />
+                          </div>
+                          <span className={`text-[10px] font-semibold tabular-nums w-10 text-right ${isSelected ? "text-[#FF6B35]" : "text-gray-500"}`}>{c.pct.toFixed(1)}%</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="text-[11px] text-gray-500 mb-1.5 block">Stage</label>
                 <div className="flex flex-wrap gap-1.5">
@@ -207,56 +267,6 @@ export default function ExportPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[11px] text-gray-500 mb-1 block">Created After</label>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-gray-500 mb-1 block">Created Before</label>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-gray-500 mb-1 block">Min Photos</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={minPhotos}
-                    onChange={(e) => setMinPhotos(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-gray-500 mb-1 block">Min Issues</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={minIssues}
-                    onChange={(e) => setMinIssues(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={hasFormsOnly} onChange={(e) => setHasFormsOnly(e.target.checked)} className="rounded border-gray-300 text-[#FF6B35] focus:ring-[#FF6B35]" />
-                <div>
-                  <p className="text-sm font-medium">Has inspection forms only</p>
-                  <p className="text-[10px] text-gray-400">Exclude jobs with no audit or inspection data</p>
-                </div>
-              </label>
             </div>
 
             <div>

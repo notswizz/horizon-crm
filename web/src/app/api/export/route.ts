@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
       rebateFilters = [],
       stageFilter = "all",
       stageFilters = [],
+      companyFilters = [],
       dateFrom = "",
       dateTo = "",
       minPhotos = 0,
@@ -33,7 +34,10 @@ export async function POST(req: NextRequest) {
 
     let jobs = await fetchAllJobs();
 
-    // Filters (support both legacy single and new multi-select)
+    // Filters
+    if (companyFilters.length > 0) {
+      jobs = jobs.filter((j) => companyFilters.includes(j.companyId || ""));
+    }
     if (rebateFilters.length > 0) {
       jobs = jobs.filter((j) => rebateFilters.includes(j.rebateStatus));
     } else if (rebateFilter !== "all") {

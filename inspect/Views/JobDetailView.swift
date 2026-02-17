@@ -61,7 +61,6 @@ struct JobDetailView: View {
                     VStack(spacing: DS.Spacing.s) {
                         contactRow
                         metricsCard
-                        timeTrackingSection
                     }
                     .padding(.horizontal, DS.Spacing.m)
                     .padding(.top, DS.Spacing.s)
@@ -80,13 +79,16 @@ struct JobDetailView: View {
                 }
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            floatingClockButton
+        }
         .background(DS.Colors.background)
         .navigationTitle(liveJob.streetAddress.isEmpty ? (liveJob.address.isEmpty ? "Job" : liveJob.address) : liveJob.streetAddress)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(item: shareText) {
-                    Image(systemName: "square.and.arrow.up")
+                Button { showTimeLog = true } label: {
+                    Image(systemName: "clock.arrow.circlepath")
                 }
             }
         }
@@ -131,144 +133,71 @@ struct JobDetailView: View {
         locationManager.distance(to: liveJob)
     }
 
-    private var timeLogButton: some View {
-        Button { showTimeLog = true } label: {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(DS.Colors.info)
-                .frame(width: 32, height: 32)
-                .background(DS.Colors.info.opacity(0.1), in: .circle)
-        }
-    }
-
-    private var timeTrackingSection: some View {
-        VStack(spacing: 8) {
+    private var floatingClockButton: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            // Show timer label when clocked in to this job
             if isClockedInToThisJob {
-                // Active timer for this job
-                HStack(spacing: 12) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(.green)
-                            .frame(width: 8, height: 8)
-                        Text(TimeTracker.formatDuration(timeTracker.elapsedSeconds))
-                            .font(.system(size: 22, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.primary)
-                    }
-
-                    Spacer()
-
-                    timeLogButton
-
-                    Button {
-                        Task {
-                            await timeTracker.clockOut(locationManager: locationManager, store: store)
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "stop.fill")
-                                .font(.system(size: 10))
-                            Text("Clock Out")
-                                .font(.system(size: 13, weight: .bold))
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(DS.Colors.error.gradient, in: .capsule)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(DS.Colors.success.opacity(0.06), in: .rect(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(DS.Colors.success.opacity(0.2), lineWidth: 1))
-
-            } else if isClockedInToOtherJob {
-                // Clocked in elsewhere
-                let otherAddress = store.jobs.first(where: { $0.id == timeTracker.activeJobId })?.streetAddress ?? "another job"
-                HStack(spacing: 8) {
-                    Image(systemName: "clock.badge.exclamationmark")
-                        .font(.system(size: 13))
-                        .foregroundStyle(DS.Colors.warning)
-                    Text(otherAddress)
-                        .font(.system(size: 13, weight: .semibold))
-                        .lineLimit(1)
-                    Spacer()
-                    Text(TimeTracker.formatDuration(timeTracker.elapsedSeconds))
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
-                        .foregroundStyle(DS.Colors.warning)
-                    timeLogButton
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(DS.Colors.warning.opacity(0.08), in: .rect(cornerRadius: 12))
-
-            } else {
-                // Not clocked in — show clock in button
-                HStack(spacing: 10) {
-                    Button {
-                        guard let uid = authManager.uid else { return }
-                        let error = timeTracker.clockIn(
-                            job: liveJob,
-                            workerId: uid,
-                            workerName: authManager.displayName,
-                            locationManager: locationManager,
-                            store: store
-                        )
-                        clockInError = error
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 10))
-                            Text("Clock In")
-                                .font(.system(size: 13, weight: .bold))
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            (timeTracker.canClockIn(job: liveJob, locationManager: locationManager)
-                                ? DS.Colors.success.gradient
-                                : Color.gray.gradient),
-                            in: .capsule
-                        )
-                    }
-                    .disabled(!timeTracker.canClockIn(job: liveJob, locationManager: locationManager))
-
-                    // Distance indicator
-                    if let dist = distanceToJob {
-                        let inRange = dist <= 500
-                        HStack(spacing: 3) {
-                            Image(systemName: inRange ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(inRange ? DS.Colors.success : DS.Colors.error)
-                            Text(dist < 1000
-                                ? String(format: "%.0fm", dist)
-                                : String(format: "%.1fkm", dist / 1000))
-                                .font(.system(size: 12))
-                                .foregroundStyle(inRange ? DS.Colors.success : DS.Colors.error)
-                        }
-                    } else {
-                        HStack(spacing: 3) {
-                            Image(systemName: "location.slash")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                            Text("No location")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
-
-                    timeLogButton
-                }
-
-                if let error = clockInError {
-                    Text(error)
-                        .font(.system(size: 12))
-                        .foregroundStyle(DS.Colors.error)
-                }
+                Text(TimeTracker.formatDuration(timeTracker.elapsedSeconds))
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(DS.Colors.success.gradient, in: .capsule)
+                    .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
             }
+
+            // FAB
+            Button {
+                if isClockedInToThisJob {
+                    Task {
+                        await timeTracker.clockOut(locationManager: locationManager, store: store)
+                    }
+                } else if !isClockedInToOtherJob {
+                    guard let uid = authManager.uid else { return }
+                    let error = timeTracker.clockIn(
+                        job: liveJob,
+                        workerId: uid,
+                        workerName: authManager.displayName,
+                        locationManager: locationManager,
+                        store: store
+                    )
+                    clockInError = error
+                }
+            } label: {
+                ZStack {
+                    if isClockedInToThisJob {
+                        // Clocked in — stop icon, red
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .background(DS.Colors.error.gradient, in: .circle)
+                    } else if isClockedInToOtherJob {
+                        // Clocked in elsewhere — warning
+                        Image(systemName: "clock.badge.exclamationmark")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .background(DS.Colors.warning.gradient, in: .circle)
+                    } else {
+                        // Not clocked in — clock icon, green if in range, gray if not
+                        let canClock = timeTracker.canClockIn(job: liveJob, locationManager: locationManager)
+                        Image(systemName: "clock")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .background(
+                                canClock ? AnyShapeStyle(DS.Colors.success.gradient) : AnyShapeStyle(Color.gray.gradient),
+                                in: .circle
+                            )
+                    }
+                }
+                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+            }
+            .disabled(isClockedInToOtherJob)
         }
+        .padding(.trailing, 20)
+        .padding(.bottom, 24)
     }
 
     // MARK: - Time History
@@ -409,7 +338,7 @@ struct JobDetailView: View {
                 }
             }
             .padding(16)
-            .frame(height: 260)
+            .frame(height: 200)
             .frame(maxWidth: .infinity)
             .background {
                 ZStack(alignment: .bottom) {
@@ -435,8 +364,12 @@ struct JobDetailView: View {
 
                     // Dark gradient scrim
                     LinearGradient(
-                        colors: [.clear, .black.opacity(0.6)],
-                        startPoint: .center,
+                        stops: [
+                            .init(color: .clear, location: 0.3),
+                            .init(color: .black.opacity(0.4), location: 0.6),
+                            .init(color: .black.opacity(0.8), location: 1.0),
+                        ],
+                        startPoint: .top,
                         endPoint: .bottom
                     )
                 }
@@ -629,25 +562,25 @@ struct JobDetailView: View {
                 startPoint: .leading,
                 endPoint: .trailing
             )
-            .frame(height: 3)
+            .frame(height: 2)
 
             // Metrics columns
             HStack(spacing: 0) {
                 MetricColumn(value: liveJob.spots.count, label: "Spots", color: DS.Colors.primary)
 
-                Divider().frame(height: 40)
+                Divider().frame(height: 28)
 
                 MetricColumn(value: liveJob.photoCount, label: "Photos", color: DS.Colors.info)
 
-                Divider().frame(height: 40)
+                Divider().frame(height: 28)
 
                 MetricColumn(value: liveJob.issueCount, label: "Issues", color: DS.Colors.error)
 
-                Divider().frame(height: 40)
+                Divider().frame(height: 28)
 
                 MetricColumn(value: liveJob.fixCount, label: "Fixes", color: DS.Colors.success)
             }
-            .padding(.vertical, 16)
+            .padding(.vertical, 10)
         }
         .background(DS.Colors.surface, in: .rect(cornerRadius: DS.Radius.card))
         .clipShape(.rect(cornerRadius: DS.Radius.card))
@@ -1199,12 +1132,12 @@ private struct MetricColumn: View {
     let color: Color
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             Text("\(value)")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(value > 0 ? color : Color(.quaternaryLabel))
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)

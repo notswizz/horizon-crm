@@ -251,8 +251,8 @@ export default function JobsPage() {
                         <span className={`text-xs font-semibold ${
                           job.rebateStatus === "submitted" ? "text-blue-600" :
                           job.rebateStatus === "declined" ? "text-red-500" :
-                          job.rebateStatus === "accepted" ? "text-emerald-600 border border-yellow-400 rounded px-1.5 py-0.5" :
-                          job.rebateStatus === "paid" ? "text-emerald-600" :
+                          job.rebateStatus === "accepted" ? "text-emerald-600" :
+                          job.rebateStatus === "paid" ? "text-emerald-600 border border-yellow-400 rounded px-1.5 py-0.5" :
                           "text-gray-500"
                         }`}>
                           {formatCurrency(job.rebateAmount)}
